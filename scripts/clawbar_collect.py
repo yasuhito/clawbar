@@ -18,6 +18,11 @@ from pathlib import Path
 from typing import Any, Sequence
 from urllib.parse import urlsplit
 
+if __package__:
+    from .clawbar_metadata import load_node_key_secret, sanitize_metadata
+else:
+    from clawbar_metadata import load_node_key_secret, sanitize_metadata
+
 SCHEMA_VERSION = 1
 DEFAULT_REFRESH_INTERVAL_SECONDS = 30
 MIN_REFRESH_INTERVAL_SECONDS = 15
@@ -190,88 +195,7 @@ def resolution_source(status: dict[str, Any], source_hint: str | None = None) ->
     except ValueError:
         return "configured_remote"
 
-def bounded_text(value: object, fallback: str = "") -> str:
-    if not isinstance(value, str):
-        return fallback
-    value = value.strip()
-    return value[:80] if value else fallback
 
-
-def timestamp_from_milliseconds(value: object) -> str | None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
-        return None
-    try:
-        return datetime.fromtimestamp(value / 1000, timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-    except (OverflowError, OSError, ValueError):
-        return None
-
-
-def sanitize_fleet(payload: object) -> list[dict[str, Any]] | None:
-    if not isinstance(payload, dict) or not isinstance(payload.get("nodes"), list):
-        return None
-    fleet = []
-    for raw in payload["nodes"][:100]:
-        if not isinstance(raw, dict):
-            continue
-        node = {
-            "name": bounded_text(raw.get("displayName"), "Unnamed Node"),
-            "state": "healthy" if raw.get("connected") is True else "offline",
-        }
-        for source_key, output_key in (("platform", "platform"), ("modelIdentifier", "model"), ("version", "version")):
-            value = bounded_text(raw.get(source_key))
-            if value:
-                node[output_key] = value
-        last_seen = timestamp_from_milliseconds(raw.get("lastSeenAtMs"))
-        if last_seen:
-            node["lastSeenAt"] = last_seen
-        fleet.append(node)
-    return fleet
-
-
-def task_timestamp(task: dict[str, Any]) -> float:
-    for key in ("endedAt", "updatedAt", "startedAt", "createdAt"):
-        value = task.get(key)
-        if isinstance(value, (int, float)) and not isinstance(value, bool):
-            return float(value)
-    return 0
-
-
-def sanitize_agents(agent_payload: object, task_payload: object) -> list[dict[str, Any]] | None:
-    if not isinstance(agent_payload, dict) or not isinstance(agent_payload.get("agents"), list):
-        return None
-    if not isinstance(task_payload, dict) or not isinstance(task_payload.get("tasks"), list):
-        return None
-    tasks = [task for task in task_payload["tasks"][:500] if isinstance(task, dict)]
-    agents = []
-    for raw in agent_payload["agents"][:100]:
-        if not isinstance(raw, dict):
-            continue
-        agent_id = bounded_text(raw.get("id"))
-        if not agent_id:
-            continue
-        own_tasks = sorted(
-            (task for task in tasks if task.get("agentId") == agent_id),
-            key=task_timestamp,
-            reverse=True,
-        )
-        statuses = [task.get("status") for task in own_tasks]
-        activity = "working" if "running" in statuses else "waiting" if "queued" in statuses else "idle"
-        completed = next(
-            (task for task in own_tasks if task.get("status") in {"completed", "failed", "timed_out", "cancelled"}),
-            None,
-        )
-        result: dict[str, Any] = {"state": "none"}
-        if completed is not None:
-            result["state"] = "succeeded" if completed.get("status") == "completed" else "failed"
-            completed_at = timestamp_from_milliseconds(completed.get("endedAt") or completed.get("updatedAt"))
-            if completed_at:
-                result["completedAt"] = completed_at
-        agent = {"name": agent_id, "activity": activity, "taskResult": result}
-        model = bounded_text(raw.get("model"))
-        if model:
-            agent["model"] = model
-        agents.append(agent)
-    return agents
 
 
 def failure_snapshot(
@@ -438,38 +362,34 @@ def decode_json(completed: subprocess.CompletedProcess[str]) -> object | None:
     except json.JSONDecodeError:
         return None
 
+METADATA_SURFACES = (
+    ("nodes", "status", "--json"),
+    ("gateway", "call", "agents.list", "--params", "{}", "--json"),
+    ("gateway", "call", "tasks.list", "--params", '{"limit":500}', "--json"),
+)
+
+
+def read_metadata_surface(
+    openclaw_command: Sequence[str],
+    arguments: Sequence[str],
+    deadline_at: float,
+    target: GatewayTarget | None,
+) -> object | None:
+    try:
+        return decode_json(metadata_command(openclaw_command, arguments, deadline_at, target))
+    except (CollectionDeadlineExceeded, OSError):
+        return None
+
+
 def collect_metadata(
     openclaw_command: Sequence[str],
     deadline_at: float,
     target: GatewayTarget | None,
 ) -> tuple[object | None, object | None, object | None]:
-    try:
-        fleet = decode_json(metadata_command(openclaw_command, ("nodes", "status", "--json"), deadline_at, target))
-    except (CollectionDeadlineExceeded, OSError):
-        return None, None, None
-    try:
-        agents = decode_json(
-            metadata_command(
-                openclaw_command,
-                ("gateway", "call", "agents.list", "--params", "{}", "--json"),
-                deadline_at,
-                target,
-            )
-        )
-    except (CollectionDeadlineExceeded, OSError):
-        return fleet, None, None
-    try:
-        tasks = decode_json(
-            metadata_command(
-                openclaw_command,
-                ("gateway", "call", "tasks.list", "--params", '{"limit":500}', "--json"),
-                deadline_at,
-                target,
-            )
-        )
-    except (CollectionDeadlineExceeded, OSError):
-        return fleet, agents, None
-    return fleet, agents, tasks
+    return tuple(
+        read_metadata_surface(openclaw_command, arguments, deadline_at, target)
+        for arguments in METADATA_SURFACES
+    )
 
 
 def collect_gateway(
@@ -477,6 +397,7 @@ def collect_gateway(
     refresh_interval: int,
     openclaw_command: Sequence[str] = ("openclaw",),
     collection_deadline: float = COLLECTION_DEADLINE_SECONDS,
+    node_key_secret: bytes | None = None,
 ) -> CollectionResult:
     refresh_interval = validate_refresh_interval(refresh_interval)
     deadline_at = time.monotonic() + collection_deadline
@@ -542,8 +463,11 @@ def collect_gateway(
         command_deadline_at,
         target,
     )
-    fleet = sanitize_fleet(fleet_payload)
-    agents = sanitize_agents(agent_payload, task_payload)
+    try:
+        secret = node_key_secret or load_node_key_secret()
+    except OSError:
+        secret = None
+    fleet, agents = sanitize_metadata(fleet_payload, agent_payload, task_payload, secret)
     return publish(snapshot_path, ExitCode.OK, current_snapshot(refresh_interval, source, fleet, agents))
 
 

@@ -18,8 +18,8 @@ omarchy plugin enable yasuhito.clawbar
 Clawbar collects immediately when enabled and every 30 seconds afterward. Node
 host discovery and the Gateway probe share one 12-second collection deadline.
 Set `CLAWBAR_REFRESH_INTERVAL_SECONDS` to an integer from 15 through 300 before
-starting the shell to change that interval. Pressing the widget requests a
-non-blocking refresh; overlapping requests are coalesced.
+starting the shell to change that interval. Middle-clicking the widget requests
+a non-blocking refresh; overlapping requests are coalesced.
 Reachable unsupported JSON is a Configuration Error. A healthy snapshot becomes
 Stale when its age exceeds three configured refresh intervals.
 The panel reads the Gateway-backed `nodes status`, `agents.list`, and

@@ -64,11 +64,11 @@ test("panel rows preserve Gateway order and keyboard focus wraps", () => {
   const snapshot = healthySnapshot(new Date(100000).toISOString())
   snapshot.fleet = {
     available: true,
-    nodes: [{ name: "Local" }, { name: "studio-ops" }]
+    nodes: [{ key: "node:a", name: "Local" }, { key: "node:b", name: "studio-ops" }]
   }
   snapshot.agents = {
     available: true,
-    items: [{ name: "planner" }, { name: "builder" }]
+    items: [{ key: "agent:planner", name: "planner" }, { key: "agent:builder", name: "builder" }]
   }
 
   const rows = Logic.panelRows(snapshot)
@@ -118,8 +118,31 @@ test("Agent Activity remains independent from previous Task Result", () => {
     "Task: Failed · 9m"
   )
   assert.equal(Logic.taskResultLabel(snapshot.agents.items[2].taskResult, 100000), "Task: None")
-  assert.equal(
-    Logic.rowTimestamp({ kind: "agent", item: snapshot.agents.items[1] }),
-    completedAt
-  )
+  const observerRow = Logic.panelRows(snapshot).find(row => row.item.name === "observer")
+  assert.equal(observerRow.timestamp, completedAt)
+  assert.equal(observerRow.missingTimestampLabel, "No completion timestamp")
+})
+
+test("selection and expansion follow stable keys through reorder and removal", () => {
+  const firstRows = Logic.panelRows({
+    fleet: {
+      available: true,
+      nodes: [
+        { key: "node:a", name: "MacBook Pro" },
+        { key: "node:b", name: "MacBook Pro" }
+      ]
+    },
+    agents: { available: true, items: [] }
+  })
+  const reorderedRows = [firstRows[1], firstRows[0]]
+
+  const retained = Logic.reconcileSelection(reorderedRows, "node:b", 1)
+  const expanded = Logic.reconcileExpanded(reorderedRows, { "node:a": true, "node:b": true })
+  const removed = Logic.reconcileSelection([firstRows[0]], retained.key, retained.index)
+
+  assert.deepEqual(retained, { key: "node:b", index: 0 })
+  assert.deepEqual(expanded, { "node:b": true, "node:a": true })
+  assert.deepEqual(removed, { key: "node:a", index: 0 })
+  assert.equal(firstRows[0].missingTimestampLabel, "No observation timestamp")
+  assert.notEqual(firstRows[0].key, firstRows[1].key)
 })

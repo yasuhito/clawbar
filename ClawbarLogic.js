@@ -38,15 +38,55 @@ function agents(snapshot) {
     && Array.isArray(snapshot.agents.items) ? snapshot.agents.items : []
 }
 
+function nodeRow(item, index) {
+  return {
+    kind: "node",
+    key: String(item.key || "node-index:" + index),
+    sectionIndex: index,
+    item: item,
+    expandable: true,
+    typeLabel: "Node",
+    timestamp: item.lastSeenAt || "",
+    missingTimestampLabel: "No observation timestamp"
+  }
+}
+
+function agentRow(item, index) {
+  var result = item.taskResult || {}
+  return {
+    kind: "agent",
+    key: String(item.key || "agent:" + item.name),
+    sectionIndex: index,
+    item: item,
+    expandable: false,
+    typeLabel: "Agent",
+    timestamp: result.completedAt || "",
+    missingTimestampLabel: "No completion timestamp"
+  }
+}
+
 function panelRows(snapshot) {
-  var rows = []
-  var nodes = fleetNodes(snapshot)
-  var agentItems = agents(snapshot)
-  for (var i = 0; i < nodes.length; i++)
-    rows.push({ kind: "node", index: i, item: nodes[i] })
-  for (var j = 0; j < agentItems.length; j++)
-    rows.push({ kind: "agent", index: j, item: agentItems[j] })
-  return rows
+  return fleetNodes(snapshot).map(nodeRow).concat(agents(snapshot).map(agentRow))
+}
+
+function indexForKey(rows, key) {
+  for (var i = 0; i < rows.length; i++)
+    if (rows[i].key === key) return i
+  return -1
+}
+
+function reconcileSelection(rows, selectedKey, indexHint) {
+  if (rows.length === 0) return { key: "", index: -1 }
+  var retained = indexForKey(rows, selectedKey)
+  var index = retained >= 0 ? retained : Math.max(0, Math.min(indexHint, rows.length - 1))
+  return { key: rows[index].key, index: index }
+}
+
+function reconcileExpanded(rows, expandedKeys) {
+  var retained = {}
+  for (var i = 0; i < rows.length; i++)
+    if (rows[i].expandable && expandedKeys[rows[i].key]) retained[rows[i].key] = true
+  return retained
 }
 
 function moveFocus(index, count, delta) {
@@ -89,11 +129,7 @@ function taskResultLabel(result, nowMilliseconds) {
   return "Task: " + state + (age ? " · " + age : "")
 }
 
-function rowTimestamp(row) {
-  if (!row || !row.item) return ""
-  if (row.kind === "node") return row.item.lastSeenAt || ""
-  return row.item.taskResult ? row.item.taskResult.completedAt || "" : ""
-}
+
 
 function summary(state, resolutionSource) {
   if (state === "healthy") {
@@ -140,6 +176,8 @@ if (typeof module !== "undefined") {
     absoluteLocalTime: absoluteLocalTime,
     activityLabel: activityLabel,
     taskResultLabel: taskResultLabel,
-    rowTimestamp: rowTimestamp
+    indexForKey: indexForKey,
+    reconcileSelection: reconcileSelection,
+    reconcileExpanded: reconcileExpanded
   }
 }
