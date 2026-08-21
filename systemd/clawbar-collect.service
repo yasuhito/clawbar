@@ -1,6 +1,0 @@
-[Unit]
-Description=Collect a private OpenClaw Fleet snapshot for Clawbar
-
-[Service]
-Type=oneshot
-ExecStart=%h/.config/omarchy/plugins/yasuhito.clawbar/scripts/clawbar-collect
