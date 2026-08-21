@@ -22,6 +22,12 @@ starting the shell to change that interval. Pressing the widget requests a
 non-blocking refresh; overlapping requests are coalesced.
 Reachable unsupported JSON is a Configuration Error. A healthy snapshot becomes
 Stale when its age exceeds three configured refresh intervals.
+The panel reads the Gateway-backed `nodes status`, `agents.list`, and
+`tasks.list` JSON surfaces. It shows Nodes in Gateway order, present Agent
+Activity separately from the most recent Task Result, and never stores raw
+responses. Press the widget to open the panel. Use `j`, `k`, or the arrow keys
+to move focus, Enter to expand or collapse a Node, `r` to refresh, and Escape
+to close. A connected Gateway with no reported Nodes shows Empty Fleet.
 
 Remove the symlink when finished testing. Marketplace installation will use
 `omarchy plugin add <repository-url> --enable`.

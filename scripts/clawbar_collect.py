@@ -190,6 +190,89 @@ def resolution_source(status: dict[str, Any], source_hint: str | None = None) ->
     except ValueError:
         return "configured_remote"
 
+def bounded_text(value: object, fallback: str = "") -> str:
+    if not isinstance(value, str):
+        return fallback
+    value = value.strip()
+    return value[:80] if value else fallback
+
+
+def timestamp_from_milliseconds(value: object) -> str | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+        return None
+    try:
+        return datetime.fromtimestamp(value / 1000, timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
+def sanitize_fleet(payload: object) -> list[dict[str, Any]] | None:
+    if not isinstance(payload, dict) or not isinstance(payload.get("nodes"), list):
+        return None
+    fleet = []
+    for raw in payload["nodes"][:100]:
+        if not isinstance(raw, dict):
+            continue
+        node = {
+            "name": bounded_text(raw.get("displayName"), "Unnamed Node"),
+            "state": "healthy" if raw.get("connected") is True else "offline",
+        }
+        for source_key, output_key in (("platform", "platform"), ("modelIdentifier", "model"), ("version", "version")):
+            value = bounded_text(raw.get(source_key))
+            if value:
+                node[output_key] = value
+        last_seen = timestamp_from_milliseconds(raw.get("lastSeenAtMs"))
+        if last_seen:
+            node["lastSeenAt"] = last_seen
+        fleet.append(node)
+    return fleet
+
+
+def task_timestamp(task: dict[str, Any]) -> float:
+    for key in ("endedAt", "updatedAt", "startedAt", "createdAt"):
+        value = task.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+    return 0
+
+
+def sanitize_agents(agent_payload: object, task_payload: object) -> list[dict[str, Any]] | None:
+    if not isinstance(agent_payload, dict) or not isinstance(agent_payload.get("agents"), list):
+        return None
+    if not isinstance(task_payload, dict) or not isinstance(task_payload.get("tasks"), list):
+        return None
+    tasks = [task for task in task_payload["tasks"][:500] if isinstance(task, dict)]
+    agents = []
+    for raw in agent_payload["agents"][:100]:
+        if not isinstance(raw, dict):
+            continue
+        agent_id = bounded_text(raw.get("id"))
+        if not agent_id:
+            continue
+        own_tasks = sorted(
+            (task for task in tasks if task.get("agentId") == agent_id),
+            key=task_timestamp,
+            reverse=True,
+        )
+        statuses = [task.get("status") for task in own_tasks]
+        activity = "working" if "running" in statuses else "waiting" if "queued" in statuses else "idle"
+        completed = next(
+            (task for task in own_tasks if task.get("status") in {"completed", "failed", "timed_out", "cancelled"}),
+            None,
+        )
+        result: dict[str, Any] = {"state": "none"}
+        if completed is not None:
+            result["state"] = "succeeded" if completed.get("status") == "completed" else "failed"
+            completed_at = timestamp_from_milliseconds(completed.get("endedAt") or completed.get("updatedAt"))
+            if completed_at:
+                result["completedAt"] = completed_at
+        agent = {"name": agent_id, "activity": activity, "taskResult": result}
+        model = bounded_text(raw.get("model"))
+        if model:
+            agent["model"] = model
+        agents.append(agent)
+    return agents
+
 
 def failure_snapshot(
     previous: dict[str, Any] | None,
@@ -242,17 +325,22 @@ def configuration_error_snapshot(
     }
 
 
-def healthy_snapshot(
+def current_snapshot(
     refresh_interval: int,
     source: str,
+    fleet: list[dict[str, Any]] | None,
+    agents: list[dict[str, Any]] | None,
 ) -> dict[str, Any]:
     generated_at = utc_now()
+    degraded = fleet is None or agents is None
     return {
         "schemaVersion": SCHEMA_VERSION,
         "generatedAt": generated_at,
         "refreshIntervalSeconds": refresh_interval,
         "resolutionSource": source,
-        "gateway": {"state": "healthy"},
+        "gateway": {"state": "degraded" if degraded else "healthy"},
+        "fleet": {"available": fleet is not None, "nodes": fleet or []},
+        "agents": {"available": agents is not None, "items": agents or []},
         "lastSuccessAt": generated_at,
         "consecutiveFailures": 0,
     }
@@ -326,6 +414,63 @@ def gateway_status_command(
         command.extend(["--url", target.url])
     return run_command(command, deadline_at)
 
+def metadata_command(
+    openclaw_command: Sequence[str],
+    arguments: Sequence[str],
+    deadline_at: float,
+    target: GatewayTarget | None,
+) -> subprocess.CompletedProcess[str]:
+    timeout_milliseconds = max(
+        1,
+        min(OPENCLAW_TIMEOUT_MILLISECONDS, int(seconds_until_deadline(deadline_at) * 1000)),
+    )
+    command = [*openclaw_command, *arguments, "--timeout", str(timeout_milliseconds)]
+    if target is not None:
+        command.extend(["--url", target.url])
+    return run_command(command, deadline_at)
+
+
+def decode_json(completed: subprocess.CompletedProcess[str]) -> object | None:
+    if completed.returncode != 0:
+        return None
+    try:
+        return json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return None
+
+def collect_metadata(
+    openclaw_command: Sequence[str],
+    deadline_at: float,
+    target: GatewayTarget | None,
+) -> tuple[object | None, object | None, object | None]:
+    try:
+        fleet = decode_json(metadata_command(openclaw_command, ("nodes", "status", "--json"), deadline_at, target))
+    except (CollectionDeadlineExceeded, OSError):
+        return None, None, None
+    try:
+        agents = decode_json(
+            metadata_command(
+                openclaw_command,
+                ("gateway", "call", "agents.list", "--params", "{}", "--json"),
+                deadline_at,
+                target,
+            )
+        )
+    except (CollectionDeadlineExceeded, OSError):
+        return fleet, None, None
+    try:
+        tasks = decode_json(
+            metadata_command(
+                openclaw_command,
+                ("gateway", "call", "tasks.list", "--params", '{"limit":500}', "--json"),
+                deadline_at,
+                target,
+            )
+        )
+    except (CollectionDeadlineExceeded, OSError):
+        return fleet, agents, None
+    return fleet, agents, tasks
+
 
 def collect_gateway(
     snapshot_path: Path,
@@ -392,17 +537,14 @@ def collect_gateway(
             configuration_error_snapshot(previous, refresh_interval, status, target.source if target else None),
         )
 
-    try:
-        seconds_until_deadline(deadline_at)
-    except CollectionDeadlineExceeded:
-        return publish_failure(
-            snapshot_path,
-            previous,
-            refresh_interval,
-            ExitCode.COMMAND_TIMEOUT,
-            "timeout",
-        )
-    return publish(snapshot_path, ExitCode.OK, healthy_snapshot(refresh_interval, source))
+    fleet_payload, agent_payload, task_payload = collect_metadata(
+        openclaw_command,
+        command_deadline_at,
+        target,
+    )
+    fleet = sanitize_fleet(fleet_payload)
+    agents = sanitize_agents(agent_payload, task_payload)
+    return publish(snapshot_path, ExitCode.OK, current_snapshot(refresh_interval, source, fleet, agents))
 
 
 def build_parser() -> argparse.ArgumentParser:

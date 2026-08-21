@@ -61,6 +61,28 @@ class CollectorFixture:
                         }))
                     raise SystemExit(0)
 
+                if arguments[:3] == ["nodes", "status", "--json"]:
+                    time.sleep(float(os.environ.get("FAKE_NODES_DELAY", "0")))
+                    output = os.environ.get("FAKE_NODES")
+                    if output is None:
+                        output = json.dumps({"nodes": []})
+                    sys.stdout.write(output)
+                    raise SystemExit(int(os.environ.get("FAKE_NODES_EXIT", "0")))
+
+                if arguments[:3] == ["gateway", "call", "agents.list"]:
+                    output = os.environ.get("FAKE_AGENTS")
+                    if output is None:
+                        output = json.dumps({"agents": []})
+                    sys.stdout.write(output)
+                    raise SystemExit(int(os.environ.get("FAKE_AGENTS_EXIT", "0")))
+
+                if arguments[:3] == ["gateway", "call", "tasks.list"]:
+                    output = os.environ.get("FAKE_TASKS")
+                    if output is None:
+                        output = json.dumps({"tasks": []})
+                    sys.stdout.write(output)
+                    raise SystemExit(int(os.environ.get("FAKE_TASKS_EXIT", "0")))
+
                 if arguments[:2] == ["gateway", "status"]:
                     time.sleep(float(os.environ.get("FAKE_GATEWAY_DELAY", "0")))
                     scenario = os.environ.get("FAKE_SCENARIO", "local")
@@ -94,6 +116,7 @@ class CollectorFixture:
             "FAKE_CALL_LOG": str(self.call_log_path),
             "FAKE_SCENARIO": "local",
             "FAKE_NODE_DELAY": "0",
+            "FAKE_NODES_DELAY": "0",
             "FAKE_GATEWAY_DELAY": "0",
             "FAKE_STDERR": "diagnostic output is ignored",
             **values,
@@ -116,6 +139,7 @@ class CollectorFixture:
         stderr: str = "diagnostic output is ignored",
         exit_code: int = 0,
         node_delay: float = 0,
+        nodes_delay: float = 0,
         gateway_delay: float = 0,
         deadline: float = 1,
         scenario: str = "local",
@@ -123,6 +147,7 @@ class CollectorFixture:
         values = {
             "FAKE_EXIT": str(exit_code),
             "FAKE_NODE_DELAY": str(node_delay),
+            "FAKE_NODES_DELAY": str(nodes_delay),
             "FAKE_GATEWAY_DELAY": str(gateway_delay),
             "FAKE_STDERR": stderr,
             "FAKE_SCENARIO": scenario,
@@ -228,6 +253,15 @@ class CollectorCommandTests(CollectorFixture, unittest.TestCase):
         self.assertLess(time.monotonic() - started_at, 0.25)
         self.assertEqual(self.read_snapshot()["failureKind"], "timeout")
 
+    def test_metadata_timeout_degrades_without_gateway_loss(self) -> None:
+        result = self.run_collector(nodes_delay=0.3, deadline=0.1)
+
+        self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
+        snapshot = self.read_snapshot()
+        self.assertEqual(snapshot["gateway"], {"state": "degraded"})
+        self.assertEqual(snapshot["fleet"], {"available": False, "nodes": []})
+        self.assertEqual(snapshot["agents"], {"available": False, "items": []})
+
     def test_atomic_replacement_preserves_last_success_metadata(self) -> None:
         original = {
             "schemaVersion": 1,
@@ -296,6 +330,7 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
                 self.assertEqual(snapshot["gateway"], {"state": "healthy"})
                 calls = self.read_calls()
                 self.assertEqual(calls[0][:2], ["gateway", "status"])
+                metadata_offset = 1
                 if scenario == "node_host":
                     self.assertNotIn("--url", calls[0])
                     self.assertEqual(calls[1], ["node", "status", "--json"])
@@ -306,9 +341,119 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
                         "wss://node-gateway.example.test:18789/openclaw-gw",
                     )
                     self.assertNotIn("node-gateway.example.test", result.stdout)
+                    metadata_offset = 3
                 else:
-                    self.assertEqual(len(calls), 1)
                     self.assertNotIn("--url", calls[0])
+                self.assertEqual(calls[metadata_offset][:3], ["nodes", "status", "--json"])
+                self.assertEqual(calls[metadata_offset + 1][:3], ["gateway", "call", "agents.list"])
+                self.assertEqual(calls[metadata_offset + 2][:3], ["gateway", "call", "tasks.list"])
+                self.assertEqual(len(calls), metadata_offset + 3)
+
+    def test_executable_distinguishes_empty_fleet_from_missing_gateway(self) -> None:
+        result = self.run_external("local")
+
+        self.assertEqual(result.returncode, clawbar_collect.ExitCode.OK, result.stderr)
+        snapshot = json.loads(result.stdout)
+        self.assertEqual(snapshot["gateway"], {"state": "healthy"})
+        self.assertEqual(snapshot["fleet"], {"available": True, "nodes": []})
+        self.assertEqual(snapshot["agents"], {"available": True, "items": []})
+
+    def test_executable_sanitizes_fleet_activity_and_task_results(self) -> None:
+        private_sentinels = [
+            "PRIVATE-HOST",
+            "PRIVATE-IP",
+            "PRIVATE-ACCOUNT",
+            "PRIVATE-INSTRUCTION",
+            "PRIVATE-DESTINATION",
+            "PRIVATE-ERROR",
+        ]
+        nodes = {
+            "nodes": [
+                {
+                    "displayName": "Local",
+                    "connected": True,
+                    "platform": "linux",
+                    "modelIdentifier": "workstation",
+                    "version": "2026.7.1",
+                    "lastSeenAtMs": 1_787_280_000_000,
+                    "nodeId": "PRIVATE-HOST",
+                    "ip": "PRIVATE-IP",
+                },
+                {"displayName": "studio-ops", "connected": True},
+            ]
+        }
+        agents = {
+            "agents": [
+                {"id": "planner", "model": "gpt-5", "workspace": "PRIVATE-HOST"},
+                {"id": "builder", "accountId": "PRIVATE-ACCOUNT"},
+                {"id": "observer"},
+                {"id": "indexer"},
+            ]
+        }
+        tasks = {
+            "tasks": [
+                {
+                    "agentId": "planner",
+                    "status": "running",
+                    "updatedAt": 1_787_280_005_000,
+                    "title": "PRIVATE-INSTRUCTION",
+                },
+                {
+                    "agentId": "planner",
+                    "status": "failed",
+                    "endedAt": 1_787_280_004_000,
+                    "error": "PRIVATE-ERROR",
+                },
+                {
+                    "agentId": "builder",
+                    "status": "queued",
+                    "updatedAt": 1_787_280_003_000,
+                    "destination": "PRIVATE-DESTINATION",
+                },
+                {
+                    "agentId": "observer",
+                    "status": "completed",
+                    "endedAt": 1_787_280_002_000,
+                },
+            ]
+        }
+
+        result = self.run_external(
+            "local",
+            environment_overrides={
+                "FAKE_NODES": json.dumps(nodes),
+                "FAKE_AGENTS": json.dumps(agents),
+                "FAKE_TASKS": json.dumps(tasks),
+            },
+        )
+
+        self.assertEqual(result.returncode, clawbar_collect.ExitCode.OK, result.stderr)
+        snapshot = json.loads(result.stdout)
+        self.assertEqual([node["name"] for node in snapshot["fleet"]["nodes"]], ["Local", "studio-ops"])
+        by_name = {agent["name"]: agent for agent in snapshot["agents"]["items"]}
+        self.assertEqual(by_name["planner"]["activity"], "working")
+        self.assertEqual(by_name["planner"]["taskResult"]["state"], "failed")
+        self.assertEqual(by_name["builder"]["activity"], "waiting")
+        self.assertEqual(by_name["builder"]["taskResult"], {"state": "none"})
+        self.assertEqual(by_name["observer"]["activity"], "idle")
+        self.assertEqual(by_name["observer"]["taskResult"]["state"], "succeeded")
+        self.assertEqual(by_name["indexer"]["activity"], "idle")
+        self.assertEqual(by_name["indexer"]["taskResult"], {"state": "none"})
+        self.assertEqual(snapshot["gateway"], {"state": "healthy"})
+        for sentinel in private_sentinels:
+            self.assertNotIn(sentinel, result.stdout)
+
+    def test_metadata_failure_is_degraded_not_gateway_loss(self) -> None:
+        result = self.run_external(
+            "local",
+            environment_overrides={"FAKE_TASKS_EXIT": "9"},
+        )
+
+        self.assertEqual(result.returncode, clawbar_collect.ExitCode.OK, result.stderr)
+        snapshot = json.loads(result.stdout)
+        self.assertEqual(snapshot["gateway"], {"state": "degraded"})
+        self.assertEqual(snapshot["fleet"], {"available": True, "nodes": []})
+        self.assertEqual(snapshot["agents"], {"available": False, "items": []})
 
     def test_executable_ignores_misleading_success_stderr_and_nonzero_streams(self) -> None:
         healthy = self.run_external(
