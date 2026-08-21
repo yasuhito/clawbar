@@ -10,7 +10,7 @@
   "entryPoints": { "barWidget": "Clawbar.qml" },
   "barWidget": {
     "displayName": "Clawbar",
-    "description": "Gateway health and failed Automations, without task or message content.",
+    "description": "Current OpenClaw Gateway health from a private, read-only snapshot.",
     "category": "AI",
     "allowMultiple": false,
     "defaultSection": "right"

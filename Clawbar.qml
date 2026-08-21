@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
+import "ClawbarLogic.js" as Logic
 
 BarWidget {
   id: root
@@ -10,48 +11,65 @@ BarWidget {
 
   property string state: "starting"
   property string resolutionSource: "unresolved"
+  property var lastSnapshot: null
   property bool refreshPending: false
+  property bool cacheReadPending: false
   property string collectorPath: decodeURIComponent(String(Qt.resolvedUrl("scripts/clawbar_collect.py")).replace(/^file:\/\//, ""))
   property string snapshotPath: {
     var stateHome = Quickshell.env("XDG_STATE_HOME")
     var base = stateHome ? stateHome : Quickshell.env("HOME") + "/.local/state"
     return base + "/clawbar/snapshot.json"
   }
-  property int refreshIntervalSeconds: {
-    var configured = parseInt(Quickshell.env("CLAWBAR_REFRESH_INTERVAL_SECONDS"))
-    return isNaN(configured) ? 30 : Math.max(15, Math.min(300, configured))
-  }
-  property string summary: {
-    if (state === "healthy") {
-      if (resolutionSource === "node_host") return "Node-host OpenClaw Gateway healthy"
-      if (resolutionSource === "configured_remote") return "Remote OpenClaw Gateway healthy"
-      return "Local OpenClaw Gateway healthy"
-    }
-    if (state === "unstable") return "OpenClaw Gateway unstable"
-    if (state === "offline") return "OpenClaw Gateway offline"
-    return "OpenClaw Gateway status unavailable"
-  }
+  property int refreshIntervalSeconds: Logic.normalizeRefreshInterval(
+    Quickshell.env("CLAWBAR_REFRESH_INTERVAL_SECONDS")
+  )
+  property string summary: Logic.summary(state, resolutionSource)
 
   function readSnapshot() {
-    if (!cacheReader.running) cacheReader.running = true
+    var action = Logic.requestRefresh(cacheReader.running)
+    cacheReadPending = action.pending
+    if (action.start) cacheReader.running = true
+  }
+
+  function consumeCacheRead(exitCode) {
+    var action = Logic.consumeRefresh(cacheReader.running, cacheReadPending)
+    cacheReadPending = action.pending
+    if (action.wait) {
+      Qt.callLater(function() { root.consumeCacheRead(exitCode) })
+      return
+    }
+    if (exitCode !== 0) {
+      lastSnapshot = null
+      state = "unknown"
+    }
+    if (action.start) cacheReader.running = true
   }
 
   function requestCollection() {
-    if (collector.running) {
-      refreshPending = true
-    } else {
-      collector.running = true
+    var action = Logic.requestRefresh(collector.running)
+    refreshPending = action.pending
+    if (action.start) collector.running = true
+  }
+
+  function consumeCollection() {
+    var action = Logic.consumeRefresh(collector.running, refreshPending)
+    refreshPending = action.pending
+    if (action.wait) {
+      Qt.callLater(function() { root.consumeCollection() })
+      return
     }
+    root.readSnapshot()
+    if (action.start) collector.running = true
   }
 
   function applySnapshot(snapshot) {
-    if (snapshot.schemaVersion !== 1 || !snapshot.gateway)
-      throw new Error("Unsupported Clawbar snapshot")
-    var nextState = String(snapshot.gateway.state || "unknown")
-    if (nextState !== "healthy" && nextState !== "unstable" && nextState !== "offline")
-      nextState = "unknown"
-    state = nextState
+    state = Logic.snapshotState(snapshot, Date.now())
     resolutionSource = String(snapshot.resolutionSource || "unresolved")
+    lastSnapshot = snapshot
+  }
+
+  function refreshFreshness() {
+    if (lastSnapshot) state = Logic.snapshotState(lastSnapshot, Date.now())
   }
 
   Component.onCompleted: readSnapshot()
@@ -67,12 +85,13 @@ BarWidget {
         try {
           root.applySnapshot(JSON.parse(text))
         } catch (_) {
+          root.lastSnapshot = null
           root.state = "unknown"
         }
       }
     }
     onExited: function(exitCode) {
-      if (exitCode !== 0) root.state = "unknown"
+      Qt.callLater(function() { root.consumeCacheRead(exitCode) })
     }
   }
 
@@ -85,11 +104,7 @@ BarWidget {
       String(root.refreshIntervalSeconds)
     ]
     onExited: function(_) {
-      root.readSnapshot()
-      if (root.refreshPending) {
-        root.refreshPending = false
-        collector.running = true
-      }
+      Qt.callLater(function() { root.consumeCollection() })
     }
   }
 
@@ -101,11 +116,23 @@ BarWidget {
     onTriggered: root.requestCollection()
   }
 
+  Timer {
+    interval: 1000
+    running: root.lastSnapshot !== null
+    repeat: true
+    onTriggered: root.refreshFreshness()
+  }
+
   BarIconButton {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: root.state === "healthy" ? "󰚩" : "󰀦"
+    text: {
+      if (root.state === "healthy") return "󰚩"
+      if (root.state === "configuration_error") return "󰒓"
+      if (root.state === "stale") return "󰔟"
+      return "󰀦"
+    }
     active: root.state !== "healthy"
     slotSize: Style.bar.statusSlot
     fontSize: Style.font.caption

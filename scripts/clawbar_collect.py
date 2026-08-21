@@ -25,6 +25,7 @@ MAX_REFRESH_INTERVAL_SECONDS = 300
 COLLECTION_DEADLINE_SECONDS = 12.0
 SNAPSHOT_WRITE_RESERVE_SECONDS = 0.5
 OPENCLAW_TIMEOUT_MILLISECONDS = 10_000
+RESOLUTION_SOURCES = frozenset({"local", "configured_remote", "node_host"})
 
 
 class ExitCode(IntEnum):
@@ -52,7 +53,7 @@ class CollectionDeadlineExceeded(Exception):
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def default_snapshot_path() -> Path:
@@ -61,14 +62,27 @@ def default_snapshot_path() -> Path:
     return base / "clawbar" / "snapshot.json"
 
 
-def parse_refresh_interval(value: str) -> int:
+def validate_refresh_interval(value: object) -> int:
+    if isinstance(value, bool):
+        raise ValueError
     try:
         interval = int(value)
-    except ValueError as error:
-        raise argparse.ArgumentTypeError("refresh interval must be an integer") from error
+    except (TypeError, ValueError) as error:
+        raise ValueError from error
+    if isinstance(value, float) and not value.is_integer():
+        raise ValueError
+    if isinstance(value, str) and value.strip() != str(interval):
+        raise ValueError
     if not MIN_REFRESH_INTERVAL_SECONDS <= interval <= MAX_REFRESH_INTERVAL_SECONDS:
-        raise argparse.ArgumentTypeError("refresh interval must be between 15 and 300 seconds")
+        raise ValueError
     return interval
+
+
+def parse_refresh_interval(value: str) -> int:
+    try:
+        return validate_refresh_interval(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("refresh interval must be an integer from 15 through 300 seconds") from error
 
 
 def load_previous_snapshot(path: Path) -> dict[str, Any] | None:
@@ -81,11 +95,11 @@ def load_previous_snapshot(path: Path) -> dict[str, Any] | None:
     return value
 
 
-def remaining_budget(deadline_at: float) -> float:
-    remaining = deadline_at - time.monotonic()
-    if remaining <= 0:
+def seconds_until_deadline(deadline_at: float) -> float:
+    seconds = deadline_at - time.monotonic()
+    if seconds <= 0:
         raise CollectionDeadlineExceeded
-    return remaining
+    return seconds
 
 
 def run_command(command: Sequence[str], deadline_at: float) -> subprocess.CompletedProcess[str]:
@@ -95,7 +109,7 @@ def run_command(command: Sequence[str], deadline_at: float) -> subprocess.Comple
             capture_output=True,
             check=False,
             text=True,
-            timeout=remaining_budget(deadline_at),
+            timeout=seconds_until_deadline(deadline_at),
         )
     except subprocess.TimeoutExpired as error:
         raise CollectionDeadlineExceeded from error
@@ -177,15 +191,62 @@ def resolution_source(status: dict[str, Any], source_hint: str | None = None) ->
         return "configured_remote"
 
 
-def healthy_snapshot(
-    status: dict[str, Any],
+def failure_snapshot(
+    previous: dict[str, Any] | None,
     refresh_interval: int,
-    generated_at: str,
-    source_hint: str | None = None,
-) -> dict[str, Any] | None:
+    failure_kind: str,
+) -> dict[str, Any]:
+    previous_failures = previous.get("consecutiveFailures", 0) if previous else 0
+    failures = previous_failures + 1 if isinstance(previous_failures, int) else 1
+    last_success = previous.get("lastSuccessAt") if previous else None
+    has_last_success = isinstance(last_success, str)
+    source = previous.get("resolutionSource") if previous else None
+    if failures >= 2:
+        state = "offline"
+    elif has_last_success:
+        state = "unstable"
+    else:
+        state = "unknown"
+    return {
+        "schemaVersion": SCHEMA_VERSION,
+        "generatedAt": utc_now(),
+        "refreshIntervalSeconds": refresh_interval,
+        "resolutionSource": source if source in RESOLUTION_SOURCES else "unresolved",
+        "gateway": {"state": state},
+        "lastSuccessAt": last_success if has_last_success else None,
+        "consecutiveFailures": failures,
+        "failureKind": failure_kind,
+    }
+
+
+def configuration_error_snapshot(
+    previous: dict[str, Any] | None,
+    refresh_interval: int,
+    status: dict[str, Any],
+    source_hint: str | None,
+) -> dict[str, Any]:
+    last_success = previous.get("lastSuccessAt") if previous else None
     source = resolution_source(status, source_hint)
-    if source is None:
-        return None
+    if source is None and previous:
+        previous_source = previous.get("resolutionSource")
+        source = previous_source if previous_source in RESOLUTION_SOURCES else None
+    return {
+        "schemaVersion": SCHEMA_VERSION,
+        "generatedAt": utc_now(),
+        "refreshIntervalSeconds": refresh_interval,
+        "resolutionSource": source or "unresolved",
+        "gateway": {"state": "configuration_error"},
+        "lastSuccessAt": last_success if isinstance(last_success, str) else None,
+        "consecutiveFailures": 0,
+        "failureKind": "unsupported_json",
+    }
+
+
+def healthy_snapshot(
+    refresh_interval: int,
+    source: str,
+) -> dict[str, Any]:
+    generated_at = utc_now()
     return {
         "schemaVersion": SCHEMA_VERSION,
         "generatedAt": generated_at,
@@ -194,29 +255,6 @@ def healthy_snapshot(
         "gateway": {"state": "healthy"},
         "lastSuccessAt": generated_at,
         "consecutiveFailures": 0,
-    }
-
-
-def failure_snapshot(
-    previous: dict[str, Any] | None,
-    refresh_interval: int,
-    generated_at: str,
-    failure_kind: str,
-) -> dict[str, Any]:
-    previous_failures = previous.get("consecutiveFailures", 0) if previous else 0
-    failures = previous_failures + 1 if isinstance(previous_failures, int) else 1
-    last_success = previous.get("lastSuccessAt") if previous else None
-    source = previous.get("resolutionSource") if previous else None
-    allowed_sources = {"local", "configured_remote", "node_host"}
-    return {
-        "schemaVersion": SCHEMA_VERSION,
-        "generatedAt": generated_at,
-        "refreshIntervalSeconds": refresh_interval,
-        "resolutionSource": source if source in allowed_sources else "unresolved",
-        "gateway": {"state": "unstable" if failures == 1 else "offline"},
-        "lastSuccessAt": last_success if isinstance(last_success, str) else None,
-        "consecutiveFailures": failures,
-        "failureKind": failure_kind,
     }
 
 
@@ -236,17 +274,23 @@ def atomic_write_snapshot(path: Path, snapshot: dict[str, Any]) -> None:
         temporary_path.unlink(missing_ok=True)
 
 
+def publish(snapshot_path: Path, exit_code: ExitCode, snapshot: dict[str, Any]) -> CollectionResult:
+    atomic_write_snapshot(snapshot_path, snapshot)
+    return CollectionResult(exit_code, snapshot)
+
+
 def publish_failure(
     snapshot_path: Path,
     previous: dict[str, Any] | None,
     refresh_interval: int,
-    generated_at: str,
     exit_code: ExitCode,
     failure_kind: str,
 ) -> CollectionResult:
-    snapshot = failure_snapshot(previous, refresh_interval, generated_at, failure_kind)
-    atomic_write_snapshot(snapshot_path, snapshot)
-    return CollectionResult(exit_code, snapshot)
+    return publish(
+        snapshot_path,
+        exit_code,
+        failure_snapshot(previous, refresh_interval, failure_kind),
+    )
 
 
 def discover_node_host(openclaw_command: Sequence[str], deadline_at: float) -> GatewayTarget | None:
@@ -260,41 +304,52 @@ def discover_node_host(openclaw_command: Sequence[str], deadline_at: float) -> G
     return node_host_target(status)
 
 
+def gateway_status_command(
+    openclaw_command: Sequence[str],
+    deadline_at: float,
+    target: GatewayTarget | None = None,
+) -> subprocess.CompletedProcess[str]:
+    timeout_milliseconds = max(
+        1,
+        min(OPENCLAW_TIMEOUT_MILLISECONDS, int(seconds_until_deadline(deadline_at) * 1000)),
+    )
+    command = [
+        *openclaw_command,
+        "gateway",
+        "status",
+        "--json",
+        "--require-rpc",
+        "--timeout",
+        str(timeout_milliseconds),
+    ]
+    if target is not None:
+        command.extend(["--url", target.url])
+    return run_command(command, deadline_at)
+
+
 def collect_gateway(
     snapshot_path: Path,
     refresh_interval: int,
     openclaw_command: Sequence[str] = ("openclaw",),
     collection_deadline: float = COLLECTION_DEADLINE_SECONDS,
 ) -> CollectionResult:
+    refresh_interval = validate_refresh_interval(refresh_interval)
     deadline_at = time.monotonic() + collection_deadline
     command_deadline_at = deadline_at - min(SNAPSHOT_WRITE_RESERVE_SECONDS, collection_deadline / 10)
-    generated_at = utc_now()
     previous = load_previous_snapshot(snapshot_path)
+    target: GatewayTarget | None = None
 
     try:
-        target = discover_node_host(openclaw_command, command_deadline_at)
-        remaining_milliseconds = max(
-            1,
-            min(OPENCLAW_TIMEOUT_MILLISECONDS, int(remaining_budget(command_deadline_at) * 1000)),
-        )
-        gateway_command = [
-            *openclaw_command,
-            "gateway",
-            "status",
-            "--json",
-            "--require-rpc",
-            "--timeout",
-            str(remaining_milliseconds),
-        ]
-        if target is not None:
-            gateway_command.extend(["--url", target.url])
-        completed = run_command(gateway_command, command_deadline_at)
+        completed = gateway_status_command(openclaw_command, command_deadline_at)
+        if completed.returncode != 0:
+            target = discover_node_host(openclaw_command, command_deadline_at)
+            if target is not None:
+                completed = gateway_status_command(openclaw_command, command_deadline_at, target)
     except CollectionDeadlineExceeded:
         return publish_failure(
             snapshot_path,
             previous,
             refresh_interval,
-            generated_at,
             ExitCode.COMMAND_TIMEOUT,
             "timeout",
         )
@@ -303,7 +358,6 @@ def collect_gateway(
             snapshot_path,
             previous,
             refresh_interval,
-            generated_at,
             ExitCode.COMMAND_FAILED,
             "command_failed",
         )
@@ -313,7 +367,6 @@ def collect_gateway(
             snapshot_path,
             previous,
             refresh_interval,
-            generated_at,
             ExitCode.COMMAND_FAILED,
             "command_failed",
         )
@@ -325,45 +378,31 @@ def collect_gateway(
             snapshot_path,
             previous,
             refresh_interval,
-            generated_at,
             ExitCode.MALFORMED_JSON,
             "malformed_json",
         )
 
     if not isinstance(status, dict):
-        return publish_failure(
+        status = {}
+    source = resolution_source(status, target.source if target else None)
+    if source is None:
+        return publish(
             snapshot_path,
-            previous,
-            refresh_interval,
-            generated_at,
             ExitCode.UNSUPPORTED_JSON,
-            "unsupported_json",
-        )
-
-    snapshot = healthy_snapshot(status, refresh_interval, generated_at, target.source if target else None)
-    if snapshot is None:
-        return publish_failure(
-            snapshot_path,
-            previous,
-            refresh_interval,
-            generated_at,
-            ExitCode.UNSUPPORTED_JSON,
-            "unsupported_json",
+            configuration_error_snapshot(previous, refresh_interval, status, target.source if target else None),
         )
 
     try:
-        remaining_budget(deadline_at)
+        seconds_until_deadline(deadline_at)
     except CollectionDeadlineExceeded:
         return publish_failure(
             snapshot_path,
             previous,
             refresh_interval,
-            generated_at,
             ExitCode.COMMAND_TIMEOUT,
             "timeout",
         )
-    atomic_write_snapshot(snapshot_path, snapshot)
-    return CollectionResult(ExitCode.OK, snapshot)
+    return publish(snapshot_path, ExitCode.OK, healthy_snapshot(refresh_interval, source))
 
 
 def build_parser() -> argparse.ArgumentParser:

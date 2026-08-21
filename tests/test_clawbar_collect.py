@@ -10,6 +10,7 @@ import tempfile
 import textwrap
 import time
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 from scripts import clawbar_collect
@@ -62,10 +63,14 @@ class CollectorFixture:
 
                 if arguments[:2] == ["gateway", "status"]:
                     time.sleep(float(os.environ.get("FAKE_GATEWAY_DELAY", "0")))
+                    scenario = os.environ.get("FAKE_SCENARIO", "local")
+                    if scenario == "node_host" and "--url" not in arguments:
+                        sys.stdout.write("connection broken")
+                        sys.stderr.write("invalid token")
+                        raise SystemExit(9)
                     sys.stderr.write(os.environ.get("FAKE_STDERR", ""))
                     output = os.environ.get("FAKE_STDOUT")
                     if output is None:
-                        scenario = os.environ.get("FAKE_SCENARIO", "local")
                         if scenario == "node_host":
                             url = arguments[arguments.index("--url") + 1]
                         elif scenario == "configured_remote":
@@ -108,15 +113,19 @@ class CollectorFixture:
         self,
         *,
         stdout: str | None = None,
+        stderr: str = "diagnostic output is ignored",
         exit_code: int = 0,
         node_delay: float = 0,
         gateway_delay: float = 0,
         deadline: float = 1,
+        scenario: str = "local",
     ) -> clawbar_collect.CollectionResult:
         values = {
             "FAKE_EXIT": str(exit_code),
             "FAKE_NODE_DELAY": str(node_delay),
             "FAKE_GATEWAY_DELAY": str(gateway_delay),
+            "FAKE_STDERR": stderr,
+            "FAKE_SCENARIO": scenario,
         }
         if stdout is not None:
             values["FAKE_STDOUT"] = stdout
@@ -165,18 +174,55 @@ class CollectorCommandTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.MALFORMED_JSON)
         self.assertEqual(self.read_snapshot()["failureKind"], "malformed_json")
 
-    def test_nonzero_command_does_not_parse_misleading_stdout(self) -> None:
-        status = {"rpc": {"ok": True, "url": "ws://127.0.0.1:18789"}}
+    def test_misleading_text_never_overrides_structured_status_or_exit_code(self) -> None:
+        status = json.dumps({"rpc": {"ok": True, "url": "ws://127.0.0.1:18789"}})
 
-        result = self.run_collector(stdout=json.dumps(status), exit_code=9)
+        healthy = self.run_collector(
+            stdout=status,
+            stderr="invalid token and connection broken",
+        )
+        failed = self.run_collector(
+            stdout="connection broken",
+            stderr="invalid token",
+            exit_code=9,
+        )
+
+        self.assertEqual(healthy.exit_code, clawbar_collect.ExitCode.OK)
+        self.assertEqual(failed.exit_code, clawbar_collect.ExitCode.COMMAND_FAILED)
+        serialized = json.dumps(failed.snapshot)
+        self.assertNotIn("invalid token", serialized)
+        self.assertNotIn("connection broken", serialized)
+
+    def test_initial_failure_without_last_success_is_not_unstable(self) -> None:
+        result = self.run_collector(stdout="connection broken", stderr="invalid token", exit_code=9)
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.COMMAND_FAILED)
-        self.assertEqual(self.read_snapshot()["gateway"], {"state": "unstable"})
+        self.assertNotEqual(self.read_snapshot()["gateway"], {"state": "unstable"})
+
+    def test_reachable_unsupported_json_is_configuration_error(self) -> None:
+        result = self.run_collector(stdout=json.dumps({"rpc": {"ok": True}}))
+
+        self.assertEqual(result.exit_code, clawbar_collect.ExitCode.UNSUPPORTED_JSON)
+        self.assertEqual(self.read_snapshot()["gateway"], {"state": "configuration_error"})
+
+    def test_success_timestamps_follow_gateway_validation(self) -> None:
+        started_at = time.time()
+
+        result = self.run_collector(gateway_delay=0.2)
+
+        generated_at = datetime.fromisoformat(result.snapshot["generatedAt"].replace("Z", "+00:00")).timestamp()
+        self.assertGreaterEqual(generated_at, started_at + 0.15)
+        self.assertEqual(result.snapshot["lastSuccessAt"], result.snapshot["generatedAt"])
 
     def test_deadline_is_shared_across_node_resolution_and_gateway_probe(self) -> None:
         started_at = time.monotonic()
 
-        result = self.run_collector(node_delay=0.07, gateway_delay=0.07, deadline=0.11)
+        result = self.run_collector(
+            node_delay=0.03,
+            gateway_delay=0.04,
+            deadline=0.10,
+            scenario="node_host",
+        )
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.COMMAND_TIMEOUT)
         self.assertLess(time.monotonic() - started_at, 0.25)
@@ -207,7 +253,13 @@ class CollectorCommandTests(CollectorFixture, unittest.TestCase):
 
 
 class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
-    def run_external(self, scenario: str, *, timeout: float = 15) -> subprocess.CompletedProcess[str]:
+    def run_external(
+        self,
+        scenario: str,
+        *,
+        timeout: float = 15,
+        environment_overrides: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         environment = os.environ.copy()
         environment.update(
             {
@@ -215,6 +267,7 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
                 "XDG_STATE_HOME": str(self.root / "external-state"),
                 "FAKE_CALL_LOG": str(self.call_log_path),
                 "FAKE_SCENARIO": scenario,
+                **(environment_overrides or {}),
             }
         )
         return subprocess.run(
@@ -242,21 +295,46 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
                 self.assertEqual(snapshot["resolutionSource"], expected_source)
                 self.assertEqual(snapshot["gateway"], {"state": "healthy"})
                 calls = self.read_calls()
-                self.assertEqual(calls[0], ["node", "status", "--json"])
-                self.assertEqual(calls[1][:2], ["gateway", "status"])
+                self.assertEqual(calls[0][:2], ["gateway", "status"])
                 if scenario == "node_host":
-                    url_index = calls[1].index("--url") + 1
+                    self.assertNotIn("--url", calls[0])
+                    self.assertEqual(calls[1], ["node", "status", "--json"])
+                    self.assertEqual(calls[2][:2], ["gateway", "status"])
+                    url_index = calls[2].index("--url") + 1
                     self.assertEqual(
-                        calls[1][url_index],
+                        calls[2][url_index],
                         "wss://node-gateway.example.test:18789/openclaw-gw",
                     )
                     self.assertNotIn("node-gateway.example.test", result.stdout)
                 else:
-                    self.assertNotIn("--url", calls[1])
+                    self.assertEqual(len(calls), 1)
+                    self.assertNotIn("--url", calls[0])
+
+    def test_executable_ignores_misleading_success_stderr_and_nonzero_streams(self) -> None:
+        healthy = self.run_external(
+            "local",
+            environment_overrides={"FAKE_STDERR": "invalid token and connection broken"},
+        )
+        failed = self.run_external(
+            "local",
+            environment_overrides={
+                "FAKE_EXIT": "9",
+                "FAKE_STDOUT": "connection broken",
+                "FAKE_STDERR": "invalid token",
+                "XDG_STATE_HOME": str(self.root / "failed-state"),
+            },
+        )
+
+        self.assertEqual(healthy.returncode, clawbar_collect.ExitCode.OK, healthy.stderr)
+        self.assertEqual(json.loads(healthy.stdout)["gateway"], {"state": "healthy"})
+        self.assertEqual(failed.returncode, clawbar_collect.ExitCode.COMMAND_FAILED, failed.stderr)
+        self.assertEqual(json.loads(failed.stdout)["gateway"], {"state": "unknown"})
+        self.assertNotIn("invalid token", failed.stdout)
+        self.assertNotIn("connection broken", failed.stdout)
 
     def test_executable_enforces_default_twelve_second_whole_collection_deadline(self) -> None:
         started_at = time.monotonic()
-        with self.fake_environment(FAKE_NODE_DELAY="30"):
+        with self.fake_environment(FAKE_SCENARIO="node_host", FAKE_NODE_DELAY="30"):
             environment = os.environ.copy()
             environment.update(
                 {
