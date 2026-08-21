@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# This collector deliberately emits only operational metadata. It does not
+# inspect prompts, messages, destinations, account identifiers, or raw logs.
+gateway_output="$(openclaw gateway status --deep 2>&1 || true)"
+if rg -qi 'running|healthy|ok' <<<"$gateway_output"; then
+  gateway_state="healthy"
+else
+  gateway_state="unhealthy"
+fi
+
+automation_failures=0
+if cron_json="$(openclaw cron list --all --json 2>/dev/null)"; then
+  automation_failures="$(jq '[.jobs[]? | select(.state.lastRunStatus? == "error" or .state.lastRunStatus? == "failed")] | length' <<<"$cron_json" 2>/dev/null || echo 0)"
+fi
+
+if [[ "$gateway_state" == healthy && "$automation_failures" == 0 ]]; then
+  summary="OpenClaw healthy"
+elif [[ "$gateway_state" == unhealthy ]]; then
+  summary="OpenClaw Gateway needs attention"
+else
+  summary="$automation_failures Automation failure(s)"
+fi
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/clawbar"
+mkdir -p "$state_dir"
+tmp_snapshot="$(mktemp "$state_dir/snapshot.json.XXXXXX")"
+trap 'rm -f "$tmp_snapshot"' EXIT
+jq -n --arg state "$gateway_state" --arg summary "$summary" --argjson automationFailures "$automation_failures" \
+  '{state: $state, summary: $summary, automationFailures: $automationFailures}' >"$tmp_snapshot"
+mv -f "$tmp_snapshot" "$state_dir/snapshot.json"

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "yasuhito.clawbar",
+  "name": "Clawbar",
+  "version": "0.1.0",
+  "author": "Yasuhito Takamiya",
+  "license": "MIT",
+  "description": "A private, read-only OpenClaw operations widget for Omarchy.",
+  "kinds": ["bar-widget"],
+  "entryPoints": { "barWidget": "Clawbar.qml" },
+  "barWidget": {
+    "displayName": "Clawbar",
+    "description": "Gateway health and failed Automations, without task or message content.",
+    "category": "AI",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
