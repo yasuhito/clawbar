@@ -14,11 +14,16 @@ _SECRET_BYTES = 32
 
 
 def load_node_key_secret() -> bytes:
-    """Return one per-login secret used to pseudonymize private Node ids."""
+    """Return the local secret used to pseudonymize private Node ids."""
     runtime_home = os.environ.get("XDG_RUNTIME_DIR")
-    if not runtime_home:
-        raise OSError("XDG_RUNTIME_DIR is required for stable private Node keys")
-    secret_path = Path(runtime_home) / "clawbar" / "node-key-secret"
+    state_home = os.environ.get("XDG_STATE_HOME")
+    if runtime_home:
+        secret_root = Path(runtime_home)
+    elif state_home:
+        secret_root = Path(state_home)
+    else:
+        secret_root = Path.home() / ".local" / "state"
+    secret_path = secret_root / "clawbar" / "node-key-secret"
     secret_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     try:
         secret = secret_path.read_bytes()

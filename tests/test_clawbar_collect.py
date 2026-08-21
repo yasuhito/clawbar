@@ -313,18 +313,20 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(len(set(first_keys)), 2)
         self.assertNotIn("PRIVATE-NODE", first.stdout + second.stdout)
 
-    def test_missing_runtime_directory_does_not_degrade_gateway(self) -> None:
+    def test_node_keys_stay_stable_without_runtime_directory(self) -> None:
         nodes = {"nodes": [{"nodeId": "PRIVATE-NODE", "displayName": "Local", "connected": True}]}
+        environment = {"FAKE_NODES": json.dumps(nodes), "XDG_RUNTIME_DIR": ""}
 
-        result = self.run_external(
-            "local",
-            environment_overrides={"FAKE_NODES": json.dumps(nodes), "XDG_RUNTIME_DIR": ""},
-        )
+        first = self.run_external("local", environment_overrides=environment)
+        second = self.run_external("local", environment_overrides=environment)
 
-        snapshot = json.loads(result.stdout)
-        self.assertEqual(result.returncode, clawbar_collect.ExitCode.OK, result.stderr)
-        self.assertEqual(snapshot["gateway"], {"state": "healthy"})
-        self.assertEqual(snapshot["fleet"]["nodes"], [{"name": "Local", "state": "healthy"}])
+        first_node = json.loads(first.stdout)["fleet"]["nodes"][0]
+        second_node = json.loads(second.stdout)["fleet"]["nodes"][0]
+        self.assertEqual(first.returncode, clawbar_collect.ExitCode.OK, first.stderr)
+        self.assertEqual(second.returncode, clawbar_collect.ExitCode.OK, second.stderr)
+        self.assertEqual(first_node["key"], second_node["key"])
+        self.assertTrue(first_node["key"].startswith("node:"))
+        self.assertNotIn("PRIVATE-NODE", first.stdout + second.stdout)
 
     def test_metadata_failure_is_degraded_not_gateway_loss(self) -> None:
         result = self.run_external(
