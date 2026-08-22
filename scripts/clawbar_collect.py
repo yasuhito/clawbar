@@ -91,7 +91,15 @@ def default_snapshot_path() -> Path:
     return base / "clawbar" / "snapshot.json"
 
 
-
+def developer_demo_active() -> bool:
+    runtime_directory = os.environ.get("XDG_RUNTIME_DIR")
+    if not runtime_directory:
+        return False
+    try:
+        marker = Path(runtime_directory) / "clawbar" / "demo-active"
+        return marker.read_text(encoding="utf-8").strip() == "1"
+    except OSError:
+        return False
 
 
 def validate_refresh_interval(value: object) -> int:
@@ -523,6 +531,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             int(ExitCode.COMMAND_FAILED),
             load_previous_snapshot,
         )
+    if developer_demo_active():
+        snapshot = load_previous_snapshot(snapshot_path)
+        if snapshot is not None:
+            json.dump(snapshot, sys.stdout, separators=(",", ":"), sort_keys=True)
+            sys.stdout.write("\n")
+        return int(ExitCode.OK)
     result = collect_gateway(snapshot_path, arguments.refresh_interval)
     json.dump(result.snapshot, sys.stdout, separators=(",", ":"), sort_keys=True)
     sys.stdout.write("\n")

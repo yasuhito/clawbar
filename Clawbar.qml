@@ -7,12 +7,11 @@ import "ClawbarLogic.js" as Logic
 
 BarWidget {
   id: root
-  moduleName: "yasuhito.clawbar"
+  moduleName: "io.github.yasuhito.clawbar"
 
   property string state: "starting"
   property string resolutionSource: "unresolved"
   property var lastSnapshot: null
-  property bool refreshPending: false
   property bool cacheReadPending: false
   property bool collectionAttempted: false
   property bool opened: false
@@ -23,12 +22,15 @@ BarWidget {
     var base = stateHome ? stateHome : Quickshell.env("HOME") + "/.local/state"
     return base + "/clawbar/snapshot.json"
   }
-  property int refreshIntervalSeconds: Logic.normalizeRefreshInterval(
-    Quickshell.env("CLAWBAR_REFRESH_INTERVAL_SECONDS")
-  )
+  readonly property var collectorService: {
+    if (!bar || !bar.shell || typeof bar.shell.serviceFor !== "function") return null
+    return bar.shell.serviceFor(root.moduleName)
+  }
   readonly property string barSeverity: Logic.barSeverity(lastSnapshot, state)
   readonly property int barCount: Logic.barCount(lastSnapshot, state)
-  readonly property string summary: Logic.summary(state, resolutionSource, barCount, barSeverity)
+  readonly property bool developerDemo: !!lastSnapshot && typeof lastSnapshot.demoScenario === "string"
+  readonly property string baseSummary: Logic.summary(state, resolutionSource, barCount, barSeverity)
+  readonly property string summary: developerDemo ? "Developer demo · " + baseSummary : baseSummary
   readonly property var barSignal: Logic.signalPresentation(
     barSeverity === "critical" ? "failed" : barSeverity === "warning" ? "waiting" : "healthy"
   )
@@ -59,22 +61,18 @@ BarWidget {
   }
 
   function requestCollection() {
+    if (!collectorService) {
+      console.warn("Clawbar scheduler service unavailable")
+      if (lastSnapshot === null) state = "no_data"
+      return
+    }
     if (lastSnapshot === null) state = "collecting"
-    var action = Logic.requestRefresh(collector.running)
-    refreshPending = action.pending
-    if (action.start) collector.running = true
+    collectorService.requestCollection()
   }
 
   function consumeCollection() {
-    var action = Logic.consumeRefresh(collector.running, refreshPending)
-    refreshPending = action.pending
-    if (action.wait) {
-      Qt.callLater(function() { root.consumeCollection() })
-      return
-    }
     collectionAttempted = true
-    root.readSnapshot()
-    if (action.start) collector.running = true
+    readSnapshot()
   }
 
   function applySnapshot(snapshot) {
@@ -136,33 +134,9 @@ BarWidget {
       Qt.callLater(function() { root.consumeCacheRead(exitCode) })
     }
   }
-
-  Process {
-    id: collector
-    command: [
-      "python3",
-      root.collectorPath,
-      "--refresh-interval",
-      String(root.refreshIntervalSeconds)
-    ]
-    onExited: function(_) {
-      Qt.callLater(function() { root.consumeCollection() })
-    }
-  }
-
   Process {
     id: historyLauncher
   }
-
-
-  Timer {
-    interval: root.refreshIntervalSeconds * 1000
-    running: true
-    repeat: true
-    triggeredOnStart: true
-    onTriggered: root.requestCollection()
-  }
-
   Timer {
     interval: 1000
     running: root.lastSnapshot !== null
@@ -217,6 +191,13 @@ BarWidget {
     onPressed: function(buttonCode) {
       if (buttonCode === Qt.MiddleButton) root.requestCollection()
       else root.toggle()
+    }
+  }
+
+  Connections {
+    target: root.collectorService
+    function onCollectionFinished() {
+      root.consumeCollection()
     }
   }
 

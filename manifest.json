@@ -1,16 +1,19 @@
 {
   "schemaVersion": 1,
-  "id": "yasuhito.clawbar",
+  "id": "io.github.yasuhito.clawbar",
   "name": "Clawbar",
   "version": "0.1.0",
   "author": "Yasuhito Takamiya",
   "license": "MIT",
-  "description": "A private, read-only OpenClaw operations widget for Omarchy.",
-  "kinds": ["bar-widget"],
-  "entryPoints": { "barWidget": "Clawbar.qml" },
+  "description": "A read-only OpenClaw fleet status view for the Omarchy bar.",
+  "kinds": ["bar-widget", "service"],
+  "entryPoints": {
+    "barWidget": "Clawbar.qml",
+    "service": "ClawbarService.qml"
+  },
   "barWidget": {
     "displayName": "Clawbar",
-    "description": "Current OpenClaw Gateway health from a private, read-only snapshot.",
+    "description": "Read-only Gateway, Fleet, Agent, and Automation status.",
     "category": "AI",
     "allowMultiple": false,
     "defaultSection": "right"
