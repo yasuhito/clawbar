@@ -109,8 +109,9 @@ class CollectorFixture:
                         elif candidate_mode == "failed":
                             raise SystemExit(9)
                         else:
-                            url = arguments[arguments.index("--url") + 1]
-                            sys.stdout.write(json.dumps({"rpc": {"ok": True, "url": url}}))
+                            dialed_url = arguments[arguments.index("--url") + 1]
+                            reported_url = os.environ.get("FAKE_REPORTED_URL", dialed_url)
+                            sys.stdout.write(json.dumps({"rpc": {"ok": True, "url": reported_url}}))
                         raise SystemExit(0)
                     if scenario in {"node_host", "unresolved"} and "--url" not in arguments:
                         if scenario == "unresolved":

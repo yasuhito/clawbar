@@ -82,10 +82,11 @@ Tailscale identifiers, or raw errors. Tailscale device identifiers are HMACed
 with Clawbar's local secret into stable candidate keys before entering a
 snapshot. QML reads only `$XDG_STATE_HOME/clawbar/snapshot.json` (or
 `~/.local/state/clawbar/snapshot.json`). Private mode-`0600` state beside the
-snapshot binds Automation history to the current snapshot's Gateway Target and
-separately remembers a verified Tailscale fallback. Automatic resolution never
-replaces that fallback. Neither state file contains a token, password, or other
-credential. Incident
+snapshot maps opaque candidate keys to Tailscale targets, binds Automation
+history to the current snapshot's Gateway Target, and separately remembers a
+verified Tailscale fallback. Automatic resolution never replaces that fallback.
+None of these state files contains a token, password, or other credential.
+Incident
 deduplication state and the local key secret are per-login data under
 `XDG_RUNTIME_DIR`.
 

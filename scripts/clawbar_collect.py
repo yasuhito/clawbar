@@ -286,7 +286,9 @@ def publish_current(
             snapshot["generatedAt"],
             snapshot["resolutionSource"],
             target_url,
-            verified_fallback=target is not None and target.source == "tailscale",
+            verified_fallback_url=(
+                target.url if target is not None and target.source == "tailscale" else None
+            ),
         )
     return publish(snapshot_path, ExitCode.OK, snapshot)
 
@@ -524,6 +526,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ("openclaw",),
             OPENCLAW_TIMEOUT_MILLISECONDS,
             int(ExitCode.COMMAND_FAILED),
+            SCHEMA_VERSION,
             load_previous_snapshot,
         )
     if developer_demo_active():

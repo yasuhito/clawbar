@@ -30,22 +30,21 @@ class GatewayTargetState:
         self,
         snapshot_generated_at: str,
         source: str,
-        url: str,
+        current_url: str,
         *,
-        verified_fallback: bool = False,
+        verified_fallback_url: str | None = None,
     ) -> None:
-        if not _safe_gateway_url(url):
-            raise ValueError("Gateway Target URL must not contain credentials")
-        if verified_fallback and source != "tailscale":
-            raise ValueError("only a Tailscale target can be a verified fallback")
-
-        if verified_fallback:
+        _require_safe_gateway_url(current_url)
+        if verified_fallback_url is not None:
+            _require_safe_gateway_url(verified_fallback_url)
+            if source != "tailscale":
+                raise ValueError("only a Tailscale target can be a verified fallback")
             atomic_write_snapshot(
                 self.verified_fallback_path,
                 {
                     "schemaVersion": self.schema_version,
                     "source": "tailscale",
-                    "url": url,
+                    "url": verified_fallback_url,
                 },
             )
         atomic_write_snapshot(
@@ -54,7 +53,7 @@ class GatewayTargetState:
                 "schemaVersion": self.schema_version,
                 "snapshotGeneratedAt": snapshot_generated_at,
                 "source": source,
-                "url": url,
+                "url": current_url,
             },
         )
 
@@ -65,7 +64,7 @@ class GatewayTargetState:
         url = state.get("url")
         return url if isinstance(url, str) and _safe_gateway_url(url) else None
 
-    def current_url(self, snapshot_generated_at: object) -> str | None:
+    def current_url(self, snapshot_generated_at: str | None) -> str | None:
         state = load_snapshot(self.current_path, self.schema_version)
         if not state or state.get("snapshotGeneratedAt") != snapshot_generated_at:
             return None
@@ -79,6 +78,13 @@ def collected_target_url(status: dict[str, Any], fallback_url: str | None) -> st
     if not isinstance(value, str):
         value = fallback_url
     return value if isinstance(value, str) and _safe_gateway_url(value) else None
+
+
+def _require_safe_gateway_url(url: str) -> None:
+    if not _safe_gateway_url(url):
+        raise ValueError(
+            "Gateway Target URL must be a ws or wss URL with a host and no credentials, query, or fragment"
+        )
 
 
 def _safe_gateway_url(url: str) -> bool:

@@ -59,13 +59,14 @@ def open_automation_history(
     openclaw_command: Sequence[str],
     timeout_milliseconds: int,
     command_failed_code: int,
+    schema_version: int,
     load_snapshot: LoadSnapshot,
 ) -> int:
     snapshot = load_snapshot(snapshot_path)
     automations = snapshot.get("automations") if snapshot else None
     items = automations.get("items") if isinstance(automations, dict) and automations.get("available") else None
     target_url = (
-        GatewayTargetState(snapshot_path, snapshot["schemaVersion"]).current_url(snapshot.get("generatedAt"))
+        GatewayTargetState(snapshot_path, schema_version).current_url(snapshot.get("generatedAt"))
         if snapshot
         else None
     )
