@@ -8,11 +8,22 @@ import subprocess
 import sys
 import time
 import unittest
+from unittest import mock
 from datetime import datetime
 from pathlib import Path
 
-from scripts import clawbar_collect
+from scripts import clawbar_collect, clawbar_metadata
 from tests.collector_fixture import CollectorFixture
+
+class MetadataTests(unittest.TestCase):
+    def test_secret_created_by_another_collector_is_validated(self) -> None:
+        with (
+            mock.patch.object(Path, "read_bytes", side_effect=[FileNotFoundError, b""]),
+            mock.patch.object(os, "open", side_effect=FileExistsError),
+        ):
+            with self.assertRaisesRegex(OSError, "Invalid Clawbar Node key secret"):
+                clawbar_metadata.load_node_key_secret()
+
 
 class CollectorCommandTests(CollectorFixture, unittest.TestCase):
     def test_healthy_json_publishes_versioned_sanitized_snapshot(self) -> None:

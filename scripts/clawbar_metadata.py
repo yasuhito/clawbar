@@ -32,9 +32,10 @@ def load_node_key_secret() -> bytes:
         try:
             descriptor = os.open(secret_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         except FileExistsError:
-            return secret_path.read_bytes()
-        with os.fdopen(descriptor, "wb") as output:
-            output.write(secret)
+            secret = secret_path.read_bytes()
+        else:
+            with os.fdopen(descriptor, "wb") as output:
+                output.write(secret)
     if len(secret) != _SECRET_BYTES:
         raise OSError("Invalid Clawbar Node key secret")
     return secret
