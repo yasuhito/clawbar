@@ -67,6 +67,8 @@ def opaque_node_key(node_id: object, secret: bytes) -> str | None:
 def sanitize_fleet(payload: object, node_key_secret: bytes | None) -> list[dict[str, Any]] | None:
     if not isinstance(payload, dict) or not isinstance(payload.get("nodes"), list):
         return None
+    if payload["nodes"] and node_key_secret is None:
+        return None
     fleet = []
     for raw in payload["nodes"][:100]:
         if not isinstance(raw, dict):

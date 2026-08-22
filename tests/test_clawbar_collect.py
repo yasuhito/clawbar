@@ -328,6 +328,22 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertTrue(first_node["key"].startswith("node:"))
         self.assertNotIn("PRIVATE-NODE", first.stdout + second.stdout)
 
+
+    def test_invalid_node_key_secret_makes_fleet_unavailable(self) -> None:
+        secret_path = self.root / "runtime" / "clawbar" / "node-key-secret"
+        secret_path.parent.mkdir(parents=True)
+        secret_path.write_bytes(b"invalid")
+        nodes = {"nodes": [{"nodeId": "PRIVATE-NODE", "displayName": "Local", "connected": True}]}
+
+        result = self.run_external("local", environment_overrides={"FAKE_NODES": json.dumps(nodes)})
+
+        self.assertEqual(result.returncode, clawbar_collect.ExitCode.OK, result.stderr)
+        snapshot = json.loads(result.stdout)
+        self.assertEqual(snapshot["gateway"], {"state": "degraded"})
+        self.assertEqual(snapshot["fleet"], {"available": False, "nodes": []})
+        self.assertNotIn("PRIVATE-NODE", result.stdout)
+
+
     def test_metadata_failure_is_degraded_not_gateway_loss(self) -> None:
         result = self.run_external(
             "local",

@@ -27,6 +27,8 @@ The panel reads the Gateway-backed `nodes status`, `agents.list`, and
 Activity separately from the most recent Task Result, and never stores raw
 responses. Opaque Node UI keys retain selection and expansion across refreshes;
 the local key secret and private Node identifiers never enter the snapshot.
+If the local pseudonymization secret cannot be loaded, Node metadata becomes
+unavailable rather than falling back to positional identity.
 Press the widget to open the panel. Use `j`, `k`, or the arrow keys
 to move focus, Enter to expand or collapse a Node, `r` to refresh, and Escape
 to close. A connected Gateway with no reported Nodes shows Empty Fleet.
