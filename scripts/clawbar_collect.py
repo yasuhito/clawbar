@@ -416,7 +416,7 @@ def collect_gateway(
                     "The selected device could not be verified. Check Tailscale or choose another device.",
                 ),
             )
-        if automatic_setup_required:
+        if automatic_setup_required and not (previous and isinstance(previous.get("lastSuccessAt"), str)):
             return publish(
                 snapshot_path,
                 ExitCode.OK,

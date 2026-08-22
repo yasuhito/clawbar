@@ -149,6 +149,23 @@ class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
             second_snapshot["lastKnown"]["observedAt"],
             json.loads(healthy.stdout)["generatedAt"],
         )
+    def test_missing_resolution_after_success_is_gateway_loss_not_setup(self) -> None:
+        healthy = self.run_external("local")
+        self.call_log_path.unlink(missing_ok=True)
+
+        first_failure = self.run_external("unresolved")
+        second_failure = self.run_external("unresolved")
+
+        self.assertEqual(healthy.returncode, clawbar_collect.ExitCode.OK, healthy.stderr)
+        self.assertEqual(first_failure.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(second_failure.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        first_snapshot = json.loads(first_failure.stdout)
+        second_snapshot = json.loads(second_failure.stdout)
+        self.assertEqual(first_snapshot["gateway"], {"state": "unstable"})
+        self.assertEqual(second_snapshot["gateway"], {"state": "offline"})
+        self.assertEqual(first_snapshot["resolutionSource"], "local")
+        self.assertNotIn(["tailscale", "status", "--json"], self.read_calls())
+
 
 
 if __name__ == "__main__":
