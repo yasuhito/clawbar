@@ -56,9 +56,13 @@ _Avoid_: Degraded Gateway, Offline Node
 A scheduled operation managed by the configured Gateway. Clawbar does not assign it to a Node because the supported Gateway metadata establishes no Node ownership.
 _Avoid_: Node Automation, Task
 
+**Automation ID**:
+The opaque identifier reported by the Gateway for an Automation. Clawbar retains it as non-display Operational Metadata only to preserve selection and open that Automation's read-only history.
+_Avoid_: Automation name, Node UI Key
+
 **Automation Failure**:
-An unsuccessful result reported by the Gateway for an Automation run. It is immediately actionable, contributes one current Attention Item, and does not change Gateway or Node state.
-_Avoid_: Gateway failure, Node failure
+An error result reported by the Gateway for an Automation run. It is immediately actionable, contributes one current Attention Item, and does not change Gateway or Node state. A skipped run is not an Automation Failure.
+_Avoid_: Gateway failure, Node failure, skipped run
 
 **Disabled Automation**:
 An Automation that remains configured but is not scheduled to run. It remains visible by name and last-run time as muted Operational Metadata but never creates an Attention Item or Incident.
