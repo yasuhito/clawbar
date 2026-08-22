@@ -45,6 +45,16 @@ Automation failures contribute once to the bar's Attention Item count without
 changing Gateway or Node state. Disabled, skipped, event-driven, completed
 one-time, and never-run Automations remain non-incident states.
 
+The bar keeps the compact claw mark in the theme foreground, adds a separate
+severity point, and shows the Attention Item count when one exists. The panel
+uses the same semantic theme roles with a Fleet rail:
+circles identify healthy or active state, triangles identify waiting or warning,
+diamonds identify current failure, and a dotted ring identifies Disabled
+Automation. Last Known Metadata keeps its observed shape with reduced emphasis;
+Idle Agent Activity has no point. Labels, text strength, and timestamps preserve
+the same distinctions in monochrome themes. The signal board has no
+nonessential motion.
+
 Clawbar sends one desktop notification when an Offline Gateway, Offline Node,
 Configuration Error, or enabled Automation Failure starts, and one when it
 recovers. Changes found in the same collection are grouped. Per-login transition
@@ -65,6 +75,8 @@ focus, Enter to expand or collapse a Node, `r` to refresh, `o` on an Automation
 to open its official read-only recent-run history for the collected Gateway
 Target, and Escape to close. A connected Gateway with no reported Nodes shows
 Empty Fleet; a valid zero-Automation response shows No Automations.
+Relative timestamps and the selected row's absolute timestamp update from the
+in-memory snapshot without collecting the Gateway again.
 
 Remove the symlink when finished testing. Marketplace installation will use
 `omarchy plugin add <repository-url> --enable`.

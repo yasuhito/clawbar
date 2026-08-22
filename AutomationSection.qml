@@ -18,6 +18,7 @@ Column {
   required property string fontFamily
   required property bool historical
   required property bool showUnavailable
+  required property var signalColor
 
   signal rowSelected(var row)
 
@@ -68,6 +69,10 @@ Column {
             readonly property var row: root.rows[root.rowOffset + index]
             readonly property bool selected: !!row && root.selectedKey === row.key
             readonly property bool failed: modelData.enabled && modelData.lastResult === "error"
+            readonly property string signalState: failed ? "failed"
+              : !modelData.enabled ? "disabled"
+              : modelData.lastResult === "ok" ? "succeeded" : "healthy"
+            readonly property var signal: Logic.signalPresentation(signalState)
             width: root.width
             height: Style.space(48)
             radius: Style.cornerRadius
@@ -81,16 +86,12 @@ Column {
               onClicked: root.rowSelected(automationRow.row)
             }
 
-            Text {
+            SignalPoint {
               anchors.left: parent.left
-              anchors.leftMargin: Style.space(9)
+              anchors.leftMargin: Style.space(8)
               anchors.verticalCenter: automationName.verticalCenter
-              text: automationRow.modelData.enabled ? "●" : "◌"
-              color: automationRow.failed
-                ? root.urgent
-                : automationRow.modelData.enabled ? root.accent : root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
+              kind: automationRow.signal.shape
+              color: root.signalColor(automationRow.signal.tone)
             }
 
             Text {
@@ -115,7 +116,7 @@ Column {
               anchors.rightMargin: Style.space(8)
               anchors.verticalCenter: automationName.verticalCenter
               text: root.historical ? "Last known" : Logic.automationStatusLabel(automationRow.modelData)
-              color: root.historical ? root.dim : automationRow.failed ? root.urgent : root.dim
+              color: root.historical ? root.dim : root.signalColor(automationRow.signal.tone)
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
             }

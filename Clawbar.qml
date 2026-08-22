@@ -29,6 +29,16 @@ BarWidget {
   readonly property string barSeverity: Logic.barSeverity(lastSnapshot, state)
   readonly property int barCount: Logic.barCount(lastSnapshot, state)
   readonly property string summary: Logic.summary(state, resolutionSource, barCount, barSeverity)
+  readonly property var barSignal: Logic.signalPresentation(
+    barSeverity === "critical" ? "failed" : barSeverity === "warning" ? "waiting" : "healthy"
+  )
+  readonly property color barSignalColor: Logic.signalColor(
+    barSignal.tone,
+    button.foreground,
+    Color.accent,
+    bar ? bar.urgent : Color.urgent,
+    Color.muted
+  )
 
   function readSnapshot() {
     var action = Logic.requestRefresh(cacheReader.running)
@@ -104,13 +114,6 @@ BarWidget {
   }
 
 
-  function barMark() {
-    if (state === "healthy" || state === "degraded") return "󰚩"
-    if (state === "configuration_error") return "󰒓"
-    if (state === "stale") return "󰔟"
-    return "󰀦"
-  }
-
   Component.onCompleted: readSnapshot()
 
   implicitWidth: button.implicitWidth
@@ -171,14 +174,46 @@ BarWidget {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: root.barMark() + (root.barCount > 0 ? " " + root.barCount : "")
-    active: root.barSeverity !== "healthy"
-    activeColor: root.barSeverity === "critical"
-      ? (root.bar ? root.bar.urgent : Color.urgent)
-      : Color.accent
-    slotSize: Style.bar.statusSlot
-    fontSize: Style.font.caption
+    text: ""
+    active: false
+    slotSize: root.barCount > 0 ? Style.space(36) : Style.bar.statusSlot
+    opticalSize: root.barCount > 0 ? Style.space(31) : Style.bar.iconCanvas
     tooltipText: root.summary
+    iconComponent: Component {
+      Item {
+        ClawMark {
+          id: barClaw
+          anchors.left: root.barCount > 0 ? parent.left : undefined
+          anchors.horizontalCenter: root.barCount > 0 ? undefined : parent.horizontalCenter
+          anchors.verticalCenter: parent.verticalCenter
+          width: Style.space(10)
+          height: width
+          color: button.foreground
+        }
+
+        SignalPoint {
+          anchors.left: barClaw.right
+          anchors.leftMargin: -Style.space(2)
+          anchors.bottom: barClaw.bottom
+          width: Style.space(6)
+          height: width
+          kind: root.barSignal.shape
+          color: root.barSignalColor
+        }
+
+        Text {
+          visible: root.barCount > 0
+          anchors.left: barClaw.right
+          anchors.leftMargin: Style.space(5)
+          anchors.verticalCenter: parent.verticalCenter
+          text: String(root.barCount)
+          color: button.foreground
+          font.family: button.fontFamily
+          font.pixelSize: Style.font.caption
+          font.bold: true
+        }
+      }
+    }
     onPressed: function(buttonCode) {
       if (buttonCode === Qt.MiddleButton) root.requestCollection()
       else root.toggle()

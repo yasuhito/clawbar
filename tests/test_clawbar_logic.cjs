@@ -192,9 +192,6 @@ test("Agent Activity remains independent from previous Task Result", () => {
     ]
   }
 
-  assert.equal(Logic.activityLabel("working"), "Working")
-  assert.equal(Logic.activityLabel("waiting"), "Waiting")
-  assert.equal(Logic.activityLabel("idle"), "")
   assert.equal(
     Logic.taskResultLabel(snapshot.agents.items[0].taskResult, 100000 + 9 * 60000),
     "Task: Failed · 9m"
@@ -311,4 +308,25 @@ test("bar uses Attention Items for critical Automation state and Working Agents 
   assert.equal(Logic.snapshotState(snapshot, 100000), "healthy")
   assert.equal(Logic.barSeverity(snapshot, "healthy"), "healthy")
   assert.equal(Logic.barCount(snapshot, "healthy"), 3)
+})
+
+test("signal semantics remain legible without color", () => {
+  assert.deepEqual(Logic.signalPresentation("healthy"), { shape: "circle", tone: "healthy", label: "Healthy" })
+  assert.deepEqual(Logic.signalPresentation("succeeded"), { shape: "circle", tone: "healthy", label: "Succeeded" })
+  assert.deepEqual(Logic.signalPresentation("working"), { shape: "circle", tone: "working", label: "Working" })
+  assert.deepEqual(Logic.signalPresentation("waiting"), { shape: "triangle", tone: "warning", label: "Waiting" })
+  assert.deepEqual(Logic.signalPresentation("failed"), { shape: "diamond", tone: "critical", label: "Failed" })
+  assert.deepEqual(Logic.signalPresentation("disabled"), { shape: "dotted", tone: "disabled", label: "Disabled" })
+  assert.deepEqual(Logic.signalPresentation("idle"), { shape: "none", tone: "idle", label: "" })
+  assert.deepEqual(Logic.signalPresentation("offline"), { shape: "diamond", tone: "critical", label: "Offline" })
+  assert.deepEqual(Logic.signalPresentation("degraded"), { shape: "triangle", tone: "warning", label: "Degraded" })
+  assert.deepEqual(Logic.signalPresentation("collecting"), { shape: "triangle", tone: "warning", label: "Collecting" })
+  assert.deepEqual(Logic.signalPresentation("no_data"), { shape: "triangle", tone: "warning", label: "No data yet" })
+  assert.deepEqual(Logic.signalPresentation("starting"), { shape: "triangle", tone: "warning", label: "Starting" })
+  assert.deepEqual(Logic.signalPresentation("unexpected"), { shape: "triangle", tone: "warning", label: "Unavailable" })
+  assert.equal(Logic.signalColor("critical", "fg", "accent", "urgent", "dim"), "urgent")
+  assert.equal(Logic.signalColor("warning", "fg", "accent", "urgent", "dim"), "accent")
+  assert.equal(Logic.signalColor("working", "fg", "accent", "urgent", "dim"), "accent")
+  assert.equal(Logic.signalColor("disabled", "fg", "accent", "urgent", "dim"), "dim")
+  assert.equal(Logic.signalColor("healthy", "fg", "accent", "urgent", "dim"), "fg")
 })

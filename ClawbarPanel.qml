@@ -31,6 +31,7 @@ KeyboardPanel {
   readonly property color accent: Color.accent
   readonly property color urgent: bar ? bar.urgent : Color.urgent
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
+  readonly property var gatewaySignal: Logic.signalPresentation(state)
 
   focusTarget: keyCatcher
   contentWidth: fittedContentWidth(Style.space(360))
@@ -82,10 +83,9 @@ KeyboardPanel {
     Qt.callLater(root.ensureSelectionVisible)
   }
 
-  function stateColor(value) {
-    if (value === "offline" || value === "configuration_error") return urgent
-    if (value === "healthy") return accent
-    return dim
+
+  function signalColor(tone) {
+    return Logic.signalColor(tone, foreground, accent, urgent, dim)
   }
 
   onRowsChanged: reconcileRows()
@@ -128,28 +128,66 @@ KeyboardPanel {
 
         Item {
           width: parent.width
-          height: Style.space(48)
+          height: Style.space(56)
 
-          Text {
+          ClawMark {
+            id: panelClaw
             anchors.left: parent.left
             anchors.top: parent.top
-            text: "Clawbar"
+            width: Style.space(20)
+            height: width
+            color: root.foreground
+          }
+
+          Text {
+            anchors.left: panelClaw.right
+            anchors.leftMargin: Style.space(8)
+            anchors.top: parent.top
+            anchors.right: gatewayStatus.left
+            anchors.rightMargin: Style.space(8)
+            text: "OpenClaw"
+            elide: Text.ElideRight
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.title
             font.bold: true
           }
 
+          Row {
+            id: gatewayStatus
+            anchors.right: parent.right
+            anchors.top: parent.top
+            spacing: Style.space(5)
+
+            SignalPoint {
+              anchors.verticalCenter: parent.verticalCenter
+              kind: root.gatewaySignal.shape
+              color: root.signalColor(root.gatewaySignal.tone)
+            }
+
+            Text {
+              text: root.gatewaySignal.label
+              color: root.signalColor(root.gatewaySignal.tone)
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: true
+            }
+          }
+
           Text {
             anchors.left: parent.left
+            anchors.right: observedTime.left
+            anchors.rightMargin: Style.space(8)
             anchors.bottom: parent.bottom
             text: root.summary
+            elide: Text.ElideRight
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
           }
 
           Text {
+            id: observedTime
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             text: root.historical
@@ -201,6 +239,7 @@ KeyboardPanel {
             readonly property var row: root.rows[index]
             readonly property bool selected: !!row && root.selectedKey === row.key
             readonly property bool expanded: !!row && !!root.expandedKeys[row.key]
+            readonly property var signal: Logic.signalPresentation(modelData.state)
             width: contentColumn.width
             height: Style.space(expanded ? 72 : 48)
             radius: Style.cornerRadius
@@ -229,12 +268,20 @@ KeyboardPanel {
 
             Rectangle {
               anchors.left: parent.left
+              anchors.leftMargin: Style.space(29)
+              anchors.verticalCenter: parent.verticalCenter
+              width: 1
+              height: parent.height + Style.space(4)
+              color: root.dim
+              opacity: 0.4
+            }
+
+            SignalPoint {
+              anchors.left: parent.left
               anchors.leftMargin: Style.space(24)
               anchors.verticalCenter: nodeTitle.verticalCenter
-              width: Style.space(6)
-              height: width
-              radius: width / 2
-              color: root.stateColor(nodeRow.modelData.state)
+              kind: nodeRow.signal.shape
+              color: root.signalColor(nodeRow.signal.tone)
             }
 
             Text {
@@ -258,10 +305,8 @@ KeyboardPanel {
               anchors.right: parent.right
               anchors.rightMargin: Style.space(8)
               anchors.verticalCenter: nodeTitle.verticalCenter
-              text: root.historical
-                ? "Last known" : nodeRow.modelData.state === "healthy" ? "Healthy" : "Offline"
-              color: root.historical ? root.dim
-                : nodeRow.modelData.state === "offline" ? root.urgent : root.dim
+              text: root.historical ? "Last known" : nodeRow.signal.label
+              color: root.historical ? root.dim : root.signalColor(nodeRow.signal.tone)
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
             }
@@ -326,7 +371,7 @@ KeyboardPanel {
             required property int index
             readonly property var row: root.rows[root.nodes.length + index]
             readonly property bool selected: !!row && root.selectedKey === row.key
-            readonly property string activityText: Logic.activityLabel(modelData.activity)
+            readonly property var signal: Logic.signalPresentation(modelData.activity)
             width: contentColumn.width
             height: Style.space(48)
             radius: Style.cornerRadius
@@ -340,15 +385,12 @@ KeyboardPanel {
               onClicked: root.selectRow(agentRow.row)
             }
 
-            Rectangle {
-              visible: agentRow.modelData.activity === "working" || agentRow.modelData.activity === "waiting"
+            SignalPoint {
               anchors.left: parent.left
-              anchors.leftMargin: Style.space(10)
+              anchors.leftMargin: Style.space(9)
               anchors.verticalCenter: agentName.verticalCenter
-              width: Style.space(6)
-              height: width
-              radius: width / 2
-              color: agentRow.modelData.activity === "working" ? root.accent : root.dim
+              kind: agentRow.signal.shape
+              color: root.signalColor(agentRow.signal.tone)
             }
 
             Text {
@@ -372,8 +414,8 @@ KeyboardPanel {
               anchors.right: parent.right
               anchors.rightMargin: Style.space(8)
               anchors.verticalCenter: agentName.verticalCenter
-              text: root.historical ? "Last known" : agentRow.activityText
-              color: root.dim
+              text: root.historical ? "Last known" : agentRow.signal.label
+              color: root.historical ? root.dim : root.signalColor(agentRow.signal.tone)
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
             }
@@ -388,6 +430,8 @@ KeyboardPanel {
               elide: Text.ElideRight
               color: agentRow.modelData.taskResult
                 && agentRow.modelData.taskResult.state === "failed" ? root.urgent : root.dim
+              font.bold: !!agentRow.modelData.taskResult
+                && agentRow.modelData.taskResult.state === "failed"
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
             }
@@ -409,6 +453,7 @@ KeyboardPanel {
           urgent: root.urgent
           fontFamily: root.fontFamily
           historical: root.historical
+          signalColor: root.signalColor
           showUnavailable: root.state === "degraded"
           onRowSelected: function(row) {
             root.selectRow(row)
@@ -457,6 +502,15 @@ KeyboardPanel {
             font.pixelSize: Style.font.caption
             wrapMode: Text.Wrap
           }
+        }
+
+        Text {
+          width: parent.width
+          text: "j/k · arrows  Move    Enter  Expand    r  Refresh    o  Automation history    Esc  Close"
+          wrapMode: Text.Wrap
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
         }
       }
     }

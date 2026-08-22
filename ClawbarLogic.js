@@ -179,11 +179,34 @@ function timeUntil(value, nowMilliseconds) {
   return Math.floor(hours / 24) + "d"
 }
 
+var SIGNAL_PRESENTATIONS = {
+  healthy: { shape: "circle", tone: "healthy", label: "Healthy" },
+  succeeded: { shape: "circle", tone: "healthy", label: "Succeeded" },
+  working: { shape: "circle", tone: "working", label: "Working" },
+  waiting: { shape: "triangle", tone: "warning", label: "Waiting" },
+  failed: { shape: "diamond", tone: "critical", label: "Failed" },
+  offline: { shape: "diamond", tone: "critical", label: "Offline" },
+  configuration_error: { shape: "diamond", tone: "critical", label: "Configuration Error" },
+  degraded: { shape: "triangle", tone: "warning", label: "Degraded" },
+  unstable: { shape: "triangle", tone: "warning", label: "Unstable" },
+  stale: { shape: "triangle", tone: "warning", label: "Stale" },
+  collecting: { shape: "triangle", tone: "warning", label: "Collecting" },
+  no_data: { shape: "triangle", tone: "warning", label: "No data yet" },
+  starting: { shape: "triangle", tone: "warning", label: "Starting" },
+  unknown: { shape: "triangle", tone: "warning", label: "Unavailable" },
+  disabled: { shape: "dotted", tone: "disabled", label: "Disabled" },
+  idle: { shape: "none", tone: "idle", label: "" }
+}
 
-function activityLabel(activity) {
-  if (activity === "working") return "Working"
-  if (activity === "waiting") return "Waiting"
-  return ""
+function signalPresentation(state) {
+  return SIGNAL_PRESENTATIONS[state] || SIGNAL_PRESENTATIONS.unknown
+}
+
+function signalColor(tone, foreground, accent, urgent, dim) {
+  if (tone === "critical") return urgent
+  if (tone === "warning" || tone === "working") return accent
+  if (tone === "disabled") return dim
+  return foreground
 }
 
 function taskResultLabel(result, nowMilliseconds) {
@@ -300,11 +323,12 @@ if (typeof module !== "undefined") {
     relativeTime: relativeTime,
     timeUntil: timeUntil,
     absoluteLocalTime: absoluteLocalTime,
-    activityLabel: activityLabel,
     taskResultLabel: taskResultLabel,
     automationStatusLabel: automationStatusLabel,
     automationKindLabel: automationKindLabel,
     automationTimingLabel: automationTimingLabel,
+    signalColor: signalColor,
+    signalPresentation: signalPresentation,
     barSeverity: barSeverity,
     barCount: barCount,
     indexForKey: indexForKey,
