@@ -23,6 +23,7 @@ if __package__:
         open_automation_history,
         target_state_path,
     )
+    from .clawbar_incidents import process_incident_transitions
     from .clawbar_metadata import build_current_snapshot, load_node_key_secret, sanitize_metadata
     from .clawbar_snapshot import (
         atomic_write_snapshot,
@@ -38,6 +39,7 @@ else:
         open_automation_history,
         target_state_path,
     )
+    from clawbar_incidents import process_incident_transitions
     from clawbar_metadata import build_current_snapshot, load_node_key_secret, sanitize_metadata
     from clawbar_snapshot import (
         atomic_write_snapshot,
@@ -252,6 +254,7 @@ def configuration_error_snapshot(
 
 def publish(snapshot_path: Path, exit_code: ExitCode, snapshot: dict[str, Any]) -> CollectionResult:
     atomic_write_snapshot(snapshot_path, snapshot)
+    process_incident_transitions(snapshot)
     return CollectionResult(exit_code, snapshot)
 
 

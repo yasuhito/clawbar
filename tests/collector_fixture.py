@@ -20,6 +20,8 @@ class CollectorFixture:
         self.snapshot_path = self.root / "state" / "clawbar" / "snapshot.json"
         self.command_path = self.root / "openclaw"
         self.call_log_path = self.root / "calls.jsonl"
+        self.notification_path = self.root / "notify-send"
+        self.notification_log_path = self.root / "notifications.jsonl"
         self.command_path.write_text(
             textwrap.dedent(
                 """\
@@ -122,6 +124,22 @@ class CollectorFixture:
             encoding="utf-8",
         )
         self.command_path.chmod(0o755)
+        self.notification_path.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env python3
+                import json
+                import os
+                import sys
+
+                with open(os.environ["FAKE_NOTIFICATION_LOG"], "a", encoding="utf-8") as log:
+                    log.write(json.dumps(sys.argv[1:]) + "\\n")
+                raise SystemExit(int(os.environ.get("FAKE_NOTIFICATION_EXIT", "0")))
+                """
+            ),
+            encoding="utf-8",
+        )
+        self.notification_path.chmod(0o755)
 
     @contextlib.contextmanager
     def fake_environment(self, **values: str):
@@ -133,6 +151,10 @@ class CollectorFixture:
             "FAKE_GATEWAY_DELAY": "0",
             "FAKE_AUTOMATIONS_DELAY": "0",
             "FAKE_STDERR": "diagnostic output is ignored",
+            "FAKE_NOTIFICATION_LOG": str(self.notification_log_path),
+            "FAKE_NOTIFICATION_EXIT": "0",
+            "PATH": f"{self.root}{os.pathsep}{os.environ['PATH']}",
+            "XDG_RUNTIME_DIR": str(self.root / "runtime"),
             **values,
         }
         previous = {name: os.environ.get(name) for name in updates}
@@ -193,6 +215,8 @@ class CollectorFixture:
                 "XDG_RUNTIME_DIR": str(self.root / "runtime"),
                 "FAKE_CALL_LOG": str(self.call_log_path),
                 "FAKE_SCENARIO": scenario,
+                "FAKE_NOTIFICATION_LOG": str(self.notification_log_path),
+                "FAKE_NOTIFICATION_EXIT": "0",
                 **(environment_overrides or {}),
             }
         )
@@ -210,3 +234,10 @@ class CollectorFixture:
 
     def read_calls(self) -> list[list[str]]:
         return [json.loads(line) for line in self.call_log_path.read_text(encoding="utf-8").splitlines()]
+
+    def read_notifications(self) -> list[list[str]]:
+        try:
+            lines = self.notification_log_path.read_text(encoding="utf-8").splitlines()
+        except FileNotFoundError:
+            return []
+        return [json.loads(line) for line in lines]

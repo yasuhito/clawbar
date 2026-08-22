@@ -45,6 +45,15 @@ Automation failures contribute once to the bar's Attention Item count without
 changing Gateway or Node state. Disabled, skipped, event-driven, completed
 one-time, and never-run Automations remain non-incident states.
 
+Clawbar sends one desktop notification when an Offline Gateway, Offline Node,
+Configuration Error, or enabled Automation Failure starts, and one when it
+recovers. Changes found in the same collection are grouped. Per-login transition
+state lives only under `XDG_RUNTIME_DIR`; repeated collections stay quiet, and a
+new desktop login may notify a still-current Incident again. Removing a Node or
+Automation from monitoring, or disabling an Automation, ends monitoring
+silently. Notifications contain only bounded target labels, generalized states,
+and aggregate counts.
+
 Opaque Node UI keys retain selection and expansion across refreshes; the local
 key secret and private Node identifiers never enter the snapshot. Automation IDs
 remain non-display metadata used only for selection and history. If the local
