@@ -36,6 +36,10 @@ _Avoid_: Offline Gateway, unsupported Node
 An operational unit managed and reported by the configured Gateway. Clawbar does not connect to Nodes directly.
 _Avoid_: Gateway, Gateway Target, host, machine
 
+**Node UI Key**:
+A local opaque identifier derived from a private Node identifier with Clawbar's local secret. It preserves selection and expansion across Fleet snapshots; neither the private identifier nor the secret enters the snapshot. If Clawbar cannot derive every Node UI Key, Fleet metadata is unavailable.
+_Avoid_: Node ID, instance ID, positional index
+
 **Fleet**:
 The set of Nodes reported by the configured Gateway.
 _Avoid_: Gateways, cluster
