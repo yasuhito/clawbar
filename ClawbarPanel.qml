@@ -13,11 +13,13 @@ KeyboardPanel {
   property int selectedIndexHint: 0
   property var expandedKeys: ({})
 
+  signal automationHistoryRequested(string automationId)
   signal refreshRequested()
 
   readonly property var rows: Logic.panelRows(snapshot)
   readonly property var nodes: Logic.fleetNodes(snapshot)
   readonly property var agents: Logic.agents(snapshot)
+  readonly property var automations: Logic.automations(snapshot)
   readonly property int selectedIndex: Logic.indexForKey(rows, selectedKey)
   readonly property var selectedRow: selectedIndex >= 0 ? rows[selectedIndex] : null
   readonly property color foreground: bar ? bar.foreground : Color.foreground
@@ -53,9 +55,9 @@ KeyboardPanel {
 
   function rowDelegate(row) {
     if (!row) return null
-    return row.kind === "node"
-      ? nodeRepeater.itemAt(row.sectionIndex)
-      : agentRepeater.itemAt(row.sectionIndex)
+    if (row.kind === "node") return nodeRepeater.itemAt(row.sectionIndex)
+    if (row.kind === "agent") return agentRepeater.itemAt(row.sectionIndex)
+    return automationSection.itemAt(row.sectionIndex)
   }
 
   function ensureSelectionVisible() {
@@ -99,6 +101,10 @@ KeyboardPanel {
       if (text === "j" || text === "J") root.moveSelection(1)
       else if (text === "k" || text === "K") root.moveSelection(-1)
       else if (text === "r" || text === "R") root.refreshRequested()
+      else if (text === "o" || text === "O") {
+        if (root.selectedRow && root.selectedRow.kind === "automation")
+          root.automationHistoryRequested(root.selectedRow.item.id)
+      }
     }
 
     Flickable {
@@ -368,6 +374,25 @@ KeyboardPanel {
           }
         }
 
+        AutomationSection {
+          id: automationSection
+          width: parent.width
+          section: root.snapshot ? root.snapshot.automations : null
+          automations: root.automations
+          rows: root.rows
+          rowOffset: root.nodes.length + root.agents.length
+          selectedKey: root.selectedKey
+          nowMs: root.nowMs
+          foreground: root.foreground
+          dim: root.dim
+          accent: root.accent
+          urgent: root.urgent
+          fontFamily: root.fontFamily
+          onRowSelected: function(row) {
+            root.selectRow(row)
+          }
+        }
+
         Rectangle {
           visible: root.selectedRow !== null
           width: parent.width
@@ -383,6 +408,21 @@ KeyboardPanel {
             anchors.margins: Style.space(8)
             text: {
               if (!root.selectedRow) return ""
+              if (root.selectedRow.kind === "automation") {
+                var automation = root.selectedRow.item
+                var automationLines = ["Automation · " + automation.name]
+                automationLines.push(
+                  Logic.automationKindLabel(automation.kind)
+                    + " · " + Logic.automationStatusLabel(automation)
+                )
+                var nextRun = Logic.absoluteLocalTime(automation.nextRunAt)
+                var lastRun = Logic.absoluteLocalTime(automation.lastRunAt)
+                if (nextRun) automationLines.push("Next run " + nextRun)
+                if (lastRun) automationLines.push("Last run " + lastRun)
+                if (!nextRun && !lastRun && automation.lastResult === "none")
+                  automationLines.push("No run timestamps")
+                return automationLines.join("\n")
+              }
               var absolute = Logic.absoluteLocalTime(root.selectedRow.timestamp)
               return root.selectedRow.typeLabel + " · " + root.selectedRow.item.name
                 + (absolute ? "\nObserved " + absolute : "\n" + root.selectedRow.missingTimestampLabel)

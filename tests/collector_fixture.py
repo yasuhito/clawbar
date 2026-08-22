@@ -3,6 +3,8 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import textwrap
 from pathlib import Path
@@ -77,6 +79,23 @@ class CollectorFixture:
                     sys.stdout.write(output)
                     raise SystemExit(int(os.environ.get("FAKE_TASKS_EXIT", "0")))
 
+                if arguments[:3] == ["gateway", "call", "cron.list"]:
+                    time.sleep(float(os.environ.get("FAKE_AUTOMATIONS_DELAY", "0")))
+                    pages = os.environ.get("FAKE_AUTOMATION_PAGES")
+                    if pages is not None:
+                        params = json.loads(arguments[arguments.index("--params") + 1])
+                        output = json.dumps(json.loads(pages)[str(params["offset"])])
+                    else:
+                        output = os.environ.get("FAKE_AUTOMATIONS")
+                        if output is None:
+                            output = json.dumps({"jobs": []})
+                    sys.stdout.write(output)
+                    raise SystemExit(int(os.environ.get("FAKE_AUTOMATIONS_EXIT", "0")))
+
+                if arguments[:2] == ["cron", "runs"]:
+                    sys.stdout.write("Official recent Automation runs\\n")
+                    raise SystemExit(int(os.environ.get("FAKE_RUNS_EXIT", "0")))
+
                 if arguments[:2] == ["gateway", "status"]:
                     time.sleep(float(os.environ.get("FAKE_GATEWAY_DELAY", "0")))
                     scenario = os.environ.get("FAKE_SCENARIO", "local")
@@ -112,6 +131,7 @@ class CollectorFixture:
             "FAKE_NODE_DELAY": "0",
             "FAKE_NODES_DELAY": "0",
             "FAKE_GATEWAY_DELAY": "0",
+            "FAKE_AUTOMATIONS_DELAY": "0",
             "FAKE_STDERR": "diagnostic output is ignored",
             **values,
         }
@@ -144,6 +164,7 @@ class CollectorFixture:
             "FAKE_NODES_DELAY": str(nodes_delay),
             "FAKE_GATEWAY_DELAY": str(gateway_delay),
             "FAKE_STDERR": stderr,
+            "FAKE_AUTOMATIONS_DELAY": "0",
             "FAKE_SCENARIO": scenario,
         }
         if stdout is not None:
@@ -156,6 +177,33 @@ class CollectorFixture:
                 collection_deadline=deadline,
                 node_key_secret=b"clawbar-test-node-key-secret-32!",
             )
+
+    def run_external(
+        self,
+        scenario: str,
+        *,
+        timeout: float = 15,
+        environment_overrides: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "PATH": f"{self.root}{os.pathsep}{environment['PATH']}",
+                "XDG_STATE_HOME": str(self.root / "external-state"),
+                "XDG_RUNTIME_DIR": str(self.root / "runtime"),
+                "FAKE_CALL_LOG": str(self.call_log_path),
+                "FAKE_SCENARIO": scenario,
+                **(environment_overrides or {}),
+            }
+        )
+        return subprocess.run(
+            [sys.executable, str(Path(clawbar_collect.__file__)), "--refresh-interval", "30"],
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=timeout,
+            env=environment,
+        )
 
     def read_snapshot(self) -> dict[str, object]:
         return json.loads(self.snapshot_path.read_text(encoding="utf-8"))

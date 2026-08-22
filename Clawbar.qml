@@ -25,8 +25,9 @@ BarWidget {
   property int refreshIntervalSeconds: Logic.normalizeRefreshInterval(
     Quickshell.env("CLAWBAR_REFRESH_INTERVAL_SECONDS")
   )
-  readonly property string summary: Logic.summary(state, resolutionSource)
-  readonly property int workingCount: Logic.workingCount(lastSnapshot)
+  readonly property string barSeverity: Logic.barSeverity(lastSnapshot, state)
+  readonly property int barCount: Logic.barCount(lastSnapshot, state)
+  readonly property string summary: Logic.summary(state, resolutionSource, barCount, barSeverity)
 
   function readSnapshot() {
     var action = Logic.requestRefresh(cacheReader.running)
@@ -89,6 +90,19 @@ BarWidget {
     opened = false
   }
 
+  function openAutomationHistory(automationId) {
+    if (!automationId || historyLauncher.running) return
+    historyLauncher.command = [
+      "xdg-terminal-exec",
+      "python3",
+      root.collectorPath,
+      "--automation-history",
+      automationId
+    ]
+    historyLauncher.running = true
+  }
+
+
   function barMark() {
     if (state === "healthy" || state === "degraded") return "󰚩"
     if (state === "configuration_error") return "󰒓"
@@ -132,6 +146,11 @@ BarWidget {
     }
   }
 
+  Process {
+    id: historyLauncher
+  }
+
+
   Timer {
     interval: root.refreshIntervalSeconds * 1000
     running: true
@@ -151,9 +170,11 @@ BarWidget {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: root.barMark()
-      + (root.state === "healthy" && root.workingCount > 0 ? " " + root.workingCount : "")
-    active: root.state !== "healthy"
+    text: root.barMark() + (root.barCount > 0 ? " " + root.barCount : "")
+    active: root.barSeverity !== "healthy"
+    activeColor: root.barSeverity === "critical"
+      ? (root.bar ? root.bar.urgent : Color.urgent)
+      : Color.accent
     slotSize: Style.bar.statusSlot
     fontSize: Style.font.caption
     tooltipText: root.summary
@@ -173,5 +194,8 @@ BarWidget {
     nowMs: root.nowMs
     summary: root.summary
     onRefreshRequested: root.requestCollection()
+    onAutomationHistoryRequested: function(automationId) {
+      root.openAutomationHistory(automationId)
+    }
   }
 }

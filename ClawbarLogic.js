@@ -38,6 +38,12 @@ function agents(snapshot) {
     && Array.isArray(snapshot.agents.items) ? snapshot.agents.items : []
 }
 
+function automations(snapshot) {
+  return snapshot && snapshot.automations && snapshot.automations.available
+    && Array.isArray(snapshot.automations.items) ? snapshot.automations.items : []
+}
+
+
 function nodeRow(item, index) {
   return {
     kind: "node",
@@ -65,8 +71,24 @@ function agentRow(item, index) {
   }
 }
 
+function automationRow(item, index) {
+  return {
+    kind: "automation",
+    key: item.id ? "automation:" + item.id : "",
+    sectionIndex: index,
+    item: item,
+    expandable: false,
+    typeLabel: "Automation",
+    timestamp: item.lastRunAt || "",
+    missingTimestampLabel: "No runs yet"
+  }
+}
+
+
 function panelRows(snapshot) {
-  return fleetNodes(snapshot).map(nodeRow).concat(agents(snapshot).map(agentRow))
+  return fleetNodes(snapshot).map(nodeRow)
+    .concat(agents(snapshot).map(agentRow))
+    .concat(automations(snapshot).map(automationRow))
 }
 
 function indexForKey(rows, key) {
@@ -96,9 +118,6 @@ function moveFocus(index, count, delta) {
   return ((current + delta) % count + count) % count
 }
 
-function workingCount(snapshot) {
-  return agents(snapshot).filter(function(agent) { return agent.activity === "working" }).length
-}
 
 function relativeTime(value, nowMilliseconds) {
   var timestamp = Date.parse(String(value || ""))
@@ -117,6 +136,19 @@ function absoluteLocalTime(value) {
   return isNaN(timestamp) ? "" : new Date(timestamp).toLocaleString()
 }
 
+function timeUntil(value, nowMilliseconds) {
+  var timestamp = Date.parse(String(value || ""))
+  if (isNaN(timestamp)) return ""
+  var seconds = Math.max(0, Math.floor((timestamp - nowMilliseconds) / 1000))
+  if (seconds < 60) return "now"
+  var minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return minutes + "m"
+  var hours = Math.floor(minutes / 60)
+  if (hours < 24) return hours + "h"
+  return Math.floor(hours / 24) + "d"
+}
+
+
 function activityLabel(activity) {
   if (activity === "working") return "Working"
   if (activity === "waiting") return "Waiting"
@@ -130,20 +162,74 @@ function taskResultLabel(result, nowMilliseconds) {
   return "Task: " + state + (age ? " · " + age : "")
 }
 
-
-
-function summary(state, resolutionSource) {
-  if (state === "healthy") {
-    if (resolutionSource === "node_host") return "Node-host OpenClaw Gateway healthy"
-    if (resolutionSource === "configured_remote") return "Remote OpenClaw Gateway healthy"
-    return "Local OpenClaw Gateway healthy"
+function automationStatusLabel(automation) {
+  if (!automation || !automation.enabled) return "Disabled"
+  if (automation.lastResult === "error") {
+    var failures = Math.max(1, Number(automation.consecutiveFailures) || 0)
+    return "Automation Failure"
+      + (failures > 1 ? " · " + failures + " consecutive failures" : "")
   }
-  if (state === "degraded") return "OpenClaw Gateway metadata degraded"
-  if (state === "unstable") return "OpenClaw Gateway unstable"
-  if (state === "offline") return "OpenClaw Gateway offline"
-  if (state === "configuration_error") return "OpenClaw Gateway configuration error"
-  if (state === "stale") return "OpenClaw Gateway snapshot stale"
-  return "OpenClaw Gateway status unavailable"
+  if (automation.lastResult === "skipped") return "Skipped"
+  if (automation.kind === "on-exit" && automation.lastResult === "none")
+    return "Waiting for event"
+  if (automation.kind === "at" && automation.lastResult === "ok" && !automation.nextRunAt)
+    return "Completed"
+  if (automation.lastResult === "none") return "No runs yet"
+  return "Healthy"
+}
+
+function automationKindLabel(kind) {
+  if (kind === "cron") return "Scheduled"
+  if (kind === "every") return "Repeating"
+  if (kind === "at") return "One-time"
+  if (kind === "on-exit") return "Event-driven"
+  return "Unknown"
+}
+
+
+function automationTimingLabel(automation, nowMilliseconds) {
+  if (!automation) return ""
+  var parts = []
+  if (automation.enabled) {
+    var next = timeUntil(automation.nextRunAt, nowMilliseconds)
+    if (next) parts.push("Next " + next)
+  }
+  var last = relativeTime(automation.lastRunAt, nowMilliseconds)
+  if (last) parts.push("Last " + last)
+  return parts.join(" · ")
+}
+
+function barSeverity(snapshot, state) {
+  if (state === "offline" || state === "configuration_error") return "critical"
+  if (state !== "healthy") return "warning"
+  return snapshot && snapshot.bar && snapshot.bar.severity === "critical" ? "critical" : "healthy"
+}
+
+function barCount(snapshot, state) {
+  var count = snapshot && snapshot.bar ? Number(snapshot.bar.count) : 0
+  if (!isFinite(count) || count < 0) count = 0
+  if (barSeverity(snapshot, state) !== "healthy") return Math.max(1, Math.floor(count))
+  return Math.floor(count)
+}
+
+
+
+
+function summary(state, resolutionSource, count, severity) {
+  var text
+  if (state === "healthy") {
+    if (resolutionSource === "node_host") text = "Node-host OpenClaw Gateway healthy"
+    else if (resolutionSource === "configured_remote") text = "Remote OpenClaw Gateway healthy"
+    else text = "Local OpenClaw Gateway healthy"
+  } else if (state === "degraded") text = "OpenClaw Gateway metadata degraded"
+  else if (state === "unstable") text = "OpenClaw Gateway unstable"
+  else if (state === "offline") text = "OpenClaw Gateway offline"
+  else if (state === "configuration_error") text = "OpenClaw Gateway configuration error"
+  else if (state === "stale") text = "OpenClaw Gateway snapshot stale"
+  else text = "OpenClaw Gateway status unavailable"
+  if (severity !== "healthy" && count > 0)
+    text += count === 1 ? " · 1 Attention Item" : " · " + count + " Attention Items"
+  return text
 }
 
 function requestRefresh(running) {
@@ -170,13 +256,19 @@ if (typeof module !== "undefined") {
     consumeRefresh: consumeRefresh,
     fleetNodes: fleetNodes,
     agents: agents,
+    automations: automations,
     panelRows: panelRows,
     moveFocus: moveFocus,
-    workingCount: workingCount,
     relativeTime: relativeTime,
+    timeUntil: timeUntil,
     absoluteLocalTime: absoluteLocalTime,
     activityLabel: activityLabel,
     taskResultLabel: taskResultLabel,
+    automationStatusLabel: automationStatusLabel,
+    automationKindLabel: automationKindLabel,
+    automationTimingLabel: automationTimingLabel,
+    barSeverity: barSeverity,
+    barCount: barCount,
     indexForKey: indexForKey,
     reconcileSelection: reconcileSelection,
     reconcileExpanded: reconcileExpanded

@@ -9,19 +9,31 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from enum import IntEnum
 from pathlib import Path
 from typing import Any, Sequence
 from urllib.parse import urlsplit
 
 if __package__:
-    from .clawbar_metadata import load_node_key_secret, sanitize_metadata
+    from .clawbar_automation import (
+        collect_automation_surface,
+        collected_target_url,
+        open_automation_history,
+        target_state_path,
+    )
+    from .clawbar_metadata import build_current_snapshot, load_node_key_secret, sanitize_metadata
+    from .clawbar_snapshot import atomic_write_snapshot, build_failure_snapshot, load_snapshot, utc_now
 else:
-    from clawbar_metadata import load_node_key_secret, sanitize_metadata
+    from clawbar_automation import (
+        collect_automation_surface,
+        collected_target_url,
+        open_automation_history,
+        target_state_path,
+    )
+    from clawbar_metadata import build_current_snapshot, load_node_key_secret, sanitize_metadata
+    from clawbar_snapshot import atomic_write_snapshot, build_failure_snapshot, load_snapshot, utc_now
 
 SCHEMA_VERSION = 1
 DEFAULT_REFRESH_INTERVAL_SECONDS = 30
@@ -57,14 +69,15 @@ class CollectionDeadlineExceeded(Exception):
     pass
 
 
-def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def default_snapshot_path() -> Path:
     state_home = os.environ.get("XDG_STATE_HOME")
     base = Path(state_home) if state_home else Path.home() / ".local" / "state"
     return base / "clawbar" / "snapshot.json"
+
+
+
 
 
 def validate_refresh_interval(value: object) -> int:
@@ -91,13 +104,7 @@ def parse_refresh_interval(value: str) -> int:
 
 
 def load_previous_snapshot(path: Path) -> dict[str, Any] | None:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, OSError, json.JSONDecodeError):
-        return None
-    if not isinstance(value, dict) or value.get("schemaVersion") != SCHEMA_VERSION:
-        return None
-    return value
+    return load_snapshot(path, SCHEMA_VERSION)
 
 
 def seconds_until_deadline(deadline_at: float) -> float:
@@ -198,32 +205,6 @@ def resolution_source(status: dict[str, Any], source_hint: str | None = None) ->
 
 
 
-def failure_snapshot(
-    previous: dict[str, Any] | None,
-    refresh_interval: int,
-    failure_kind: str,
-) -> dict[str, Any]:
-    previous_failures = previous.get("consecutiveFailures", 0) if previous else 0
-    failures = previous_failures + 1 if isinstance(previous_failures, int) else 1
-    last_success = previous.get("lastSuccessAt") if previous else None
-    has_last_success = isinstance(last_success, str)
-    source = previous.get("resolutionSource") if previous else None
-    if failures >= 2:
-        state = "offline"
-    elif has_last_success:
-        state = "unstable"
-    else:
-        state = "unknown"
-    return {
-        "schemaVersion": SCHEMA_VERSION,
-        "generatedAt": utc_now(),
-        "refreshIntervalSeconds": refresh_interval,
-        "resolutionSource": source if source in RESOLUTION_SOURCES else "unresolved",
-        "gateway": {"state": state},
-        "lastSuccessAt": last_success if has_last_success else None,
-        "consecutiveFailures": failures,
-        "failureKind": failure_kind,
-    }
 
 
 def configuration_error_snapshot(
@@ -249,41 +230,8 @@ def configuration_error_snapshot(
     }
 
 
-def current_snapshot(
-    refresh_interval: int,
-    source: str,
-    fleet: list[dict[str, Any]] | None,
-    agents: list[dict[str, Any]] | None,
-) -> dict[str, Any]:
-    generated_at = utc_now()
-    degraded = fleet is None or agents is None
-    return {
-        "schemaVersion": SCHEMA_VERSION,
-        "generatedAt": generated_at,
-        "refreshIntervalSeconds": refresh_interval,
-        "resolutionSource": source,
-        "gateway": {"state": "degraded" if degraded else "healthy"},
-        "fleet": {"available": fleet is not None, "nodes": fleet or []},
-        "agents": {"available": agents is not None, "items": agents or []},
-        "lastSuccessAt": generated_at,
-        "consecutiveFailures": 0,
-    }
 
 
-def atomic_write_snapshot(path: Path, snapshot: dict[str, Any]) -> None:
-    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f"{path.name}.", suffix=".tmp", dir=path.parent)
-    temporary_path = Path(temporary_name)
-    try:
-        os.fchmod(descriptor, 0o600)
-        with os.fdopen(descriptor, "w", encoding="utf-8") as output:
-            json.dump(snapshot, output, separators=(",", ":"), sort_keys=True)
-            output.write("\n")
-            output.flush()
-            os.fsync(output.fileno())
-        os.replace(temporary_path, path)
-    finally:
-        temporary_path.unlink(missing_ok=True)
 
 
 def publish(snapshot_path: Path, exit_code: ExitCode, snapshot: dict[str, Any]) -> CollectionResult:
@@ -301,7 +249,13 @@ def publish_failure(
     return publish(
         snapshot_path,
         exit_code,
-        failure_snapshot(previous, refresh_interval, failure_kind),
+        build_failure_snapshot(
+            previous,
+            refresh_interval,
+            failure_kind,
+            SCHEMA_VERSION,
+            RESOLUTION_SOURCES,
+        ),
     )
 
 
@@ -381,15 +335,43 @@ def read_metadata_surface(
         return None
 
 
+
+
 def collect_metadata(
     openclaw_command: Sequence[str],
     deadline_at: float,
     target: GatewayTarget | None,
-) -> tuple[object | None, object | None, object | None]:
-    return tuple(
+) -> tuple[object | None, object | None, object | None, object | None]:
+    core = tuple(
         read_metadata_surface(openclaw_command, arguments, deadline_at, target)
         for arguments in METADATA_SURFACES
     )
+    def read_automation(arguments: Sequence[str]) -> object | None:
+        return read_metadata_surface(openclaw_command, arguments, deadline_at, target)
+    return (*core, collect_automation_surface(read_automation))
+
+
+
+def publish_current(
+    snapshot_path: Path,
+    snapshot: dict[str, Any],
+    target_url: str | None,
+) -> CollectionResult:
+    if target_url is None:
+        return publish(snapshot_path, ExitCode.OK, snapshot)
+    atomic_write_snapshot(
+        target_state_path(snapshot_path),
+        {
+            "schemaVersion": SCHEMA_VERSION,
+            "snapshotGeneratedAt": snapshot["generatedAt"],
+            "url": target_url,
+        },
+    )
+    return publish(snapshot_path, ExitCode.OK, snapshot)
+
+
+
+
 
 
 def collect_gateway(
@@ -458,7 +440,7 @@ def collect_gateway(
             configuration_error_snapshot(previous, refresh_interval, status, target.source if target else None),
         )
 
-    fleet_payload, agent_payload, task_payload = collect_metadata(
+    fleet_payload, agent_payload, task_payload, automation_payload = collect_metadata(
         openclaw_command,
         command_deadline_at,
         target,
@@ -467,8 +449,25 @@ def collect_gateway(
         secret = node_key_secret or load_node_key_secret()
     except OSError:
         secret = None
-    fleet, agents = sanitize_metadata(fleet_payload, agent_payload, task_payload, secret)
-    return publish(snapshot_path, ExitCode.OK, current_snapshot(refresh_interval, source, fleet, agents))
+    fleet, agents, automations, automation_failure = sanitize_metadata(
+        fleet_payload,
+        agent_payload,
+        task_payload,
+        automation_payload,
+        secret,
+    )
+    snapshot = build_current_snapshot(
+        SCHEMA_VERSION,
+        utc_now(),
+        refresh_interval,
+        source,
+        fleet,
+        agents,
+        automations,
+        automation_failure,
+    )
+    fallback_url = target.url if target else None
+    return publish_current(snapshot_path, snapshot, collected_target_url(status, fallback_url))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -481,12 +480,27 @@ def build_parser() -> argparse.ArgumentParser:
         type=parse_refresh_interval,
         metavar="SECONDS",
     )
+    parser.add_argument(
+        "--automation-history",
+        metavar="AUTOMATION_ID",
+        help="open official read-only recent-run history for a collected Automation",
+    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = build_parser().parse_args(argv)
-    result = collect_gateway(default_snapshot_path(), arguments.refresh_interval)
+    snapshot_path = default_snapshot_path()
+    if arguments.automation_history:
+        return open_automation_history(
+            snapshot_path,
+            arguments.automation_history,
+            ("openclaw",),
+            OPENCLAW_TIMEOUT_MILLISECONDS,
+            int(ExitCode.COMMAND_FAILED),
+            load_previous_snapshot,
+        )
+    result = collect_gateway(snapshot_path, arguments.refresh_interval)
     json.dump(result.snapshot, sys.stdout, separators=(",", ":"), sort_keys=True)
     sys.stdout.write("\n")
     return int(result.exit_code)

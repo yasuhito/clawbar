@@ -11,6 +11,10 @@ from pathlib import Path
 from typing import Any
 
 _SECRET_BYTES = 32
+MAX_AUTOMATIONS = 500
+AUTOMATION_KINDS = frozenset({"at", "every", "cron", "on-exit"})
+AUTOMATION_RESULTS = frozenset({"ok", "error", "skipped"})
+
 
 
 def load_node_key_secret() -> bytes:
@@ -143,14 +147,135 @@ def sanitize_agents(agent_payload: object, task_payload: object) -> list[dict[st
         agents.append(agent)
     return agents
 
+def sanitize_automations(payload: object) -> tuple[list[dict[str, Any]] | None, str | None]:
+    if not isinstance(payload, dict) or not isinstance(payload.get("jobs"), list):
+        return None, "unavailable"
+    total = payload.get("total")
+    if isinstance(total, int) and not isinstance(total, bool) and total > MAX_AUTOMATIONS:
+        return None, "more_than_500"
+    raw_jobs = payload["jobs"]
+    if len(raw_jobs) > MAX_AUTOMATIONS:
+        return None, "more_than_500"
+
+    automations = []
+    seen_ids: set[str] = set()
+    for raw in raw_jobs:
+        if not isinstance(raw, dict):
+            return None, "unavailable"
+        automation_id = raw.get("id")
+        if not isinstance(automation_id, str) or not automation_id or len(automation_id) > 512:
+            return None, "unavailable"
+        if automation_id in seen_ids:
+            return None, "unavailable"
+        seen_ids.add(automation_id)
+
+        schedule = raw.get("schedule")
+        state = raw.get("state")
+        if not isinstance(schedule, dict) or not isinstance(state, dict):
+            return None, "unavailable"
+        kind = schedule.get("kind")
+        if kind not in AUTOMATION_KINDS:
+            return None, "unavailable"
+        result = state.get("lastRunStatus", state.get("lastStatus"))
+        if result not in AUTOMATION_RESULTS:
+            result = "none"
+        consecutive_failures = state.get("consecutiveErrors", 0)
+        if (
+            isinstance(consecutive_failures, bool)
+            or not isinstance(consecutive_failures, int)
+            or consecutive_failures < 0
+        ):
+            consecutive_failures = 0
+
+        automations.append({
+            "id": automation_id,
+            "name": bounded_text(raw.get("name"), "Unnamed Automation"),
+            "enabled": raw.get("enabled") is True,
+            "kind": kind,
+            "nextRunAt": timestamp_from_milliseconds(state.get("nextRunAtMs")),
+            "lastRunAt": timestamp_from_milliseconds(state.get("lastRunAtMs")),
+            "lastResult": result,
+            "consecutiveFailures": consecutive_failures,
+        })
+
+    def sort_key(automation: dict[str, Any]) -> tuple[object, ...]:
+        if automation["enabled"] and automation["lastResult"] == "error":
+            return (0, automation["name"].casefold(), automation["id"])
+        if automation["enabled"] and automation["nextRunAt"] is not None:
+            return (1, automation["nextRunAt"], automation["name"].casefold(), automation["id"])
+        if automation["enabled"]:
+            return (2, automation["name"].casefold(), automation["id"])
+        return (3, automation["name"].casefold(), automation["id"])
+
+    automations.sort(key=sort_key)
+    return automations, None
+
+
+
 
 def sanitize_metadata(
     fleet_payload: object,
     agent_payload: object,
     task_payload: object,
+    automation_payload: object,
     node_key_secret: bytes | None,
-) -> tuple[list[dict[str, Any]] | None, list[dict[str, Any]] | None]:
+) -> tuple[
+    list[dict[str, Any]] | None,
+    list[dict[str, Any]] | None,
+    list[dict[str, Any]] | None,
+    str | None,
+]:
+    automations, automation_failure = sanitize_automations(automation_payload)
     return (
         sanitize_fleet(fleet_payload, node_key_secret),
         sanitize_agents(agent_payload, task_payload),
+        automations,
+        automation_failure,
     )
+
+
+def build_current_snapshot(
+    schema_version: int,
+    generated_at: str,
+    refresh_interval: int,
+    source: str,
+    fleet: list[dict[str, Any]] | None,
+    agents: list[dict[str, Any]] | None,
+    automations: list[dict[str, Any]] | None,
+    automation_failure: str | None,
+) -> dict[str, Any]:
+    degraded = fleet is None or agents is None or automations is None
+    gateway_state = "degraded" if degraded else "healthy"
+    automation_items = automations or []
+    critical_items = sum(node.get("state") == "offline" for node in (fleet or []))
+    critical_items += sum(
+        automation.get("enabled") is True and automation.get("lastResult") == "error"
+        for automation in automation_items
+    )
+    attention_items = critical_items + (1 if degraded else 0)
+    working_agents = sum(agent.get("activity") == "working" for agent in (agents or []))
+    if critical_items:
+        bar = {"kind": "attention", "count": attention_items, "severity": "critical"}
+    elif attention_items:
+        bar = {"kind": "attention", "count": attention_items, "severity": "warning"}
+    else:
+        bar = {"kind": "working_agents", "count": working_agents, "severity": "healthy"}
+    automation_section: dict[str, Any] = {
+        "available": automations is not None,
+        "items": automation_items,
+    }
+    if automation_failure is not None:
+        automation_section["reason"] = automation_failure
+    return {
+        "schemaVersion": schema_version,
+        "generatedAt": generated_at,
+        "refreshIntervalSeconds": refresh_interval,
+        "resolutionSource": source,
+        "gateway": {"state": gateway_state},
+        "fleet": {"available": fleet is not None, "nodes": fleet or []},
+        "agents": {"available": agents is not None, "items": agents or []},
+        "automations": automation_section,
+        "bar": bar,
+        "lastSuccessAt": generated_at,
+        "consecutiveFailures": 0,
+    }

@@ -144,32 +144,6 @@ class CollectorCommandTests(CollectorFixture, unittest.TestCase):
 
 
 class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
-    def run_external(
-        self,
-        scenario: str,
-        *,
-        timeout: float = 15,
-        environment_overrides: dict[str, str] | None = None,
-    ) -> subprocess.CompletedProcess[str]:
-        environment = os.environ.copy()
-        environment.update(
-            {
-                "PATH": f"{self.root}{os.pathsep}{environment['PATH']}",
-                "XDG_STATE_HOME": str(self.root / "external-state"),
-                "XDG_RUNTIME_DIR": str(self.root / "runtime"),
-                "FAKE_CALL_LOG": str(self.call_log_path),
-                "FAKE_SCENARIO": scenario,
-                **(environment_overrides or {}),
-            }
-        )
-        return subprocess.run(
-            [sys.executable, str(Path(clawbar_collect.__file__)), "--refresh-interval", "30"],
-            capture_output=True,
-            check=False,
-            text=True,
-            timeout=timeout,
-            env=environment,
-        )
 
     def test_executable_resolves_local_configured_remote_and_node_host_gateways(self) -> None:
         expected_sources = {
@@ -205,7 +179,11 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
                 self.assertEqual(calls[metadata_offset][:3], ["nodes", "status", "--json"])
                 self.assertEqual(calls[metadata_offset + 1][:3], ["gateway", "call", "agents.list"])
                 self.assertEqual(calls[metadata_offset + 2][:3], ["gateway", "call", "tasks.list"])
-                self.assertEqual(len(calls), metadata_offset + 3)
+                self.assertEqual(calls[metadata_offset + 3][:3], ["gateway", "call", "cron.list"])
+                cron_call = calls[metadata_offset + 3]
+                cron_params = json.loads(cron_call[cron_call.index("--params") + 1])
+                self.assertEqual(cron_params, {"includeDisabled": True, "limit": 200, "offset": 0})
+                self.assertEqual(len(calls), metadata_offset + 4)
 
     def test_executable_distinguishes_empty_fleet_from_missing_gateway(self) -> None:
         result = self.run_external("local")
