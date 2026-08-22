@@ -80,7 +80,7 @@ destinations, account identifiers, credentials, host/IP/private Node
 identifiers, or raw errors. QML reads only
 `$XDG_STATE_HOME/clawbar/snapshot.json` (or
 `~/.local/state/clawbar/snapshot.json`). Private mode-`0600` state beside the
-snapshot maps opaque setup keys to Tailscale targets and remembers a verified
+snapshot maps setup keys to Tailscale targets and remembers a verified
 target URL; it contains no token, password, or other credential. Incident
 deduplication state and the Node-key secret are per-login data under
 `XDG_RUNTIME_DIR`.
