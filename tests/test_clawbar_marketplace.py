@@ -193,6 +193,58 @@ class MarketplaceContractTest(unittest.TestCase):
             ):
                 self.assertNotIn(prohibited, serialized)
 
+    def test_submission_draft_matches_marketplace_issue_form(self) -> None:
+        title = (ROOT / "MARKETPLACE_SUBMISSION_TITLE.txt").read_text(encoding="utf-8")
+        body = (ROOT / "MARKETPLACE_SUBMISSION.md").read_text(encoding="utf-8")
+        headings = [
+            "### Repository URL",
+            "### Category",
+            "### Tags",
+            "### Suggest a missing tag",
+            "### Maintainer notes",
+            "### Submission checklist",
+        ]
+        checklist = [
+            "- [x] The repository is public and contains installation and removal instructions.",
+            "- [x] I have documented the plugin license and any external dependencies.",
+            "- [x] I confirm that I own or have permission to submit this plugin and its preview assets.",
+            "- [x] The plugin does not overwrite user configuration without explicit consent.",
+            "- [x] I understand that approval is for listing and is not a security review.",
+        ]
+
+        self.assertEqual(title, "[Plugin]: Clawbar\n")
+        self.assertEqual(
+            [line for line in body.splitlines() if line.startswith("### ")],
+            headings,
+        )
+        self.assertIn("\nhttps://github.com/yasuhito/clawbar\n", body)
+        self.assertIn("\nWidgets\n", body)
+        self.assertIn("\nai, bar, quickshell\n", body)
+        self.assertEqual(
+            [line for line in body.splitlines() if line.startswith("- [x]")],
+            checklist,
+        )
+
+    def test_repository_excludes_generated_and_systemd_artifacts(self) -> None:
+        tracked = subprocess.run(
+            ["git", "ls-files", "-z"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout.split(b"\0")
+        tracked_paths = {
+            Path(path.decode("utf-8"))
+            for path in tracked
+            if path
+        }
+
+        for path in tracked_paths:
+            with self.subTest(path=path):
+                self.assertNotIn(".playwright-cli", path.parts)
+                self.assertNotIn("__pycache__", path.parts)
+                self.assertNotIn(path.suffix, {".pyc", ".pyo", ".pyd"})
+                self.assertNotIn(path.suffix, {".service", ".timer"})
+
 
 if __name__ == "__main__":
     unittest.main()
