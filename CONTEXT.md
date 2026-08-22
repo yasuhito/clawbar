@@ -49,11 +49,15 @@ A Node whose unavailable state is reported by the configured Gateway. Clawbar do
 _Avoid_: Offline Gateway, Unstable Gateway
 
 **Degraded Node**:
-A Node whose core state is current but whose Task or Automation metadata is unavailable. The unavailable child state rolls up to the parent Node as yellow, and failed-section values are not carried forward.
+A Node whose core state is current but whose Task metadata is unavailable. The unavailable child state rolls up to the parent Node as yellow, and failed-section values are not carried forward.
 _Avoid_: Degraded Gateway, Offline Node
 
+**Automation**:
+A scheduled operation managed by the configured Gateway. Clawbar does not assign it to a Node because the supported Gateway metadata establishes no Node ownership.
+_Avoid_: Node Automation, Task
+
 **Automation Failure**:
-An unsuccessful result reported by the Gateway for an Automation run. Unlike a collection failure, it is immediately actionable.
+An unsuccessful result reported by the Gateway for an Automation run. It is immediately actionable, contributes one current Attention Item, and does not change Gateway or Node state.
 _Avoid_: Gateway failure, Node failure
 
 **Disabled Automation**:
@@ -85,7 +89,7 @@ The outcome and completion time of an Agent's most recently completed Task: Succ
 _Avoid_: Agent failure, Agent Activity
 
 **Attention Item**:
-An Offline or Unstable Gateway, a Degraded Gateway, an Offline or Degraded Node reported by the Gateway, a Configuration Error, an Automation Failure, or a Stale Snapshot. Gateway-level items may appear before the Fleet tree. Node and Automation items stay in the tree and roll up to their parent Node instead of being duplicated in a separate summary. Gateway Setup Required is handled by the setup form.
+An Offline or Unstable Gateway, a Degraded Gateway, an Offline or Degraded Node reported by the Gateway, a Configuration Error, an Automation Failure, or a Stale Snapshot. Gateway-level items may appear before the Fleet tree. Node items stay in the Fleet tree, and Automation items stay in the Automations section; each contributes once to the bar count and is not duplicated in a separate summary. Gateway Setup Required is handled by the setup form.
 _Avoid_: Task failure, notification, setup state
 
 **Empty Fleet**:
