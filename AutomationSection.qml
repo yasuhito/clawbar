@@ -16,6 +16,8 @@ Column {
   required property color accent
   required property color urgent
   required property string fontFamily
+  required property bool historical
+  required property bool showUnavailable
 
   signal rowSelected(var row)
 
@@ -36,7 +38,7 @@ Column {
         }
 
         Text {
-          visible: !!root.section && !root.section.available
+          visible: root.showUnavailable && !!root.section && !root.section.available
           width: parent.width
           text: root.section && root.section.reason === "more_than_500"
               ? "Unavailable — more than 500 Automations"
@@ -69,6 +71,7 @@ Column {
             width: root.width
             height: Style.space(48)
             radius: Style.cornerRadius
+            opacity: root.historical ? 0.55 : 1
             color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
             border.width: selected ? 1 : 0
             border.color: root.accent
@@ -111,8 +114,8 @@ Column {
               anchors.right: parent.right
               anchors.rightMargin: Style.space(8)
               anchors.verticalCenter: automationName.verticalCenter
-              text: Logic.automationStatusLabel(automationRow.modelData)
-              color: automationRow.failed ? root.urgent : root.dim
+              text: root.historical ? "Last known" : Logic.automationStatusLabel(automationRow.modelData)
+              color: root.historical ? root.dim : automationRow.failed ? root.urgent : root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
             }
@@ -123,7 +126,12 @@ Column {
               anchors.rightMargin: Style.space(8)
               anchors.bottom: parent.bottom
               anchors.bottomMargin: Style.space(6)
-              text: Logic.automationTimingLabel(automationRow.modelData, root.nowMs)
+              text: {
+                if (!root.historical)
+                  return Logic.automationTimingLabel(automationRow.modelData, root.nowMs)
+                var last = Logic.relativeTime(automationRow.modelData.lastRunAt, root.nowMs)
+                return last ? "Last " + last : "No runs yet"
+              }
               elide: Text.ElideRight
               color: root.dim
               font.family: root.fontFamily

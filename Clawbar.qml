@@ -14,6 +14,7 @@ BarWidget {
   property var lastSnapshot: null
   property bool refreshPending: false
   property bool cacheReadPending: false
+  property bool collectionAttempted: false
   property bool opened: false
   property double nowMs: Date.now()
   property string collectorPath: decodeURIComponent(String(Qt.resolvedUrl("scripts/clawbar_collect.py")).replace(/^file:\/\//, ""))
@@ -42,14 +43,13 @@ BarWidget {
       Qt.callLater(function() { root.consumeCacheRead(exitCode) })
       return
     }
-    if (exitCode !== 0) {
-      lastSnapshot = null
-      state = "unknown"
-    }
+    if (exitCode !== 0 && lastSnapshot === null)
+      state = collectionAttempted ? "no_data" : "unknown"
     if (action.start) cacheReader.running = true
   }
 
   function requestCollection() {
+    if (lastSnapshot === null) state = "collecting"
     var action = Logic.requestRefresh(collector.running)
     refreshPending = action.pending
     if (action.start) collector.running = true
@@ -62,6 +62,7 @@ BarWidget {
       Qt.callLater(function() { root.consumeCollection() })
       return
     }
+    collectionAttempted = true
     root.readSnapshot()
     if (action.start) collector.running = true
   }
@@ -123,8 +124,8 @@ BarWidget {
         try {
           root.applySnapshot(JSON.parse(text))
         } catch (_) {
-          root.lastSnapshot = null
-          root.state = "unknown"
+          if (root.lastSnapshot === null)
+            root.state = root.collectionAttempted ? "no_data" : "unknown"
         }
       }
     }
@@ -191,6 +192,7 @@ BarWidget {
     bar: root.bar
     open: root.opened
     snapshot: root.lastSnapshot
+    state: root.state
     nowMs: root.nowMs
     summary: root.summary
     onRefreshRequested: root.requestCollection()

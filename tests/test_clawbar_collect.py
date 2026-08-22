@@ -79,7 +79,7 @@ class CollectorCommandTests(CollectorFixture, unittest.TestCase):
         result = self.run_collector(stdout="connection broken", stderr="invalid token", exit_code=9)
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.COMMAND_FAILED)
-        self.assertNotEqual(self.read_snapshot()["gateway"], {"state": "unstable"})
+        self.assertEqual(self.read_snapshot()["gateway"], {"state": "no_data"})
 
     def test_reachable_unsupported_json_is_configuration_error(self) -> None:
         result = self.run_collector(stdout=json.dumps({"rpc": {"ok": True}}))
@@ -373,7 +373,7 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(healthy.returncode, clawbar_collect.ExitCode.OK, healthy.stderr)
         self.assertEqual(json.loads(healthy.stdout)["gateway"], {"state": "healthy"})
         self.assertEqual(failed.returncode, clawbar_collect.ExitCode.COMMAND_FAILED, failed.stderr)
-        self.assertEqual(json.loads(failed.stdout)["gateway"], {"state": "unknown"})
+        self.assertEqual(json.loads(failed.stdout)["gateway"], {"state": "no_data"})
         self.assertNotIn("invalid token", failed.stdout)
         self.assertNotIn("connection broken", failed.stdout)
 

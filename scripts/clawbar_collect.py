@@ -24,7 +24,13 @@ if __package__:
         target_state_path,
     )
     from .clawbar_metadata import build_current_snapshot, load_node_key_secret, sanitize_metadata
-    from .clawbar_snapshot import atomic_write_snapshot, build_failure_snapshot, load_snapshot, utc_now
+    from .clawbar_snapshot import (
+        atomic_write_snapshot,
+        build_failure_snapshot,
+        last_known_metadata,
+        load_snapshot,
+        utc_now,
+    )
 else:
     from clawbar_automation import (
         collect_automation_surface,
@@ -33,7 +39,13 @@ else:
         target_state_path,
     )
     from clawbar_metadata import build_current_snapshot, load_node_key_secret, sanitize_metadata
-    from clawbar_snapshot import atomic_write_snapshot, build_failure_snapshot, load_snapshot, utc_now
+    from clawbar_snapshot import (
+        atomic_write_snapshot,
+        build_failure_snapshot,
+        last_known_metadata,
+        load_snapshot,
+        utc_now,
+    )
 
 SCHEMA_VERSION = 1
 DEFAULT_REFRESH_INTERVAL_SECONDS = 30
@@ -218,7 +230,7 @@ def configuration_error_snapshot(
     if source is None and previous:
         previous_source = previous.get("resolutionSource")
         source = previous_source if previous_source in RESOLUTION_SOURCES else None
-    return {
+    snapshot = {
         "schemaVersion": SCHEMA_VERSION,
         "generatedAt": utc_now(),
         "refreshIntervalSeconds": refresh_interval,
@@ -228,6 +240,10 @@ def configuration_error_snapshot(
         "consecutiveFailures": 0,
         "failureKind": "unsupported_json",
     }
+    retained = last_known_metadata(previous)
+    if retained is not None:
+        snapshot["lastKnown"] = retained
+    return snapshot
 
 
 
@@ -466,6 +482,10 @@ def collect_gateway(
         automations,
         automation_failure,
     )
+    if fleet is None:
+        retained = last_known_metadata(previous)
+        if retained and retained.get("fleet", {}).get("available") is True:
+            snapshot["lastKnown"] = retained
     fallback_url = target.url if target else None
     return publish_current(snapshot_path, snapshot, collected_target_url(status, fallback_url))
 

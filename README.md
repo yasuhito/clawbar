@@ -22,6 +22,14 @@ starting the shell to change that interval. Middle-clicking the widget requests
 a non-blocking refresh; overlapping requests are coalesced.
 Reachable unsupported JSON is a Configuration Error. A healthy snapshot becomes
 Stale when its age exceeds three configured refresh intervals.
+The first bounded attempt shows Collecting and becomes No data yet if it produces
+no valid snapshot. After a successful collection, one complete collection
+failure shows an Unstable Gateway and two consecutive failures show an Offline
+Gateway. Both retain the previous Fleet as dimmed, time-stamped Last Known
+Metadata without counting historical Node or Automation states as current
+Attention Items. A successful collection clears the failure count and restores
+current rows. Stale snapshots use the same Last known presentation; their
+current yellow Stale state takes precedence over historical row colors.
 The panel reads the Gateway-backed `nodes status`, `agents.list`, `tasks.list`,
 and paginated `cron.list` JSON surfaces. It immediately reduces Automation data
 to ID, name, enabled state, kind, next and last run times, last result, and

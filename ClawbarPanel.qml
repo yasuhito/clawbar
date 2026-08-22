@@ -7,6 +7,7 @@ KeyboardPanel {
   id: root
 
   required property var snapshot
+  required property string state
   property double nowMs: Date.now()
   property string summary: ""
   property string selectedKey: ""
@@ -16,10 +17,13 @@ KeyboardPanel {
   signal automationHistoryRequested(string automationId)
   signal refreshRequested()
 
-  readonly property var rows: Logic.panelRows(snapshot)
-  readonly property var nodes: Logic.fleetNodes(snapshot)
-  readonly property var agents: Logic.agents(snapshot)
-  readonly property var automations: Logic.automations(snapshot)
+  readonly property var metadata: Logic.metadataSnapshot(snapshot, state)
+  readonly property bool historical: Logic.historicalState(state)
+  readonly property string observedAt: Logic.observationTime(snapshot, state)
+  readonly property var rows: Logic.panelRows(snapshot, state)
+  readonly property var nodes: Logic.fleetNodes(snapshot, state)
+  readonly property var agents: Logic.agents(snapshot, state)
+  readonly property var automations: Logic.automations(snapshot, state)
   readonly property int selectedIndex: Logic.indexForKey(rows, selectedKey)
   readonly property var selectedRow: selectedIndex >= 0 ? rows[selectedIndex] : null
   readonly property color foreground: bar ? bar.foreground : Color.foreground
@@ -148,7 +152,9 @@ KeyboardPanel {
           Text {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            text: root.snapshot ? Logic.relativeTime(root.snapshot.generatedAt, root.nowMs) : ""
+            text: root.historical
+              ? "Last known " + Logic.relativeTime(root.observedAt, root.nowMs)
+              : root.snapshot ? Logic.relativeTime(root.snapshot.generatedAt, root.nowMs) : ""
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -165,7 +171,8 @@ KeyboardPanel {
         }
 
         Text {
-          visible: root.snapshot && root.snapshot.fleet && !root.snapshot.fleet.available
+          visible: root.state === "degraded" && root.snapshot
+            && root.snapshot.fleet && !root.snapshot.fleet.available
           width: parent.width
           text: "Node metadata unavailable"
           color: root.dim
@@ -174,8 +181,8 @@ KeyboardPanel {
         }
 
         Text {
-          visible: root.snapshot && root.snapshot.fleet
-            && root.snapshot.fleet.available && root.nodes.length === 0
+          visible: root.metadata && root.metadata.fleet
+            && root.metadata.fleet.available && root.nodes.length === 0
           width: parent.width
           text: "Empty Fleet"
           color: root.dim
@@ -197,6 +204,7 @@ KeyboardPanel {
             width: contentColumn.width
             height: Style.space(expanded ? 72 : 48)
             radius: Style.cornerRadius
+            opacity: root.historical ? 0.55 : 1
             color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
             border.width: selected ? 1 : 0
             border.color: root.accent
@@ -250,8 +258,10 @@ KeyboardPanel {
               anchors.right: parent.right
               anchors.rightMargin: Style.space(8)
               anchors.verticalCenter: nodeTitle.verticalCenter
-              text: nodeRow.modelData.state === "healthy" ? "Healthy" : "Offline"
-              color: nodeRow.modelData.state === "offline" ? root.urgent : root.dim
+              text: root.historical
+                ? "Last known" : nodeRow.modelData.state === "healthy" ? "Healthy" : "Offline"
+              color: root.historical ? root.dim
+                : nodeRow.modelData.state === "offline" ? root.urgent : root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
             }
@@ -266,8 +276,16 @@ KeyboardPanel {
               text: {
                 var parts = [nodeRow.modelData.platform, nodeRow.modelData.model, nodeRow.modelData.version]
                   .filter(function(value) { return !!value })
-                var age = Logic.relativeTime(nodeRow.modelData.lastSeenAt, root.nowMs)
-                if (age) parts.push("Seen " + age)
+                if (root.historical) {
+                  var observed = Logic.relativeTime(root.observedAt, root.nowMs)
+                  parts.unshift(
+                    (nodeRow.modelData.state === "healthy" ? "Healthy" : "Offline")
+                      + (observed ? " · " + observed : "")
+                  )
+                } else {
+                  var age = Logic.relativeTime(nodeRow.modelData.lastSeenAt, root.nowMs)
+                  if (age) parts.push("Seen " + age)
+                }
                 return parts.length > 0 ? parts.join(" · ") : "No additional Operational Metadata"
               }
               elide: Text.ElideRight
@@ -289,7 +307,8 @@ KeyboardPanel {
         }
 
         Text {
-          visible: root.snapshot && root.snapshot.agents && !root.snapshot.agents.available
+          visible: root.state === "degraded" && root.snapshot
+            && root.snapshot.agents && !root.snapshot.agents.available
           width: parent.width
           text: "Agent and Task metadata unavailable"
           color: root.dim
@@ -311,6 +330,7 @@ KeyboardPanel {
             width: contentColumn.width
             height: Style.space(48)
             radius: Style.cornerRadius
+            opacity: root.historical ? 0.55 : 1
             color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
             border.width: selected ? 1 : 0
             border.color: root.accent
@@ -352,7 +372,7 @@ KeyboardPanel {
               anchors.right: parent.right
               anchors.rightMargin: Style.space(8)
               anchors.verticalCenter: agentName.verticalCenter
-              text: agentRow.activityText
+              text: root.historical ? "Last known" : agentRow.activityText
               color: root.dim
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -377,7 +397,7 @@ KeyboardPanel {
         AutomationSection {
           id: automationSection
           width: parent.width
-          section: root.snapshot ? root.snapshot.automations : null
+          section: root.metadata ? root.metadata.automations : null
           automations: root.automations
           rows: root.rows
           rowOffset: root.nodes.length + root.agents.length
@@ -388,6 +408,8 @@ KeyboardPanel {
           accent: root.accent
           urgent: root.urgent
           fontFamily: root.fontFamily
+          historical: root.historical
+          showUnavailable: root.state === "degraded"
           onRowSelected: function(row) {
             root.selectRow(row)
           }
@@ -408,6 +430,9 @@ KeyboardPanel {
             anchors.margins: Style.space(8)
             text: {
               if (!root.selectedRow) return ""
+              var prefix = root.selectedRow.historical
+                ? "Last known · " + Logic.relativeTime(root.selectedRow.observedAt, root.nowMs) + "\n"
+                : ""
               if (root.selectedRow.kind === "automation") {
                 var automation = root.selectedRow.item
                 var automationLines = ["Automation · " + automation.name]
@@ -421,10 +446,10 @@ KeyboardPanel {
                 if (lastRun) automationLines.push("Last run " + lastRun)
                 if (!nextRun && !lastRun && automation.lastResult === "none")
                   automationLines.push("No run timestamps")
-                return automationLines.join("\n")
+                return prefix + automationLines.join("\n")
               }
               var absolute = Logic.absoluteLocalTime(root.selectedRow.timestamp)
-              return root.selectedRow.typeLabel + " · " + root.selectedRow.item.name
+              return prefix + root.selectedRow.typeLabel + " · " + root.selectedRow.item.name
                 + (absolute ? "\nObserved " + absolute : "\n" + root.selectedRow.missingTimestampLabel)
             }
             color: root.foreground

@@ -27,6 +27,59 @@ test("healthy snapshots become stale after three refresh intervals", () => {
   assert.equal(Logic.snapshotState(snapshot, 190001), "stale")
   assert.equal(Logic.summary("stale", "local"), "OpenClaw Gateway snapshot stale")
 })
+test("first collection exposes Collecting then No data yet", () => {
+  const snapshot = healthySnapshot(new Date(100000).toISOString())
+  snapshot.gateway.state = "no_data"
+  snapshot.bar = { kind: "attention", count: 0, severity: "warning" }
+
+  assert.equal(Logic.summary("collecting", "unresolved", 0, "warning"), "Collecting OpenClaw Gateway status")
+  assert.equal(Logic.snapshotState(snapshot, 100000), "no_data")
+  assert.equal(Logic.summary("no_data", "unresolved", 0, "warning"), "No OpenClaw Gateway data yet")
+  assert.equal(Logic.barCount(snapshot, "no_data"), 0)
+})
+
+test("stale and failed collections render retained rows as historical", () => {
+  const observedAt = new Date(100000).toISOString()
+  const fleet = { available: true, nodes: [{ key: "node:old", name: "studio", state: "offline" }] }
+  const agents = { available: true, items: [{ key: "agent:old", name: "planner", activity: "working" }] }
+  const automations = {
+    available: true,
+    items: [{ id: "cron-old", name: "Morning review", enabled: true, lastResult: "error" }]
+  }
+  const stale = healthySnapshot(observedAt)
+  Object.assign(stale, {
+    fleet,
+    agents,
+    automations,
+    bar: { kind: "attention", count: 3, severity: "critical" }
+  })
+
+  assert.equal(Logic.snapshotState(stale, 190001), "stale")
+  assert.equal(Logic.barSeverity(stale, "stale"), "warning")
+  assert.equal(Logic.barCount(stale, "stale"), 1)
+  assert.deepEqual(
+    Logic.panelRows(stale, "stale").map(row => [row.kind, row.historical, row.observedAt]),
+    [
+      ["node", true, observedAt],
+      ["agent", true, observedAt],
+      ["automation", true, observedAt]
+    ]
+  )
+
+  const failed = {
+    ...healthySnapshot(new Date(130000).toISOString()),
+    gateway: { state: "unstable" },
+    fleet: { available: false, nodes: [] },
+    agents: { available: false, items: [] },
+    automations: { available: false, items: [] },
+    bar: { kind: "attention", count: 1, severity: "warning" },
+    lastKnown: { observedAt, gateway: { state: "healthy" }, fleet, agents, automations }
+  }
+  assert.deepEqual(Logic.fleetNodes(failed, "unstable"), fleet.nodes)
+  assert.equal(Logic.panelRows(failed, "unstable")[0].historical, true)
+  assert.equal(Logic.barCount(failed, "unstable"), 1)
+})
+
 
 test("refresh interval normalization uses one policy", () => {
   assert.equal(Logic.normalizeRefreshInterval("15"), 15)
@@ -58,6 +111,9 @@ test("degraded snapshots preserve core reachability until stale", () => {
   assert.equal(Logic.snapshotState(snapshot, 190000), "degraded")
   assert.equal(Logic.snapshotState(snapshot, 190001), "stale")
   assert.equal(Logic.summary("degraded", "local"), "OpenClaw Gateway metadata degraded")
+  snapshot.bar = { kind: "attention", count: 2, severity: "critical" }
+  assert.equal(Logic.barSeverity(snapshot, "degraded"), "critical")
+  assert.equal(Logic.barCount(snapshot, "degraded"), 2)
 })
 
 test("panel rows preserve Gateway order and keyboard focus wraps", () => {

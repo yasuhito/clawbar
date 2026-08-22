@@ -16,7 +16,7 @@ function snapshotState(snapshot, nowMilliseconds) {
   if (!snapshot || snapshot.schemaVersion !== 1 || !snapshot.gateway)
     throw new Error("Unsupported Clawbar snapshot")
   var state = String(snapshot.gateway.state || "unknown")
-  var supportedStates = ["healthy", "degraded", "unstable", "offline", "configuration_error", "unknown"]
+  var supportedStates = ["healthy", "degraded", "unstable", "offline", "configuration_error", "no_data", "unknown"]
   if (supportedStates.indexOf(state) === -1)
     throw new Error("Unsupported Gateway state")
   if (state !== "healthy" && state !== "degraded") return state
@@ -28,23 +28,43 @@ function snapshotState(snapshot, nowMilliseconds) {
   return nowMilliseconds - generatedAt > staleAfter ? "stale" : state
 }
 
-function fleetNodes(snapshot) {
-  return snapshot && snapshot.fleet && snapshot.fleet.available
-    && Array.isArray(snapshot.fleet.nodes) ? snapshot.fleet.nodes : []
+function historicalState(state) {
+  return state === "unstable" || state === "offline" || state === "stale"
 }
 
-function agents(snapshot) {
-  return snapshot && snapshot.agents && snapshot.agents.available
-    && Array.isArray(snapshot.agents.items) ? snapshot.agents.items : []
+function metadataSnapshot(snapshot, state) {
+  if (!snapshot || !historicalState(state)) return snapshot
+  if (state === "stale") return snapshot
+  return snapshot.lastKnown || null
 }
 
-function automations(snapshot) {
-  return snapshot && snapshot.automations && snapshot.automations.available
-    && Array.isArray(snapshot.automations.items) ? snapshot.automations.items : []
+function observationTime(snapshot, state) {
+  if (!snapshot || !historicalState(state)) return ""
+  if (state !== "stale" && snapshot.lastKnown)
+    return String(snapshot.lastKnown.observedAt || "")
+  return String(snapshot.lastSuccessAt || snapshot.generatedAt || "")
+}
+
+function fleetNodes(snapshot, state) {
+  var metadata = metadataSnapshot(snapshot, state)
+  return metadata && metadata.fleet && metadata.fleet.available
+    && Array.isArray(metadata.fleet.nodes) ? metadata.fleet.nodes : []
+}
+
+function agents(snapshot, state) {
+  var metadata = metadataSnapshot(snapshot, state)
+  return metadata && metadata.agents && metadata.agents.available
+    && Array.isArray(metadata.agents.items) ? metadata.agents.items : []
+}
+
+function automations(snapshot, state) {
+  var metadata = metadataSnapshot(snapshot, state)
+  return metadata && metadata.automations && metadata.automations.available
+    && Array.isArray(metadata.automations.items) ? metadata.automations.items : []
 }
 
 
-function nodeRow(item, index) {
+function nodeRow(item, index, historical, observedAt) {
   return {
     kind: "node",
     key: String(item.key || ""),
@@ -53,11 +73,13 @@ function nodeRow(item, index) {
     expandable: true,
     typeLabel: "Node",
     timestamp: item.lastSeenAt || "",
-    missingTimestampLabel: "No observation timestamp"
+    missingTimestampLabel: "No observation timestamp",
+    historical: historical,
+    observedAt: observedAt
   }
 }
 
-function agentRow(item, index) {
+function agentRow(item, index, historical, observedAt) {
   var result = item.taskResult || {}
   return {
     kind: "agent",
@@ -67,11 +89,13 @@ function agentRow(item, index) {
     expandable: false,
     typeLabel: "Agent",
     timestamp: result.completedAt || "",
-    missingTimestampLabel: "No completion timestamp"
+    missingTimestampLabel: "No completion timestamp",
+    historical: historical,
+    observedAt: observedAt
   }
 }
 
-function automationRow(item, index) {
+function automationRow(item, index, historical, observedAt) {
   return {
     kind: "automation",
     key: item.id ? "automation:" + item.id : "",
@@ -80,15 +104,23 @@ function automationRow(item, index) {
     expandable: false,
     typeLabel: "Automation",
     timestamp: item.lastRunAt || "",
-    missingTimestampLabel: "No runs yet"
+    missingTimestampLabel: "No runs yet",
+    historical: historical,
+    observedAt: observedAt
   }
 }
 
 
-function panelRows(snapshot) {
-  return fleetNodes(snapshot).map(nodeRow)
-    .concat(agents(snapshot).map(agentRow))
-    .concat(automations(snapshot).map(automationRow))
+function panelRows(snapshot, state) {
+  var historical = historicalState(state)
+  var observedAt = observationTime(snapshot, state)
+  return fleetNodes(snapshot, state).map(function(item, index) {
+    return nodeRow(item, index, historical, observedAt)
+  }).concat(agents(snapshot, state).map(function(item, index) {
+    return agentRow(item, index, historical, observedAt)
+  })).concat(automations(snapshot, state).map(function(item, index) {
+    return automationRow(item, index, historical, observedAt)
+  }))
 }
 
 function indexForKey(rows, key) {
@@ -201,19 +233,21 @@ function automationTimingLabel(automation, nowMilliseconds) {
 
 function barSeverity(snapshot, state) {
   if (state === "offline" || state === "configuration_error") return "critical"
-  if (state !== "healthy") return "warning"
-  return snapshot && snapshot.bar && snapshot.bar.severity === "critical" ? "critical" : "healthy"
+  if (state !== "healthy" && state !== "degraded") return "warning"
+  if (snapshot && snapshot.bar && snapshot.bar.severity === "critical") return "critical"
+  return state === "degraded" ? "warning" : "healthy"
 }
 
 function barCount(snapshot, state) {
+  if (state === "collecting" || state === "unknown") return 0
+  if (state === "stale" || state === "configuration_error") return 1
   var count = snapshot && snapshot.bar ? Number(snapshot.bar.count) : 0
   if (!isFinite(count) || count < 0) count = 0
-  if (barSeverity(snapshot, state) !== "healthy") return Math.max(1, Math.floor(count))
-  return Math.floor(count)
+  count = Math.floor(count)
+  if (state === "no_data") return count
+  if (barSeverity(snapshot, state) !== "healthy") return Math.max(1, count)
+  return count
 }
-
-
-
 
 function summary(state, resolutionSource, count, severity) {
   var text
@@ -226,6 +260,8 @@ function summary(state, resolutionSource, count, severity) {
   else if (state === "offline") text = "OpenClaw Gateway offline"
   else if (state === "configuration_error") text = "OpenClaw Gateway configuration error"
   else if (state === "stale") text = "OpenClaw Gateway snapshot stale"
+  else if (state === "collecting") text = "Collecting OpenClaw Gateway status"
+  else if (state === "no_data") text = "No OpenClaw Gateway data yet"
   else text = "OpenClaw Gateway status unavailable"
   if (severity !== "healthy" && count > 0)
     text += count === 1 ? " · 1 Attention Item" : " · " + count + " Attention Items"
@@ -254,6 +290,9 @@ if (typeof module !== "undefined") {
     summary: summary,
     requestRefresh: requestRefresh,
     consumeRefresh: consumeRefresh,
+    historicalState: historicalState,
+    metadataSnapshot: metadataSnapshot,
+    observationTime: observationTime,
     fleetNodes: fleetNodes,
     agents: agents,
     automations: automations,
