@@ -15,6 +15,7 @@ else:
 
 INCIDENT_STATE_SCHEMA_VERSION = 1
 NOTIFICATION_TIMEOUT_SECONDS = 0.25
+MAX_NOTIFICATION_DETAILS = 3
 
 
 def default_incident_state_path() -> Path | None:
@@ -24,7 +25,7 @@ def default_incident_state_path() -> Path | None:
     return Path(runtime_directory) / "clawbar" / "incidents.json"
 
 
-def valid_incidents(state: dict[str, Any] | None) -> dict[str, dict[str, str]]:
+def incidents_from_state(state: dict[str, Any] | None) -> dict[str, dict[str, str]]:
     if state is None or not isinstance(state.get("incidents"), dict):
         return {}
     incidents: dict[str, dict[str, str]] = {}
@@ -43,7 +44,7 @@ def reconcile_incidents(
     snapshot: dict[str, Any],
     previous: dict[str, Any] | None,
 ) -> tuple[dict[str, Any], list[dict[str, str]], list[dict[str, str]]]:
-    incidents = valid_incidents(previous)
+    incidents = incidents_from_state(previous)
     starts: list[dict[str, str]] = []
     recoveries: list[dict[str, str]] = []
 
@@ -63,11 +64,9 @@ def reconcile_incidents(
     if gateway_state == "offline":
         start("gateway", "Gateway", "Offline")
     elif gateway_state == "configuration_error":
-        start("gateway", "Gateway", "Configuration error")
+        start("gateway", "Gateway", "Configuration Error")
     elif gateway_state in {"healthy", "degraded"}:
         recover("gateway", "Gateway")
-    elif gateway_state in {"no_data", "setup_required"}:
-        incidents.clear()
 
     fleet = snapshot.get("fleet")
     if isinstance(fleet, dict) and fleet.get("available") is True and isinstance(fleet.get("nodes"), list):
@@ -106,7 +105,7 @@ def reconcile_incidents(
             incident_key = f"automation:{automation_id}"
             observed_automations.add(incident_key)
             if automation.get("enabled") is True and automation.get("lastResult") == "error":
-                start(incident_key, label, "Automation failure")
+                start(incident_key, label, "Automation Failure")
             elif automation.get("enabled") is True:
                 recover(incident_key, label)
             else:
@@ -124,9 +123,11 @@ def notification_arguments(changes: list[dict[str, str]], *, recovered: bool) ->
     noun = "Incident" if count == 1 else "Incidents"
     action = "recovered" if recovered else "started"
     urgency = "normal" if recovered else "critical"
-    body_parts = [f"{change['label']}: {change['state']}" for change in changes[:3]]
-    if count > 3:
-        body_parts.append(f"+{count - 3} more")
+    body_parts = [
+        f"{change['label']}: {change['state']}" for change in changes[:MAX_NOTIFICATION_DETAILS]
+    ]
+    if count > MAX_NOTIFICATION_DETAILS:
+        body_parts.append(f"+{count - MAX_NOTIFICATION_DETAILS} more")
     return [
         "--app-name=Clawbar",
         f"--urgency={urgency}",

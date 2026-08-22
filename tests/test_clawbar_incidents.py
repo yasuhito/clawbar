@@ -45,20 +45,23 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
             (
                 "configuration error",
                 {"FAKE_STDOUT": json.dumps({"rpc": {"ok": True}})},
-                "Gateway: Configuration error",
+                23,
+                "Gateway: Configuration Error",
             ),
             (
                 "offline node",
                 {"FAKE_NODES": json.dumps({"nodes": [self.offline_node("node-1", "studio-ops")]})},
+                0,
                 "studio-ops: Offline",
             ),
             (
                 "automation failure",
                 {"FAKE_AUTOMATIONS": json.dumps({"jobs": [self.automation()]})},
-                "Morning review: Automation failure",
+                0,
+                "Morning review: Automation Failure",
             ),
         )
-        for index, (name, overrides, expected_body) in enumerate(scenarios):
+        for index, (name, overrides, expected_exit_code, expected_body) in enumerate(scenarios):
             with self.subTest(name=name):
                 log_path = self.root / f"notifications-{index}.jsonl"
                 result = self.run_external(
@@ -70,7 +73,7 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
                         **overrides,
                     },
                 )
-                self.assertEqual(result.returncode, 0 if name != "configuration error" else 23)
+                self.assertEqual(result.returncode, expected_exit_code)
                 notification = json.loads(log_path.read_text(encoding="utf-8"))
                 self.assertEqual(
                     notification,
@@ -82,10 +85,13 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
                     ],
                 )
 
+    def test_offline_gateway_starts_after_two_consecutive_failures(self) -> None:
         self.collect()
         self.collect(extra={"FAKE_EXIT": "9", "FAKE_STDOUT": "connection broken"})
         self.assertEqual(self.read_notifications(), [])
+
         result = self.collect(extra={"FAKE_EXIT": "9", "FAKE_STDOUT": "connection broken"})
+
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.read_notifications()[-1][-1], "Gateway: Offline")
 
@@ -119,6 +125,15 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
         )
         self.assertFalse(setup_log.exists())
 
+    def test_no_data_does_not_repeat_a_still_current_incident(self) -> None:
+        offline = [self.offline_node("node-1", "studio-ops")]
+        self.collect(nodes=offline)
+        (self.root / "external-state" / "clawbar" / "snapshot.json").unlink()
+        self.collect(extra={"FAKE_EXIT": "9", "FAKE_STDOUT": "connection broken"})
+        self.collect(nodes=offline)
+
+        self.assertEqual(len(self.read_notifications()), 1)
+
     def test_simultaneous_starts_are_grouped_once(self) -> None:
         result = self.collect(
             nodes=[self.offline_node("node-1", "studio-ops"), self.offline_node("node-2", "archive-box")],
@@ -132,7 +147,7 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
                 "--app-name=Clawbar",
                 "--urgency=critical",
                 "Clawbar: 3 Incidents started",
-                "studio-ops: Offline; archive-box: Offline; Morning review: Automation failure",
+                "studio-ops: Offline; archive-box: Offline; Morning review: Automation Failure",
             ]],
         )
 
