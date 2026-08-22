@@ -34,13 +34,12 @@ function historicalState(state) {
 
 function metadataSnapshot(snapshot, state) {
   if (!snapshot || !historicalState(state)) return snapshot
-  if (state === "stale") return snapshot
-  return snapshot.lastKnown || null
+  return snapshot.lastKnown || snapshot
 }
 
 function observationTime(snapshot, state) {
   if (!snapshot || !historicalState(state)) return ""
-  if (state !== "stale" && snapshot.lastKnown)
+  if (snapshot.lastKnown)
     return String(snapshot.lastKnown.observedAt || "")
   return String(snapshot.lastSuccessAt || snapshot.generatedAt || "")
 }

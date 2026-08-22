@@ -89,6 +89,9 @@ test("stale and failed collections render retained rows as historical", () => {
   assert.deepEqual(Logic.fleetNodes(failed, "unstable"), fleet.nodes)
   assert.equal(Logic.panelRows(failed, "unstable")[0].historical, true)
   assert.equal(Logic.barCount(failed, "unstable"), 1)
+  assert.equal(Logic.snapshotState(failed, 220001), "stale")
+  assert.deepEqual(Logic.fleetNodes(failed, "stale"), fleet.nodes)
+  assert.equal(Logic.observationTime(failed, "stale"), observedAt)
 })
 
 
