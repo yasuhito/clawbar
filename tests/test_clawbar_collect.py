@@ -184,6 +184,228 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
                 cron_params = json.loads(cron_call[cron_call.index("--params") + 1])
                 self.assertEqual(cron_params, {"includeDisabled": True, "limit": 200, "offset": 0})
                 self.assertEqual(len(calls), metadata_offset + 4)
+    def test_executable_treats_a_failing_resolved_node_host_as_gateway_loss(self) -> None:
+        healthy = self.run_external("node_host")
+        self.assertEqual(healthy.returncode, clawbar_collect.ExitCode.OK, healthy.stderr)
+        self.call_log_path.unlink(missing_ok=True)
+
+        failed = self.run_external(
+            "node_host",
+            environment_overrides={"FAKE_EXIT": "9"},
+        )
+
+        self.assertEqual(failed.returncode, clawbar_collect.ExitCode.COMMAND_FAILED, failed.stderr)
+        snapshot = json.loads(failed.stdout)
+        self.assertEqual(snapshot["gateway"], {"state": "unstable"})
+        self.assertEqual(snapshot["resolutionSource"], "node_host")
+        self.assertNotIn(["tailscale", "status", "--json"], self.read_calls())
+
+    def test_executable_lists_tailscale_candidates_only_when_gateway_setup_is_required(self) -> None:
+        tailscale_status = {
+            "Self": {"ID": "PRIVATE-SELF", "HostName": "local-device", "Online": True},
+            "Peer": {
+                "nodekey:PRIVATE-A": {
+                    "ID": "PRIVATE-A",
+                    "HostName": "gateway-alpha",
+                    "DNSName": "gateway-alpha.example.ts.net.",
+                    "TailscaleIPs": ["100.64.0.10"],
+                    "Online": True,
+                },
+                "nodekey:PRIVATE-B": {
+                    "ID": "PRIVATE-B",
+                    "HostName": "offline-device",
+                    "DNSName": "offline-device.example.ts.net.",
+                    "TailscaleIPs": ["100.64.0.11"],
+                    "Online": False,
+                },
+            },
+        }
+
+        result = self.run_external(
+            "unresolved",
+            environment_overrides={"FAKE_TAILSCALE_STATUS": json.dumps(tailscale_status)},
+        )
+
+        self.assertEqual(result.returncode, clawbar_collect.ExitCode.OK, result.stderr)
+        snapshot = json.loads(result.stdout)
+        self.assertEqual(snapshot["gateway"], {"state": "setup_required"})
+        self.assertEqual(snapshot["resolutionSource"], "unresolved")
+        self.assertEqual(
+            snapshot["setup"],
+            {
+                "candidates": [{"key": "candidate:0", "name": "gateway-alpha"}],
+                "guidance": "Choose a Tailscale device to verify as your OpenClaw Gateway.",
+            },
+        )
+        self.assertEqual(snapshot["bar"], {"count": 0, "severity": "warning"})
+        self.assertNotIn("PRIVATE-", result.stdout)
+        self.assertEqual(self.read_calls()[-1], ["tailscale", "status", "--json"])
+
+    def test_executable_gives_actionable_setup_guidance_without_tailscale(self) -> None:
+        result = self.run_external("unresolved")
+
+        self.assertEqual(result.returncode, clawbar_collect.ExitCode.OK, result.stderr)
+        snapshot = json.loads(result.stdout)
+        self.assertEqual(snapshot["gateway"], {"state": "setup_required"})
+        self.assertEqual(
+            snapshot["setup"],
+            {
+                "candidates": [],
+                "guidance": "Connect Tailscale on this device, then refresh to find Gateway candidates.",
+            },
+        )
+        self.assertEqual(self.read_notifications(), [])
+
+    def test_executable_verifies_and_reuses_a_selected_tailscale_candidate(self) -> None:
+        tailscale_status = {
+            "Peer": {
+                "nodekey:PRIVATE-A": {
+                    "ID": "PRIVATE-A",
+                    "HostName": "gateway-alpha",
+                    "DNSName": "gateway-alpha.example.ts.net.",
+                    "Online": True,
+                }
+            }
+        }
+        setup = self.run_external(
+            "unresolved",
+            environment_overrides={"FAKE_TAILSCALE_STATUS": json.dumps(tailscale_status)},
+        )
+        self.assertEqual(setup.returncode, clawbar_collect.ExitCode.OK, setup.stderr)
+
+        verified = self.run_external(
+            "unresolved",
+            collector_arguments=["--verify-candidate", "candidate:0"],
+        )
+        reused = self.run_external("unresolved")
+        failed = self.run_external(
+            "unresolved",
+            environment_overrides={"FAKE_CANDIDATE_MODE": "failed"},
+        )
+
+        self.assertEqual(verified.returncode, clawbar_collect.ExitCode.OK, verified.stderr)
+        self.assertEqual(reused.returncode, clawbar_collect.ExitCode.OK, reused.stderr)
+        for result in (verified, reused):
+            snapshot = json.loads(result.stdout)
+            self.assertEqual(snapshot["gateway"], {"state": "healthy"})
+            self.assertEqual(snapshot["resolutionSource"], "tailscale")
+            self.assertNotIn("example.ts.net", result.stdout)
+        self.assertEqual(failed.returncode, clawbar_collect.ExitCode.COMMAND_FAILED, failed.stderr)
+        failed_snapshot = json.loads(failed.stdout)
+        self.assertEqual(failed_snapshot["gateway"], {"state": "unstable"})
+        self.assertEqual(failed_snapshot["resolutionSource"], "tailscale")
+        calls = self.read_calls()
+        self.assertEqual(sum(call == ["tailscale", "status", "--json"] for call in calls), 1)
+        candidate_probes = [
+            call for call in calls
+            if call[:2] == ["gateway", "status"] and "--url" in call
+        ]
+        self.assertEqual(len(candidate_probes), 3)
+        self.assertTrue(all("--require-rpc" in call and "--timeout" in call for call in candidate_probes))
+
+    def test_executable_rejects_unverified_and_unsupported_candidates(self) -> None:
+        tailscale_status = {
+            "Peer": {
+                "nodekey:PRIVATE-A": {
+                    "HostName": "gateway-alpha",
+                    "DNSName": "gateway-alpha.example.ts.net.",
+                    "Online": True,
+                }
+            }
+        }
+        setup = self.run_external(
+            "unresolved",
+            environment_overrides={"FAKE_TAILSCALE_STATUS": json.dumps(tailscale_status)},
+        )
+        self.assertEqual(setup.returncode, clawbar_collect.ExitCode.OK, setup.stderr)
+
+        missing = self.run_external(
+            "unresolved",
+            collector_arguments=["--verify-candidate", "candidate:99"],
+        )
+        unsupported = self.run_external(
+            "unresolved",
+            environment_overrides={"FAKE_CANDIDATE_MODE": "unsupported"},
+            collector_arguments=["--verify-candidate", "candidate:0"],
+        )
+
+        self.assertEqual(missing.returncode, clawbar_collect.ExitCode.OK, missing.stderr)
+        self.assertEqual(json.loads(missing.stdout)["gateway"], {"state": "setup_required"})
+        self.assertEqual(unsupported.returncode, clawbar_collect.ExitCode.UNSUPPORTED_JSON, unsupported.stderr)
+        unsupported_snapshot = json.loads(unsupported.stdout)
+        self.assertEqual(unsupported_snapshot["gateway"], {"state": "configuration_error"})
+        self.assertEqual(
+            unsupported_snapshot["setup"]["error"],
+            "The selected device does not provide a supported OpenClaw Gateway.",
+        )
+        self.assertNotIn("PRIVATE-", missing.stdout + unsupported.stdout)
+        self.assertNotIn("example.ts.net", missing.stdout + unsupported.stdout)
+
+    def test_executable_keeps_setup_required_when_candidate_verification_fails(self) -> None:
+        tailscale_status = {
+            "Peer": {
+                "nodekey:PRIVATE-A": {
+                    "HostName": "gateway-alpha",
+                    "DNSName": "gateway-alpha.example.ts.net.",
+                    "Online": True,
+                }
+            }
+        }
+        setup = self.run_external(
+            "unresolved",
+            environment_overrides={"FAKE_TAILSCALE_STATUS": json.dumps(tailscale_status)},
+        )
+        self.assertEqual(setup.returncode, clawbar_collect.ExitCode.OK, setup.stderr)
+
+        failed = self.run_external(
+            "unresolved",
+            environment_overrides={"FAKE_CANDIDATE_MODE": "failed"},
+            collector_arguments=["--verify-candidate", "candidate:0"],
+        )
+
+        self.assertEqual(failed.returncode, clawbar_collect.ExitCode.OK, failed.stderr)
+        snapshot = json.loads(failed.stdout)
+        self.assertEqual(snapshot["gateway"], {"state": "setup_required"})
+        self.assertEqual(snapshot["setup"]["candidates"], [{"key": "candidate:0", "name": "gateway-alpha"}])
+        self.assertEqual(
+            snapshot["setup"]["error"],
+            "The selected device could not be verified. Check Tailscale or choose another device.",
+        )
+        self.assertFalse((self.root / "external-state" / "clawbar" / "gateway-target.json").exists())
+
+    def test_executable_times_out_candidate_verification_without_accepting_it(self) -> None:
+        tailscale_status = {
+            "Peer": {
+                "nodekey:PRIVATE-A": {
+                    "HostName": "gateway-alpha",
+                    "DNSName": "gateway-alpha.example.ts.net.",
+                    "Online": True,
+                }
+            }
+        }
+        setup = self.run_external(
+            "unresolved",
+            environment_overrides={"FAKE_TAILSCALE_STATUS": json.dumps(tailscale_status)},
+        )
+        self.assertEqual(setup.returncode, clawbar_collect.ExitCode.OK, setup.stderr)
+
+        started_at = time.monotonic()
+        timed_out = self.run_external(
+            "unresolved",
+            timeout=14,
+            environment_overrides={"FAKE_GATEWAY_DELAY": "30"},
+            collector_arguments=["--verify-candidate", "candidate:0"],
+        )
+        elapsed = time.monotonic() - started_at
+
+        self.assertEqual(timed_out.returncode, clawbar_collect.ExitCode.COMMAND_TIMEOUT, timed_out.stderr)
+        snapshot = json.loads(timed_out.stdout)
+        self.assertEqual(snapshot["gateway"], {"state": "setup_required"})
+        self.assertEqual(snapshot["failureKind"], "timeout")
+        self.assertEqual(snapshot["setup"]["error"], "Gateway verification timed out. Check Tailscale and try again.")
+        self.assertLess(elapsed, 12.25)
+        self.assertFalse((self.root / "external-state" / "clawbar" / "gateway-target.json").exists())
+
 
     def test_executable_distinguishes_empty_fleet_from_missing_gateway(self) -> None:
         result = self.run_external("local")

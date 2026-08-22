@@ -193,12 +193,19 @@ def snapshot_for(scenario: str, now: datetime) -> dict[str, Any]:
     if scenario == "setup-required":
         snapshot.update({
             "resolutionSource": "unresolved",
-            "gateway": {"state": "no_data"},
+            "gateway": {"state": "setup_required"},
             "fleet": {"available": False, "nodes": []},
             "agents": {"available": False, "items": []},
             "automations": {"available": False, "items": []},
             "bar": {"kind": "attention", "count": 0, "severity": "warning"},
             "lastSuccessAt": None,
+            "setup": {
+                "candidates": [
+                    {"key": "candidate:0", "name": "gateway-alpha"},
+                    {"key": "candidate:1", "name": "gateway-beta"},
+                ],
+                "guidance": "Choose a Tailscale device to verify as your OpenClaw Gateway.",
+            },
         })
     elif scenario == "working-agents":
         snapshot["agents"]["items"] = working_agents(now)

@@ -21,6 +21,7 @@ class CollectorFixture:
         self.command_path = self.root / "openclaw"
         self.call_log_path = self.root / "calls.jsonl"
         self.notification_path = self.root / "notify-send"
+        self.tailscale_path = self.root / "tailscale"
         self.notification_log_path = self.root / "notifications.jsonl"
         self.command_path.write_text(
             textwrap.dedent(
@@ -101,8 +102,24 @@ class CollectorFixture:
                 if arguments[:2] == ["gateway", "status"]:
                     time.sleep(float(os.environ.get("FAKE_GATEWAY_DELAY", "0")))
                     scenario = os.environ.get("FAKE_SCENARIO", "local")
-                    if scenario == "node_host" and "--url" not in arguments:
-                        sys.stdout.write("connection broken")
+                    candidate_mode = os.environ.get("FAKE_CANDIDATE_MODE", "healthy")
+                    if "--url" in arguments and scenario == "unresolved":
+                        if candidate_mode == "unsupported":
+                            sys.stdout.write(json.dumps({"rpc": {"ok": False}}))
+                        elif candidate_mode == "failed":
+                            raise SystemExit(9)
+                        else:
+                            url = arguments[arguments.index("--url") + 1]
+                            sys.stdout.write(json.dumps({"rpc": {"ok": True, "url": url}}))
+                        raise SystemExit(0)
+                    if scenario in {"node_host", "unresolved"} and "--url" not in arguments:
+                        if scenario == "unresolved":
+                            sys.stdout.write(json.dumps({
+                                "service": {"loaded": False, "runtime": {"status": "stopped"}},
+                                "rpc": {"ok": False, "url": "ws://127.0.0.1:18789"}
+                            }))
+                        else:
+                            sys.stdout.write("connection broken")
                         sys.stderr.write("invalid token")
                         raise SystemExit(9)
                     sys.stderr.write(os.environ.get("FAKE_STDERR", ""))
@@ -140,6 +157,27 @@ class CollectorFixture:
             encoding="utf-8",
         )
         self.notification_path.chmod(0o755)
+        self.tailscale_path.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env python3
+                import json
+                import os
+                import sys
+                import time
+
+                with open(os.environ["FAKE_CALL_LOG"], "a", encoding="utf-8") as log:
+                    log.write(json.dumps(["tailscale", *sys.argv[1:]]) + "\\n")
+                time.sleep(float(os.environ.get("FAKE_TAILSCALE_DELAY", "0")))
+                output = os.environ.get("FAKE_TAILSCALE_STATUS")
+                if output is not None:
+                    sys.stdout.write(output)
+                raise SystemExit(int(os.environ.get("FAKE_TAILSCALE_EXIT", "0")))
+                """
+            ),
+            encoding="utf-8",
+        )
+        self.tailscale_path.chmod(0o755)
 
     @contextlib.contextmanager
     def fake_environment(self, **values: str):
@@ -206,6 +244,7 @@ class CollectorFixture:
         *,
         timeout: float = 15,
         environment_overrides: dict[str, str] | None = None,
+        collector_arguments: list[str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         environment = os.environ.copy()
         environment.update(
@@ -221,7 +260,13 @@ class CollectorFixture:
             }
         )
         return subprocess.run(
-            [sys.executable, str(Path(clawbar_collect.__file__)), "--refresh-interval", "30"],
+            [
+                sys.executable,
+                str(Path(clawbar_collect.__file__)),
+                "--refresh-interval",
+                "30",
+                *(collector_arguments or []),
+            ],
             capture_output=True,
             check=False,
             text=True,

@@ -124,6 +124,18 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
             },
         )
         self.assertFalse(setup_log.exists())
+    def test_gateway_setup_required_silently_ends_a_previous_gateway_incident(self) -> None:
+        self.run_external(
+            "local",
+            environment_overrides={"FAKE_STDOUT": json.dumps({"rpc": {"ok": False}})},
+        )
+        self.run_external("unresolved")
+        self.run_external("local")
+
+        notifications = self.read_notifications()
+        self.assertEqual(len(notifications), 1)
+        self.assertIn("Clawbar: Incident started", notifications[0])
+
 
     def test_no_data_does_not_repeat_a_still_current_incident(self) -> None:
         offline = [self.offline_node("node-1", "studio-ops")]

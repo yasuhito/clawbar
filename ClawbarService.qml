@@ -8,30 +8,60 @@ Item {
   visible: false
 
   property bool refreshPending: false
+  property string candidatePending: ""
   property string collectorPath: decodeURIComponent(
     String(Qt.resolvedUrl("scripts/clawbar_collect.py")).replace(/^file:\/\//, "")
   )
   property int refreshIntervalSeconds: Logic.normalizeRefreshInterval(
     Quickshell.env("CLAWBAR_REFRESH_INTERVAL_SECONDS")
   )
+  readonly property bool verifyingCandidate: candidateVerifier.running || candidatePending !== ""
 
   signal collectionFinished()
 
+  function busy() {
+    return collector.running || candidateVerifier.running
+  }
+
   function requestCollection() {
-    var action = Logic.requestRefresh(collector.running)
-    refreshPending = action.pending
-    if (action.start) collector.running = true
+    if (busy()) {
+      refreshPending = true
+      return
+    }
+    collector.running = true
+  }
+
+  function verifyCandidate(candidateKey) {
+    if (!candidateKey) return
+    if (busy()) {
+      candidatePending = candidateKey
+      return
+    }
+    candidateVerifier.command = [
+      "python3",
+      root.collectorPath,
+      "--refresh-interval",
+      String(root.refreshIntervalSeconds),
+      "--verify-candidate",
+      candidateKey
+    ]
+    candidateVerifier.running = true
   }
 
   function consumeCollection() {
-    var action = Logic.consumeRefresh(collector.running, refreshPending)
-    refreshPending = action.pending
-    if (action.wait) {
+    if (busy()) {
       Qt.callLater(root.consumeCollection)
       return
     }
     collectionFinished()
-    if (action.start) collector.running = true
+    if (candidatePending) {
+      var candidateKey = candidatePending
+      candidatePending = ""
+      verifyCandidate(candidateKey)
+    } else if (refreshPending) {
+      refreshPending = false
+      collector.running = true
+    }
   }
 
   Process {
@@ -42,6 +72,13 @@ Item {
       "--refresh-interval",
       String(root.refreshIntervalSeconds)
     ]
+    onExited: function(_) {
+      Qt.callLater(root.consumeCollection)
+    }
+  }
+
+  Process {
+    id: candidateVerifier
     onExited: function(_) {
       Qt.callLater(root.consumeCollection)
     }

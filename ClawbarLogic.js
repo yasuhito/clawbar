@@ -16,10 +16,10 @@ function snapshotState(snapshot, nowMilliseconds) {
   if (!snapshot || snapshot.schemaVersion !== 1 || !snapshot.gateway)
     throw new Error("Unsupported Clawbar snapshot")
   var state = String(snapshot.gateway.state || "unknown")
-  var supportedStates = ["healthy", "degraded", "unstable", "offline", "configuration_error", "no_data", "unknown"]
+  var supportedStates = ["healthy", "degraded", "unstable", "offline", "configuration_error", "setup_required", "no_data", "unknown"]
   if (supportedStates.indexOf(state) === -1)
     throw new Error("Unsupported Gateway state")
-  if (state === "no_data" || state === "unknown") return state
+  if (state === "setup_required" || state === "no_data" || state === "unknown") return state
 
   var generatedAt = Date.parse(String(snapshot.generatedAt || ""))
   var refreshInterval = normalizeRefreshInterval(snapshot.refreshIntervalSeconds)
@@ -60,6 +60,29 @@ function automations(snapshot, state) {
   var metadata = metadataSnapshot(snapshot, state)
   return metadata && metadata.automations && metadata.automations.available
     && Array.isArray(metadata.automations.items) ? metadata.automations.items : []
+}
+
+
+function setupCandidates(snapshot, state) {
+  if (state !== "setup_required" && state !== "configuration_error") return []
+  var setup = snapshot && snapshot.setup
+  return setup && Array.isArray(setup.candidates) ? setup.candidates : []
+}
+
+
+function candidateRow(item, index) {
+  return {
+    kind: "candidate",
+    key: String(item.key || ""),
+    sectionIndex: index,
+    item: item,
+    expandable: false,
+    typeLabel: "Gateway candidate",
+    timestamp: "",
+    missingTimestampLabel: "",
+    historical: false,
+    observedAt: ""
+  }
 }
 
 
@@ -113,9 +136,11 @@ function automationRow(item, index, historical, observedAt) {
 function panelRows(snapshot, state) {
   var historical = historicalState(state)
   var observedAt = observationTime(snapshot, state)
-  return fleetNodes(snapshot, state).map(function(item, index) {
+  return setupCandidates(snapshot, state).map(function(item, index) {
+    return candidateRow(item, index)
+  }).concat(fleetNodes(snapshot, state).map(function(item, index) {
     return nodeRow(item, index, historical, observedAt)
-  }).concat(agents(snapshot, state).map(function(item, index) {
+  })).concat(agents(snapshot, state).map(function(item, index) {
     return agentRow(item, index, historical, observedAt)
   })).concat(automations(snapshot, state).map(function(item, index) {
     return automationRow(item, index, historical, observedAt)
@@ -191,6 +216,7 @@ var SIGNAL_PRESENTATIONS = {
   unstable: { shape: "triangle", tone: "warning", label: "Unstable" },
   stale: { shape: "triangle", tone: "warning", label: "Stale" },
   collecting: { shape: "triangle", tone: "warning", label: "Collecting" },
+  setup_required: { shape: "triangle", tone: "warning", label: "Gateway Setup Required" },
   no_data: { shape: "triangle", tone: "warning", label: "No data yet" },
   starting: { shape: "triangle", tone: "warning", label: "Starting" },
   unknown: { shape: "triangle", tone: "warning", label: "Unavailable" },
@@ -261,7 +287,7 @@ function barSeverity(snapshot, state) {
 }
 
 function barCount(snapshot, state) {
-  if (state === "collecting" || state === "unknown") return 0
+  if (state === "collecting" || state === "unknown" || state === "setup_required") return 0
   if (state === "stale" || state === "configuration_error") return 1
   var count = snapshot && snapshot.bar ? Number(snapshot.bar.count) : 0
   if (!isFinite(count) || count < 0) count = 0
@@ -274,7 +300,8 @@ function barCount(snapshot, state) {
 function summary(state, resolutionSource, count, severity) {
   var text
   if (state === "healthy") {
-    if (resolutionSource === "node_host") text = "Node-host OpenClaw Gateway healthy"
+    if (resolutionSource === "tailscale") text = "Verified Tailscale OpenClaw Gateway healthy"
+    else if (resolutionSource === "node_host") text = "Node-host OpenClaw Gateway healthy"
     else if (resolutionSource === "configured_remote") text = "Remote OpenClaw Gateway healthy"
     else text = "Local OpenClaw Gateway healthy"
   } else if (state === "degraded") text = "OpenClaw Gateway metadata degraded"
@@ -283,6 +310,7 @@ function summary(state, resolutionSource, count, severity) {
   else if (state === "configuration_error") text = "OpenClaw Gateway configuration error"
   else if (state === "stale") text = "OpenClaw Gateway snapshot stale"
   else if (state === "collecting") text = "Collecting OpenClaw Gateway status"
+  else if (state === "setup_required") text = "OpenClaw Gateway setup required"
   else if (state === "no_data") text = "No OpenClaw Gateway data yet"
   else text = "OpenClaw Gateway status unavailable"
   if (severity !== "healthy" && count > 0)
@@ -318,6 +346,7 @@ if (typeof module !== "undefined") {
     fleetNodes: fleetNodes,
     agents: agents,
     automations: automations,
+    setupCandidates: setupCandidates,
     panelRows: panelRows,
     moveFocus: moveFocus,
     relativeTime: relativeTime,

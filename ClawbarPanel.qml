@@ -13,9 +13,11 @@ KeyboardPanel {
   property string selectedKey: ""
   property int selectedIndexHint: 0
   property var expandedKeys: ({})
+  property bool verifyingCandidate: false
 
   signal automationHistoryRequested(string automationId)
   signal refreshRequested()
+  signal candidateVerificationRequested(string candidateKey)
 
   readonly property var metadata: Logic.metadataSnapshot(snapshot, state)
   readonly property bool historical: Logic.historicalState(state)
@@ -24,6 +26,9 @@ KeyboardPanel {
   readonly property var nodes: Logic.fleetNodes(snapshot, state)
   readonly property var agents: Logic.agents(snapshot, state)
   readonly property var automations: Logic.automations(snapshot, state)
+  readonly property var candidates: Logic.setupCandidates(snapshot, state)
+  readonly property bool setupVisible: candidates.length > 0 || state === "setup_required"
+    || (state === "configuration_error" && snapshot && snapshot.setup)
   readonly property int selectedIndex: Logic.indexForKey(rows, selectedKey)
   readonly property var selectedRow: selectedIndex >= 0 ? rows[selectedIndex] : null
   readonly property color foreground: bar ? bar.foreground : Color.foreground
@@ -60,6 +65,7 @@ KeyboardPanel {
 
   function rowDelegate(row) {
     if (!row) return null
+    if (row.kind === "candidate") return candidateRepeater.itemAt(row.sectionIndex)
     if (row.kind === "node") return nodeRepeater.itemAt(row.sectionIndex)
     if (row.kind === "agent") return agentRepeater.itemAt(row.sectionIndex)
     return automationSection.itemAt(row.sectionIndex)
@@ -76,7 +82,13 @@ KeyboardPanel {
   }
 
   function activateSelection() {
-    if (!selectedRow || !selectedRow.expandable) return
+    if (!selectedRow) return
+    if (selectedRow.kind === "candidate") {
+      if (!verifyingCandidate)
+        candidateVerificationRequested(selectedRow.key)
+      return
+    }
+    if (!selectedRow.expandable) return
     var next = Object.assign({}, expandedKeys)
     next[selectedRow.key] = !next[selectedRow.key]
     expandedKeys = next
@@ -200,6 +212,95 @@ KeyboardPanel {
         }
 
         Text {
+          visible: root.setupVisible
+          width: parent.width
+          text: "GATEWAY SETUP REQUIRED"
+          color: root.accent
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          font.bold: true
+        }
+
+        Text {
+          visible: root.setupVisible
+          width: parent.width
+          text: root.snapshot && root.snapshot.setup
+            ? String(root.snapshot.setup.guidance || "")
+            : "Connect Tailscale on this device, then refresh to find Gateway candidates."
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+          wrapMode: Text.Wrap
+        }
+
+        Text {
+          visible: root.setupVisible && root.snapshot && root.snapshot.setup
+            && !!root.snapshot.setup.error
+          width: parent.width
+          text: visible ? String(root.snapshot.setup.error) : ""
+          color: root.state === "configuration_error" ? root.urgent : root.accent
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          font.bold: true
+          wrapMode: Text.Wrap
+        }
+
+        Repeater {
+          id: candidateRepeater
+          model: root.candidates
+
+          delegate: Rectangle {
+            id: candidateRow
+            required property var modelData
+            required property int index
+            readonly property var row: root.rows[index]
+            readonly property bool selected: !!row && root.selectedKey === row.key
+            width: contentColumn.width
+            height: Style.space(40)
+            radius: Style.cornerRadius
+            color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
+            border.width: selected ? 1 : 0
+            border.color: root.accent
+
+            MouseArea {
+              anchors.fill: parent
+              enabled: !root.verifyingCandidate
+              onClicked: {
+                root.selectRow(candidateRow.row)
+                root.activateSelection()
+              }
+            }
+
+            Text {
+              anchors.left: parent.left
+              anchors.leftMargin: Style.space(9)
+              anchors.right: candidateAction.left
+              anchors.rightMargin: Style.space(8)
+              anchors.verticalCenter: parent.verticalCenter
+              text: candidateRow.modelData.name
+              elide: Text.ElideRight
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              font.bold: true
+            }
+
+            Text {
+              id: candidateAction
+              anchors.right: parent.right
+              anchors.rightMargin: Style.space(9)
+              anchors.verticalCenter: parent.verticalCenter
+              text: root.verifyingCandidate && candidateRow.selected ? "Verifying…" : "Verify"
+              color: root.accent
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: true
+            }
+          }
+        }
+
+        Text {
+          visible: !root.setupVisible
           width: parent.width
           text: "FLEET"
           color: root.dim
@@ -236,7 +337,7 @@ KeyboardPanel {
             id: nodeRow
             required property var modelData
             required property int index
-            readonly property var row: root.rows[index]
+            readonly property var row: root.rows[root.candidates.length + index]
             readonly property bool selected: !!row && root.selectedKey === row.key
             readonly property bool expanded: !!row && !!root.expandedKeys[row.key]
             readonly property var signal: Logic.signalPresentation(modelData.state)
@@ -342,6 +443,7 @@ KeyboardPanel {
         }
 
         Text {
+          visible: !root.setupVisible
           width: parent.width
           topPadding: Style.space(8)
           text: "AGENTS"
@@ -369,7 +471,7 @@ KeyboardPanel {
             id: agentRow
             required property var modelData
             required property int index
-            readonly property var row: root.rows[root.nodes.length + index]
+            readonly property var row: root.rows[root.candidates.length + root.nodes.length + index]
             readonly property bool selected: !!row && root.selectedKey === row.key
             readonly property var signal: Logic.signalPresentation(modelData.activity)
             width: contentColumn.width
@@ -441,10 +543,11 @@ KeyboardPanel {
         AutomationSection {
           id: automationSection
           width: parent.width
+          visible: !root.setupVisible
           section: root.metadata ? root.metadata.automations : null
           automations: root.automations
           rows: root.rows
-          rowOffset: root.nodes.length + root.agents.length
+          rowOffset: root.candidates.length + root.nodes.length + root.agents.length
           selectedKey: root.selectedKey
           nowMs: root.nowMs
           foreground: root.foreground
@@ -478,6 +581,9 @@ KeyboardPanel {
               var prefix = root.selectedRow.historical
                 ? "Last known · " + Logic.relativeTime(root.selectedRow.observedAt, root.nowMs) + "\n"
                 : ""
+              if (root.selectedRow.kind === "candidate")
+                return "Gateway candidate · " + root.selectedRow.item.name
+                  + (root.verifyingCandidate ? "\nVerifying supported read-only Gateway JSON…" : "\nPress Enter to verify")
               if (root.selectedRow.kind === "automation") {
                 var automation = root.selectedRow.item
                 var automationLines = ["Automation · " + automation.name]
@@ -506,7 +612,9 @@ KeyboardPanel {
 
         Text {
           width: parent.width
-          text: "j/k · arrows  Move    Enter  Expand    r  Refresh    o  Automation history    Esc  Close"
+          text: root.setupVisible
+            ? "j/k · arrows  Move    Enter  Verify    r  Refresh    Esc  Close"
+            : "j/k · arrows  Move    Enter  Expand    r  Refresh    o  Automation history    Esc  Close"
           wrapMode: Text.Wrap
           color: root.dim
           font.family: root.fontFamily

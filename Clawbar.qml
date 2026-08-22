@@ -74,6 +74,10 @@ BarWidget {
     collectionAttempted = true
     readSnapshot()
   }
+  function verifyCandidate(candidateKey) {
+    if (!collectorService || !candidateKey) return
+    collectorService.verifyCandidate(candidateKey)
+  }
 
   function applySnapshot(snapshot) {
     state = Logic.snapshotState(snapshot, Date.now())
@@ -211,9 +215,13 @@ BarWidget {
     state: root.state
     nowMs: root.nowMs
     summary: root.summary
+    verifyingCandidate: root.collectorService ? root.collectorService.verifyingCandidate : false
     onRefreshRequested: root.requestCollection()
     onAutomationHistoryRequested: function(automationId) {
       root.openAutomationHistory(automationId)
+    }
+    onCandidateVerificationRequested: function(candidateKey) {
+      root.verifyCandidate(candidateKey)
     }
   }
 }

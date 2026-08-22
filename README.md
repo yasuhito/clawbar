@@ -12,8 +12,8 @@ the cached snapshot without blocking Quickshell.
 - OpenClaw `2026.7.1-2` or a later stable release with the same supported JSON
   command surfaces
 - Python 3; the collector uses only the standard library
-- Optional: Tailscale when OpenClaw-owned Node-host state resolves the managing
-  Gateway through a Tailscale address
+- Optional: Tailscale for the verified fallback setup when OpenClaw cannot
+  resolve a local, configured remote, or Node-host Gateway
 
 Clawbar does not install a Python package, daemon, systemd service, or timer.
 One Quickshell service entry point owns the bounded collection schedule.
@@ -29,6 +29,14 @@ collection and repeats every 30 seconds. OpenClaw first resolves its normal
 local or configured remote Gateway. If that fails on a Node host, Clawbar uses
 the Gateway connection recorded in OpenClaw-owned Node-host state; it never
 probes Fleet Nodes directly and never stores a Gateway token.
+
+If none of those sources resolves a Gateway, the panel shows Gateway Setup
+Required and lists online Tailscale devices. Select a device with `j`/`k` or
+the arrow keys and press Enter. Clawbar accepts it only after the bounded,
+read-only Gateway JSON probe succeeds. A verified target is reused for later
+collections; Clawbar never asks for or stores a Gateway token or password.
+Without Tailscale, the panel stays in the non-Incident setup state and gives
+instructions to connect Tailscale and refresh.
 
 ## Configure
 
@@ -49,7 +57,7 @@ snapshot becomes Stale after three configured refresh intervals.
 Press Clawbar to open the panel.
 
 - `j`, `k`, Up, Down: move selection
-- Enter: expand or collapse the selected Node
+- Enter: expand or collapse the selected Node, or verify a selected Gateway candidate
 - `r`: request a non-blocking refresh
 - `o`: open official read-only recent-run history for the selected Automation
 - Escape: close the panel
@@ -71,8 +79,11 @@ Clawbar never persists or displays task instructions, message bodies,
 destinations, account identifiers, credentials, host/IP/private Node
 identifiers, or raw errors. QML reads only
 `$XDG_STATE_HOME/clawbar/snapshot.json` (or
-`~/.local/state/clawbar/snapshot.json`). Incident deduplication state and the
-Node-key secret are per-login data under `XDG_RUNTIME_DIR`.
+`~/.local/state/clawbar/snapshot.json`). Private mode-`0600` state beside the
+snapshot maps opaque setup keys to Tailscale targets and remembers a verified
+target URL; it contains no token, password, or other credential. Incident
+deduplication state and the Node-key secret are per-login data under
+`XDG_RUNTIME_DIR`.
 
 The only context action invokes OpenClaw's official read-only Automation run
 history command for an ID already present in the current snapshot. Clawbar

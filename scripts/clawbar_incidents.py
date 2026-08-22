@@ -65,6 +65,8 @@ def reconcile_incidents(
         start("gateway", "Gateway", "Offline")
     elif gateway_state == "configuration_error":
         start("gateway", "Gateway", "Configuration Error")
+    elif gateway_state == "setup_required":
+        incidents.pop("gateway", None)
     elif gateway_state in {"healthy", "degraded"}:
         recover("gateway", "Gateway")
 
