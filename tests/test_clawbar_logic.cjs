@@ -85,6 +85,19 @@ test("panel rows preserve Gateway order and keyboard focus wraps", () => {
   assert.equal(Logic.moveFocus(0, 0, 1), -1)
 })
 
+test("keyless Nodes never receive positional identity", () => {
+  const snapshot = healthySnapshot(new Date(100000).toISOString())
+  snapshot.fleet = {
+    available: true,
+    nodes: [{ name: "Local" }, { name: "studio-ops" }]
+  }
+
+  const rows = Logic.panelRows(snapshot)
+
+  assert.deepEqual(rows.map(row => row.key), ["", ""])
+  assert.equal(Logic.indexForKey(rows, ""), -1)
+})
+
 test("Agent Activity remains independent from previous Task Result", () => {
   const completedAt = new Date(100000).toISOString()
   const snapshot = healthySnapshot(completedAt)

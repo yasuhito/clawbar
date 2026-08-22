@@ -354,6 +354,16 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(snapshot["fleet"], {"available": False, "nodes": []})
         self.assertNotIn("PRIVATE-NODE", result.stdout)
 
+    def test_node_without_private_identity_makes_fleet_unavailable(self) -> None:
+        nodes = {"nodes": [{"displayName": "Local", "connected": True}]}
+
+        result = self.run_external("local", environment_overrides={"FAKE_NODES": json.dumps(nodes)})
+
+        self.assertEqual(result.returncode, clawbar_collect.ExitCode.OK, result.stderr)
+        snapshot = json.loads(result.stdout)
+        self.assertEqual(snapshot["gateway"], {"state": "degraded"})
+        self.assertEqual(snapshot["fleet"], {"available": False, "nodes": []})
+
 
     def test_metadata_failure_is_degraded_not_gateway_loss(self) -> None:
         result = self.run_external(

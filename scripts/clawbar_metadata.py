@@ -75,12 +75,13 @@ def sanitize_fleet(payload: object, node_key_secret: bytes | None) -> list[dict[
         if not isinstance(raw, dict):
             continue
         key = opaque_node_key(raw.get("nodeId"), node_key_secret) if node_key_secret is not None else None
+        if key is None:
+            return None
         node = {
+            "key": key,
             "name": bounded_text(raw.get("displayName"), "Unnamed Node"),
             "state": "healthy" if raw.get("connected") is True else "offline",
         }
-        if key is not None:
-            node["key"] = key
         for source_key, output_key in (("platform", "platform"), ("modelIdentifier", "model"), ("version", "version")):
             value = bounded_text(raw.get(source_key))
             if value:

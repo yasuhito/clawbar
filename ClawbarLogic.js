@@ -41,7 +41,7 @@ function agents(snapshot) {
 function nodeRow(item, index) {
   return {
     kind: "node",
-    key: String(item.key || "node-index:" + index),
+    key: String(item.key || ""),
     sectionIndex: index,
     item: item,
     expandable: true,
@@ -70,6 +70,7 @@ function panelRows(snapshot) {
 }
 
 function indexForKey(rows, key) {
+  if (!key) return -1
   for (var i = 0; i < rows.length; i++)
     if (rows[i].key === key) return i
   return -1
