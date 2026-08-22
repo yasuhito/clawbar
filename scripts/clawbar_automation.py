@@ -7,7 +7,11 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Callable, Sequence
-from urllib.parse import urlsplit
+
+if __package__:
+    from .clawbar_target_state import GatewayTargetState
+else:
+    from clawbar_target_state import GatewayTargetState
 
 ReadSurface = Callable[[Sequence[str]], object | None]
 LoadSnapshot = Callable[[Path], dict[str, Any] | None]
@@ -45,19 +49,8 @@ def collect_automation_surface(read_surface: ReadSurface) -> object | None:
         offset = next_offset
 
 
-def collected_target_url(status: dict[str, Any], fallback_url: str | None) -> str | None:
-    rpc = status.get("rpc")
-    value = rpc.get("url") if isinstance(rpc, dict) else None
-    if not isinstance(value, str):
-        value = fallback_url
-    if not isinstance(value, str):
-        return None
-    parsed = urlsplit(value)
-    return value if parsed.scheme in {"ws", "wss"} and parsed.hostname else None
 
 
-def target_state_path(snapshot_path: Path) -> Path:
-    return snapshot_path.with_name("gateway-target.json")
 
 
 def open_automation_history(
@@ -69,19 +62,17 @@ def open_automation_history(
     load_snapshot: LoadSnapshot,
 ) -> int:
     snapshot = load_snapshot(snapshot_path)
-    target_state = load_snapshot(target_state_path(snapshot_path))
     automations = snapshot.get("automations") if snapshot else None
     items = automations.get("items") if isinstance(automations, dict) and automations.get("available") else None
-    target_url = target_state.get("url") if target_state else None
-    matching_snapshot = (
-        target_state
-        and snapshot
-        and target_state.get("snapshotGeneratedAt") == snapshot.get("generatedAt")
+    target_url = (
+        GatewayTargetState(snapshot_path, snapshot["schemaVersion"]).current_url(snapshot.get("generatedAt"))
+        if snapshot
+        else None
     )
     known_id = isinstance(items, list) and any(
         isinstance(item, dict) and item.get("id") == automation_id for item in items
     )
-    if not matching_snapshot or not known_id or not isinstance(target_url, str):
+    if not known_id or target_url is None:
         print("Automation history unavailable", file=sys.stderr)
         return command_failed_code
     try:

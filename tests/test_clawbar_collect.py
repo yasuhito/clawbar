@@ -374,6 +374,11 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
             "unresolved",
             collector_arguments=["--verify-candidate", candidate_key],
         )
+        verified_target_path = self.root / "external-state" / "clawbar" / "gateway-verified-target.json"
+        verified_target = verified_target_path.read_bytes()
+        automatic = self.run_external("configured_remote")
+        self.assertEqual(automatic.returncode, clawbar_collect.ExitCode.OK, automatic.stderr)
+        self.assertEqual(verified_target_path.read_bytes(), verified_target)
         reused = self.run_external("unresolved")
         failed = self.run_external(
             "unresolved",

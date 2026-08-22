@@ -135,8 +135,6 @@ def candidate_state_path(snapshot_path: Path) -> Path:
     return snapshot_path.with_name("gateway-candidates.json")
 
 
-def verified_target_path(snapshot_path: Path) -> Path:
-    return snapshot_path.with_name("gateway-verified-target.json")
 
 
 def tailscale_candidate(device: object) -> tuple[str, str, str] | None:
@@ -302,17 +300,6 @@ def discover_node_host(openclaw_command: Sequence[str], deadline_at: float) -> G
     return node_host_target(status)
 
 
-def stored_target(path: Path, source: str, schema_version: int) -> GatewayTarget | None:
-    state = load_snapshot(path, schema_version)
-    if not state or state.get("source") != source:
-        return None
-    url = state.get("url")
-    if not isinstance(url, str):
-        return None
-    parsed = urlsplit(url)
-    if parsed.scheme not in {"ws", "wss"} or parsed.hostname is None or parsed.username or parsed.password:
-        return None
-    return GatewayTarget(url, source)
 
 
 def selected_candidate(snapshot_path: Path, key: str, schema_version: int) -> GatewayTarget | None:

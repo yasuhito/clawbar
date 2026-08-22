@@ -17,9 +17,7 @@ from typing import Any, Sequence
 if __package__:
     from .clawbar_automation import (
         collect_automation_surface,
-        collected_target_url,
         open_automation_history,
-        target_state_path,
     )
     from .clawbar_gateway import (
         CollectionDeadlineExceeded,
@@ -35,8 +33,6 @@ if __package__:
         setup_required_snapshot,
         setup_retry_snapshot,
         setup_section,
-        stored_target,
-        verified_target_path,
     )
     from .clawbar_incidents import process_incident_transitions
     from .clawbar_metadata import build_current_snapshot, load_local_key_secret, sanitize_metadata
@@ -47,12 +43,11 @@ if __package__:
         load_snapshot,
         utc_now,
     )
+    from .clawbar_target_state import GatewayTargetState, collected_target_url
 else:
     from clawbar_automation import (
         collect_automation_surface,
-        collected_target_url,
         open_automation_history,
-        target_state_path,
     )
     from clawbar_gateway import (
         CollectionDeadlineExceeded,
@@ -68,8 +63,6 @@ else:
         setup_required_snapshot,
         setup_retry_snapshot,
         setup_section,
-        stored_target,
-        verified_target_path,
     )
     from clawbar_incidents import process_incident_transitions
     from clawbar_metadata import build_current_snapshot, load_local_key_secret, sanitize_metadata
@@ -80,6 +73,7 @@ else:
         load_snapshot,
         utc_now,
     )
+    from clawbar_target_state import GatewayTargetState, collected_target_url
 
 SCHEMA_VERSION = 1
 DEFAULT_REFRESH_INTERVAL_SECONDS = 30
@@ -287,25 +281,12 @@ def publish_current(
     target: GatewayTarget | None,
 ) -> CollectionResult:
     target_url = collected_target_url(status, target.url if target else None)
-    if target_url is None:
-        return publish(snapshot_path, ExitCode.OK, snapshot)
-    atomic_write_snapshot(
-        target_state_path(snapshot_path),
-        {
-            "schemaVersion": SCHEMA_VERSION,
-            "snapshotGeneratedAt": snapshot["generatedAt"],
-            "source": snapshot["resolutionSource"],
-            "url": target_url,
-        },
-    )
-    if target is not None and target.source == "tailscale":
-        atomic_write_snapshot(
-            verified_target_path(snapshot_path),
-            {
-                "schemaVersion": SCHEMA_VERSION,
-                "source": "tailscale",
-                "url": target_url,
-            },
+    if target_url is not None:
+        GatewayTargetState(snapshot_path, SCHEMA_VERSION).record_success(
+            snapshot["generatedAt"],
+            snapshot["resolutionSource"],
+            target_url,
+            verified_fallback=target is not None and target.source == "tailscale",
         )
     return publish(snapshot_path, ExitCode.OK, snapshot)
 
@@ -355,7 +336,11 @@ def collect_gateway(
                 automatic_setup_required = automatic_resolution_missing(completed)
                 target = discover_node_host(openclaw_command, command_deadline_at)
                 if target is None:
-                    target = stored_target(verified_target_path(snapshot_path), "tailscale", SCHEMA_VERSION)
+                    verified_url = GatewayTargetState(
+                        snapshot_path,
+                        SCHEMA_VERSION,
+                    ).load_verified_fallback()
+                    target = GatewayTarget(verified_url, "tailscale") if verified_url else None
                 if target is not None:
                     completed = gateway_status_command(openclaw_command, command_deadline_at, target)
     except CollectionDeadlineExceeded:
