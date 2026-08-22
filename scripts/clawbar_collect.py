@@ -280,21 +280,18 @@ def publish_current(
     status: dict[str, Any],
     target: GatewayTarget | None,
 ) -> CollectionResult:
-    target_url = collected_target_url(status, target.url if target else None)
-    if target_url is not None:
+    current_url = collected_target_url(status, target.url if target else None)
+    verified_fallback_url = (
+        target.url if target is not None and target.source == "tailscale" else None
+    )
+    if current_url is not None or verified_fallback_url is not None:
         GatewayTargetState(snapshot_path, SCHEMA_VERSION).record_success(
             snapshot["generatedAt"],
             snapshot["resolutionSource"],
-            target_url,
-            verified_fallback_url=(
-                target.url if target is not None and target.source == "tailscale" else None
-            ),
+            current_url,
+            verified_fallback_url=verified_fallback_url,
         )
     return publish(snapshot_path, ExitCode.OK, snapshot)
-
-
-
-
 
 
 def collect_gateway(
@@ -527,7 +524,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             OPENCLAW_TIMEOUT_MILLISECONDS,
             int(ExitCode.COMMAND_FAILED),
             SCHEMA_VERSION,
-            load_previous_snapshot,
         )
     if developer_demo_active():
         snapshot = load_previous_snapshot(snapshot_path)

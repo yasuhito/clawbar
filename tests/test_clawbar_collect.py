@@ -429,6 +429,40 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(len(candidate_probes), 3)
         self.assertTrue(all("--require-rpc" in call and "--timeout" in call for call in candidate_probes))
 
+    def test_verified_fallback_survives_an_unsafe_reported_gateway_url(self) -> None:
+        tailscale_status = {
+            "Peer": {
+                "nodekey:PRIVATE-A": {
+                    "ID": "PRIVATE-A",
+                    "HostName": "gateway-alpha",
+                    "DNSName": "gateway-alpha.example.ts.net.",
+                    "Online": True,
+                }
+            }
+        }
+        setup = self.run_external(
+            "unresolved",
+            environment_overrides={"FAKE_TAILSCALE_STATUS": json.dumps(tailscale_status)},
+        )
+        candidate_key = json.loads(setup.stdout)["setup"]["candidates"][0]["key"]
+
+        verified = self.run_external(
+            "unresolved",
+            environment_overrides={
+                "FAKE_REPORTED_URL": "wss://operator:PRIVATE-TOKEN@gateway.example.test:18789",
+            },
+            collector_arguments=["--verify-candidate", candidate_key],
+        )
+
+        self.assertEqual(verified.returncode, clawbar_collect.ExitCode.OK, verified.stderr)
+        state_directory = self.root / "external-state" / "clawbar"
+        verified_state = json.loads(
+            (state_directory / "gateway-verified-target.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(verified_state["url"], "ws://gateway-alpha.example.ts.net:18789")
+        self.assertFalse((state_directory / "gateway-target.json").exists())
+        self.assertNotIn("PRIVATE-TOKEN", verified.stdout)
+
     def test_failed_verified_fallback_write_keeps_previous_current_target_published(self) -> None:
         automation_id = "stable-automation-id"
         automations = {

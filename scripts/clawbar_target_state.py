@@ -30,11 +30,12 @@ class GatewayTargetState:
         self,
         snapshot_generated_at: str,
         source: str,
-        current_url: str,
+        current_url: str | None,
         *,
         verified_fallback_url: str | None = None,
     ) -> None:
-        _require_safe_gateway_url(current_url)
+        if current_url is not None:
+            _require_safe_gateway_url(current_url)
         if verified_fallback_url is not None:
             _require_safe_gateway_url(verified_fallback_url)
             if source != "tailscale":
@@ -47,15 +48,16 @@ class GatewayTargetState:
                     "url": verified_fallback_url,
                 },
             )
-        atomic_write_snapshot(
-            self.current_path,
-            {
-                "schemaVersion": self.schema_version,
-                "snapshotGeneratedAt": snapshot_generated_at,
-                "source": source,
-                "url": current_url,
-            },
-        )
+        if current_url is not None:
+            atomic_write_snapshot(
+                self.current_path,
+                {
+                    "schemaVersion": self.schema_version,
+                    "snapshotGeneratedAt": snapshot_generated_at,
+                    "source": source,
+                    "url": current_url,
+                },
+            )
 
     def load_verified_fallback(self) -> str | None:
         state = load_snapshot(self.verified_fallback_path, self.schema_version)

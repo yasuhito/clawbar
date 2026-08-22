@@ -6,15 +6,16 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import Callable, Sequence
 
 if __package__:
+    from .clawbar_snapshot import load_snapshot
     from .clawbar_target_state import GatewayTargetState
 else:
+    from clawbar_snapshot import load_snapshot
     from clawbar_target_state import GatewayTargetState
 
 ReadSurface = Callable[[Sequence[str]], object | None]
-LoadSnapshot = Callable[[Path], dict[str, Any] | None]
 
 
 def collect_automation_surface(read_surface: ReadSurface) -> object | None:
@@ -49,10 +50,6 @@ def collect_automation_surface(read_surface: ReadSurface) -> object | None:
         offset = next_offset
 
 
-
-
-
-
 def open_automation_history(
     snapshot_path: Path,
     automation_id: str,
@@ -60,9 +57,8 @@ def open_automation_history(
     timeout_milliseconds: int,
     command_failed_code: int,
     schema_version: int,
-    load_snapshot: LoadSnapshot,
 ) -> int:
-    snapshot = load_snapshot(snapshot_path)
+    snapshot = load_snapshot(snapshot_path, schema_version)
     automations = snapshot.get("automations") if snapshot else None
     items = automations.get("items") if isinstance(automations, dict) and automations.get("available") else None
     target_url = (
