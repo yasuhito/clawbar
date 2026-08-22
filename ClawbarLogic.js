@@ -19,7 +19,7 @@ function snapshotState(snapshot, nowMilliseconds) {
   var supportedStates = ["healthy", "degraded", "unstable", "offline", "configuration_error", "no_data", "unknown"]
   if (supportedStates.indexOf(state) === -1)
     throw new Error("Unsupported Gateway state")
-  if (state !== "healthy" && state !== "degraded") return state
+  if (state === "no_data" || state === "unknown") return state
 
   var generatedAt = Date.parse(String(snapshot.generatedAt || ""))
   var refreshInterval = normalizeRefreshInterval(snapshot.refreshIntervalSeconds)

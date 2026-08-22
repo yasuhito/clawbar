@@ -27,6 +27,17 @@ test("healthy snapshots become stale after three refresh intervals", () => {
   assert.equal(Logic.snapshotState(snapshot, 190001), "stale")
   assert.equal(Logic.summary("stale", "local"), "OpenClaw Gateway snapshot stale")
 })
+test("stale timing takes precedence over an old Offline Gateway", () => {
+  const snapshot = healthySnapshot(new Date(100000).toISOString())
+  snapshot.gateway.state = "offline"
+  snapshot.bar = { kind: "attention", count: 1, severity: "critical" }
+
+  assert.equal(Logic.snapshotState(snapshot, 190000), "offline")
+  assert.equal(Logic.snapshotState(snapshot, 190001), "stale")
+  assert.equal(Logic.barSeverity(snapshot, "stale"), "warning")
+  assert.equal(Logic.barCount(snapshot, "stale"), 1)
+})
+
 test("first collection exposes Collecting then No data yet", () => {
   const snapshot = healthySnapshot(new Date(100000).toISOString())
   snapshot.gateway.state = "no_data"
