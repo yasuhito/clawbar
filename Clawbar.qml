@@ -44,7 +44,7 @@ BarWidget {
       return
     }
     if (exitCode !== 0 && lastSnapshot === null)
-      state = collectionAttempted ? "no_data" : "unknown"
+      state = collectionAttempted ? "no_data" : "collecting"
     if (action.start) cacheReader.running = true
   }
 
@@ -125,7 +125,7 @@ BarWidget {
           root.applySnapshot(JSON.parse(text))
         } catch (_) {
           if (root.lastSnapshot === null)
-            root.state = root.collectionAttempted ? "no_data" : "unknown"
+            root.state = root.collectionAttempted ? "no_data" : "collecting"
         }
       }
     }
