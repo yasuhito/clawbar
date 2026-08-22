@@ -201,8 +201,8 @@ def snapshot_for(scenario: str, now: datetime) -> dict[str, Any]:
             "lastSuccessAt": None,
             "setup": {
                 "candidates": [
-                    {"key": "candidate:0", "name": "gateway-alpha"},
-                    {"key": "candidate:1", "name": "gateway-beta"},
+                    {"key": "candidate:65a84e5cbb06f1195fb3", "name": "gateway-alpha"},
+                    {"key": "candidate:9d487cbecf592db688fb", "name": "gateway-beta"},
                 ],
                 "guidance": "Choose a Tailscale device to verify as your OpenClaw Gateway.",
             },

@@ -16,6 +16,10 @@ _Avoid_: Node, Gateway
 No local Gateway is running and neither OpenClaw configuration nor node-host state identifies a remote Gateway. It requires the user to choose and verify a fallback device, uses the yellow state, and is not an Incident.
 _Avoid_: Empty Fleet, Offline Gateway, Configuration Error
 
+**Gateway Candidate Key**:
+A per-login opaque identifier derived from a private Tailscale device identifier with Clawbar's local secret. It remains attached to the same fallback candidate when candidate order changes; neither the private identifier nor the secret enters the snapshot. If Clawbar cannot derive every Gateway Candidate Key, fallback candidates are unavailable.
+_Avoid_: Tailscale device ID, positional index
+
 **Unstable Gateway**:
 The latest attempt to collect from a previously reachable Gateway failed, without yet reaching two consecutive failures.
 _Avoid_: Offline Gateway, Offline Node

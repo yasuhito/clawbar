@@ -31,10 +31,11 @@ the Gateway connection recorded in OpenClaw-owned Node-host state; it never
 probes Fleet Nodes directly and never stores a Gateway token.
 
 If none of those sources resolves a Gateway, the panel shows Gateway Setup
-Required and lists online Tailscale devices. Select a device with `j`/`k` or
-the arrow keys and press Enter. Clawbar accepts it only after the bounded,
-read-only Gateway JSON probe succeeds. A verified target is reused for later
-collections; Clawbar never asks for or stores a Gateway token or password.
+Required and lists online Tailscale devices under stable, opaque candidate
+keys. Select a device with `j`/`k` or the arrow keys and press Enter. Clawbar
+accepts it only after the bounded, read-only Gateway JSON probe succeeds. A
+verified target is reused for later collections; Clawbar never asks for or
+stores a Gateway token or password.
 Without Tailscale, the panel stays in the non-Incident setup state and gives
 instructions to connect Tailscale and refresh.
 
@@ -76,13 +77,14 @@ metadata, timestamps, and opaque local UI keys. It discards raw command output
 after parsing.
 
 Clawbar never persists or displays task instructions, message bodies,
-destinations, account identifiers, credentials, host/IP/private Node
-identifiers, or raw errors. QML reads only
-`$XDG_STATE_HOME/clawbar/snapshot.json` (or
+destinations, account identifiers, credentials, host/IP/private Node or
+Tailscale identifiers, or raw errors. Tailscale device identifiers are HMACed
+with Clawbar's local secret into stable candidate keys before entering a
+snapshot. QML reads only `$XDG_STATE_HOME/clawbar/snapshot.json` (or
 `~/.local/state/clawbar/snapshot.json`). Private mode-`0600` state beside the
-snapshot maps setup keys to Tailscale targets and remembers a verified
+snapshot maps those opaque keys to Tailscale targets and remembers a verified
 target URL; it contains no token, password, or other credential. Incident
-deduplication state and the Node-key secret are per-login data under
+deduplication state and the local key secret are per-login data under
 `XDG_RUNTIME_DIR`.
 
 The only context action invokes OpenClaw's official read-only Automation run

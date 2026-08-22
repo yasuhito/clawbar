@@ -12,14 +12,17 @@ from typing import Any, Sequence
 from urllib.parse import urlsplit
 
 if __package__:
+    from .clawbar_metadata import opaque_candidate_key
     from .clawbar_snapshot import atomic_write_snapshot, last_known_metadata, load_snapshot, utc_now
 else:
+    from clawbar_metadata import opaque_candidate_key
     from clawbar_snapshot import atomic_write_snapshot, last_known_metadata, load_snapshot, utc_now
 
 GATEWAY_PORT = 18789
 TAILSCALE_COMMAND = ("tailscale",)
 SETUP_GUIDANCE = "Choose a Tailscale device to verify as your OpenClaw Gateway."
 NO_TAILSCALE_GUIDANCE = "Connect Tailscale on this device, then refresh to find Gateway candidates."
+KEY_SECRET_ERROR = "Clawbar cannot derive private Gateway Candidate Keys. Repair its local key secret."
 
 
 @dataclass(frozen=True)
@@ -136,8 +139,11 @@ def verified_target_path(snapshot_path: Path) -> Path:
     return snapshot_path.with_name("gateway-verified-target.json")
 
 
-def tailscale_candidate(device: object) -> tuple[str, str] | None:
+def tailscale_candidate(device: object) -> tuple[str, str, str] | None:
     if not isinstance(device, dict) or device.get("Online") is not True:
+        return None
+    device_id = device.get("ID")
+    if not isinstance(device_id, str) or not device_id.strip():
         return None
     name = device.get("HostName")
     if not isinstance(name, str) or not name.strip():
@@ -156,10 +162,10 @@ def tailscale_candidate(device: object) -> tuple[str, str] | None:
         if any(character in host for character in "/@?#:"):
             return None
         url_host = host
-    return name.strip(), f"ws://{url_host}:{GATEWAY_PORT}"
+    return device_id.strip(), name.strip(), f"ws://{url_host}:{GATEWAY_PORT}"
 
 
-def discover_tailscale_candidates(deadline_at: float) -> list[tuple[str, str]]:
+def discover_tailscale_candidates(deadline_at: float) -> list[tuple[str, str, str]]:
     try:
         completed = run_command([*TAILSCALE_COMMAND, "status", "--json"], deadline_at)
     except (CollectionDeadlineExceeded, OSError):
@@ -172,7 +178,9 @@ def discover_tailscale_candidates(deadline_at: float) -> list[tuple[str, str]]:
     if not isinstance(peers, dict):
         return []
     candidates = [candidate for device in peers.values() if (candidate := tailscale_candidate(device))]
-    return sorted(candidates, key=lambda candidate: candidate[0].casefold())
+    return sorted(candidates, key=lambda candidate: candidate[1].casefold())
+
+
 
 
 def retained_setup_candidates(previous: dict[str, Any] | None) -> list[dict[str, str]]:
@@ -252,21 +260,28 @@ def setup_required_snapshot(
     refresh_interval: int,
     deadline_at: float,
     schema_version: int,
+    candidate_key_secret: bytes | None,
 ) -> dict[str, Any]:
+    if candidate_key_secret is None:
+        setup = setup_section(retained_setup_candidates(previous), KEY_SECRET_ERROR)
+        setup["guidance"] = KEY_SECRET_ERROR
+        return build_setup_snapshot(previous, refresh_interval, schema_version, setup)
     candidates = discover_tailscale_candidates(deadline_at)
-    public_candidates = [
-        {"key": f"candidate:{index}", "name": name}
-        for index, (name, _) in enumerate(candidates)
+    keyed_candidates = [
+        (opaque_candidate_key(device_id, candidate_key_secret), name, url)
+        for device_id, name, url in candidates
     ]
+    public_candidates = [
+        {"key": key, "name": name}
+        for key, name, _ in keyed_candidates
+    ]
+    candidate_targets = {
+        key: {"url": url}
+        for key, _, url in keyed_candidates
+    }
     atomic_write_snapshot(
         candidate_state_path(snapshot_path),
-        {
-            "schemaVersion": schema_version,
-            "candidates": {
-                candidate["key"]: {"url": candidates[index][1]}
-                for index, candidate in enumerate(public_candidates)
-            },
-        },
+        {"schemaVersion": schema_version, "candidates": candidate_targets},
     )
     return build_setup_snapshot(
         previous,

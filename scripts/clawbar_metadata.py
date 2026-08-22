@@ -17,8 +17,8 @@ AUTOMATION_RESULTS = frozenset({"ok", "error", "skipped"})
 
 
 
-def load_node_key_secret() -> bytes:
-    """Return the local secret used to pseudonymize private Node ids."""
+def load_local_key_secret() -> bytes:
+    """Return the local secret used to pseudonymize private identifiers."""
     runtime_home = os.environ.get("XDG_RUNTIME_DIR")
     state_home = os.environ.get("XDG_STATE_HOME")
     if runtime_home:
@@ -41,7 +41,7 @@ def load_node_key_secret() -> bytes:
             with os.fdopen(descriptor, "wb") as output:
                 output.write(secret)
     if len(secret) != _SECRET_BYTES:
-        raise OSError("Invalid Clawbar Node key secret")
+        raise OSError("Invalid Clawbar local key secret")
     return secret
 
 
@@ -61,12 +61,20 @@ def timestamp_from_milliseconds(value: object) -> str | None:
         return None
 
 
+def _opaque_key(message: str, secret: bytes, prefix: str) -> str:
+    digest = hmac.new(secret, message.encode(), hashlib.sha256).hexdigest()[:20]
+    return f"{prefix}:{digest}"
+
+
+def opaque_candidate_key(device_id: str, secret: bytes) -> str:
+    return _opaque_key(f"tailscale-candidate\0{device_id}", secret, "candidate")
+
+
 def opaque_node_key(node_id: object, secret: bytes) -> str | None:
     node_id = bounded_text(node_id)
     if not node_id:
         return None
-    digest = hmac.new(secret, node_id.encode("utf-8"), hashlib.sha256).hexdigest()[:20]
-    return f"node:{digest}"
+    return _opaque_key(node_id, secret, "node")
 
 
 def sanitize_fleet(payload: object, node_key_secret: bytes | None) -> list[dict[str, Any]] | None:

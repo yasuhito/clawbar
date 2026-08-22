@@ -39,7 +39,7 @@ if __package__:
         verified_target_path,
     )
     from .clawbar_incidents import process_incident_transitions
-    from .clawbar_metadata import build_current_snapshot, load_node_key_secret, sanitize_metadata
+    from .clawbar_metadata import build_current_snapshot, load_local_key_secret, sanitize_metadata
     from .clawbar_snapshot import (
         atomic_write_snapshot,
         build_failure_snapshot,
@@ -72,7 +72,7 @@ else:
         verified_target_path,
     )
     from clawbar_incidents import process_incident_transitions
-    from clawbar_metadata import build_current_snapshot, load_node_key_secret, sanitize_metadata
+    from clawbar_metadata import build_current_snapshot, load_local_key_secret, sanitize_metadata
     from clawbar_snapshot import (
         atomic_write_snapshot,
         build_failure_snapshot,
@@ -319,13 +319,17 @@ def collect_gateway(
     refresh_interval: int,
     openclaw_command: Sequence[str] = ("openclaw",),
     collection_deadline: float = COLLECTION_DEADLINE_SECONDS,
-    node_key_secret: bytes | None = None,
+    local_key_secret: bytes | None = None,
     candidate_key: str | None = None,
 ) -> CollectionResult:
     refresh_interval = validate_refresh_interval(refresh_interval)
     deadline_at = time.monotonic() + collection_deadline
     command_deadline_at = deadline_at - min(SNAPSHOT_WRITE_RESERVE_SECONDS, collection_deadline / 10)
     previous = load_previous_snapshot(snapshot_path)
+    try:
+        secret = local_key_secret or load_local_key_secret()
+    except OSError:
+        secret = None
     target = selected_candidate(snapshot_path, candidate_key, SCHEMA_VERSION) if candidate_key else None
     automatic_setup_required = False
 
@@ -426,6 +430,7 @@ def collect_gateway(
                     refresh_interval,
                     command_deadline_at,
                     SCHEMA_VERSION,
+                    secret,
                 ),
             )
         return publish_failure(
@@ -477,10 +482,6 @@ def collect_gateway(
         command_deadline_at,
         target,
     )
-    try:
-        secret = node_key_secret or load_node_key_secret()
-    except OSError:
-        secret = None
     fleet, agents, automations, automation_failure = sanitize_metadata(
         fleet_payload,
         agent_payload,

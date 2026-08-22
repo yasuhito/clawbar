@@ -21,8 +21,8 @@ class MetadataTests(unittest.TestCase):
             mock.patch.object(Path, "read_bytes", side_effect=[FileNotFoundError, b""]),
             mock.patch.object(os, "open", side_effect=FileExistsError),
         ):
-            with self.assertRaisesRegex(OSError, "Invalid Clawbar Node key secret"):
-                clawbar_metadata.load_node_key_secret()
+            with self.assertRaisesRegex(OSError, "Invalid Clawbar local key secret"):
+                clawbar_metadata.load_local_key_secret()
 
 
 class CollectorCommandTests(CollectorFixture, unittest.TestCase):
@@ -230,16 +230,112 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         snapshot = json.loads(result.stdout)
         self.assertEqual(snapshot["gateway"], {"state": "setup_required"})
         self.assertEqual(snapshot["resolutionSource"], "unresolved")
+        candidates = snapshot["setup"]["candidates"]
+        self.assertEqual([candidate["name"] for candidate in candidates], ["gateway-alpha"])
+        candidate_key = candidates[0]["key"]
+        self.assertRegex(candidate_key, r"^candidate:[0-9a-f]{20}$")
         self.assertEqual(
-            snapshot["setup"],
-            {
-                "candidates": [{"key": "candidate:0", "name": "gateway-alpha"}],
-                "guidance": "Choose a Tailscale device to verify as your OpenClaw Gateway.",
-            },
+            snapshot["setup"]["guidance"],
+            "Choose a Tailscale device to verify as your OpenClaw Gateway.",
         )
         self.assertEqual(snapshot["bar"], {"count": 0, "severity": "warning"})
         self.assertNotIn("PRIVATE-", result.stdout)
+        self.assertNotIn("gateway-alpha.example.ts.net", result.stdout)
+        self.assertNotIn("100.64.0.10", result.stdout)
         self.assertEqual(self.read_calls()[-1], ["tailscale", "status", "--json"])
+
+    def test_tailscale_candidate_keys_survive_reorder_and_distinguish_devices(self) -> None:
+        first_status = {
+            "Peer": {
+                "nodekey:PRIVATE-A": {
+                    "ID": "PRIVATE-A",
+                    "HostName": "gateway-alpha",
+                    "DNSName": "gateway-alpha.example.ts.net.",
+                    "Online": True,
+                },
+                "nodekey:PRIVATE-B": {
+                    "ID": "PRIVATE-B",
+                    "HostName": "gateway-beta",
+                    "DNSName": "gateway-beta.example.ts.net.",
+                    "Online": True,
+                },
+            }
+        }
+        reordered_status = {
+            "Peer": {
+                "nodekey:PRIVATE-B": {
+                    "ID": "PRIVATE-B",
+                    "HostName": "gateway-aardvark",
+                    "DNSName": "gateway-beta.example.ts.net.",
+                    "Online": True,
+                },
+                "nodekey:PRIVATE-A": {
+                    "ID": "PRIVATE-A",
+                    "HostName": "gateway-zulu",
+                    "DNSName": "gateway-alpha.example.ts.net.",
+                    "Online": True,
+                },
+            }
+        }
+
+        first = self.run_external(
+            "unresolved",
+            environment_overrides={"FAKE_TAILSCALE_STATUS": json.dumps(first_status)},
+        )
+        reordered = self.run_external(
+            "unresolved",
+            environment_overrides={"FAKE_TAILSCALE_STATUS": json.dumps(reordered_status)},
+        )
+
+        first_by_name = {
+            candidate["name"]: candidate["key"]
+            for candidate in json.loads(first.stdout)["setup"]["candidates"]
+        }
+        reordered_by_name = {
+            candidate["name"]: candidate["key"]
+            for candidate in json.loads(reordered.stdout)["setup"]["candidates"]
+        }
+        self.assertEqual(first_by_name["gateway-alpha"], reordered_by_name["gateway-zulu"])
+        self.assertEqual(first_by_name["gateway-beta"], reordered_by_name["gateway-aardvark"])
+        self.assertEqual(len(set(first_by_name.values())), 2)
+        serialized = first.stdout + reordered.stdout
+        for private_value in ("PRIVATE-A", "PRIVATE-B", "example.ts.net", "100.64."):
+            self.assertNotIn(private_value, serialized)
+        candidate_state = self.root / "external-state" / "clawbar" / "gateway-candidates.json"
+        self.assertEqual(candidate_state.stat().st_mode & 0o777, 0o600)
+        self.assertNotIn("PRIVATE-", candidate_state.read_text(encoding="utf-8"))
+        self.assertNotIn("PRIVATE-", json.dumps(self.read_notifications()))
+
+    def test_secret_failure_preserves_existing_tailscale_candidates(self) -> None:
+        tailscale_status = {
+            "Peer": {
+                "nodekey:PRIVATE-A": {
+                    "ID": "PRIVATE-A",
+                    "HostName": "gateway-alpha",
+                    "DNSName": "gateway-alpha.example.ts.net.",
+                    "Online": True,
+                }
+            }
+        }
+        environment = {"FAKE_TAILSCALE_STATUS": json.dumps(tailscale_status)}
+        setup = self.run_external("unresolved", environment_overrides=environment)
+        candidate = json.loads(setup.stdout)["setup"]["candidates"][0]
+        secret_path = self.root / "runtime" / "clawbar" / "node-key-secret"
+        secret_path.write_bytes(b"invalid")
+
+        unavailable = self.run_external("unresolved", environment_overrides=environment)
+        verified = self.run_external(
+            "unresolved",
+            collector_arguments=["--verify-candidate", candidate["key"]],
+        )
+
+        unavailable_snapshot = json.loads(unavailable.stdout)
+        self.assertEqual(unavailable_snapshot["setup"]["candidates"], [candidate])
+        self.assertEqual(
+            unavailable_snapshot["setup"]["error"],
+            "Clawbar cannot derive private Gateway Candidate Keys. Repair its local key secret.",
+        )
+        self.assertEqual(json.loads(verified.stdout)["gateway"], {"state": "healthy"})
 
     def test_executable_gives_actionable_setup_guidance_without_tailscale(self) -> None:
         result = self.run_external("unresolved")
@@ -272,10 +368,11 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
             environment_overrides={"FAKE_TAILSCALE_STATUS": json.dumps(tailscale_status)},
         )
         self.assertEqual(setup.returncode, clawbar_collect.ExitCode.OK, setup.stderr)
+        candidate_key = json.loads(setup.stdout)["setup"]["candidates"][0]["key"]
 
         verified = self.run_external(
             "unresolved",
-            collector_arguments=["--verify-candidate", "candidate:0"],
+            collector_arguments=["--verify-candidate", candidate_key],
         )
         reused = self.run_external("unresolved")
         failed = self.run_external(
@@ -308,6 +405,7 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
             "Peer": {
                 "nodekey:PRIVATE-A": {
                     "HostName": "gateway-alpha",
+                    "ID": "PRIVATE-A",
                     "DNSName": "gateway-alpha.example.ts.net.",
                     "Online": True,
                 }
@@ -318,6 +416,7 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
             environment_overrides={"FAKE_TAILSCALE_STATUS": json.dumps(tailscale_status)},
         )
         self.assertEqual(setup.returncode, clawbar_collect.ExitCode.OK, setup.stderr)
+        candidate_key = json.loads(setup.stdout)["setup"]["candidates"][0]["key"]
 
         missing = self.run_external(
             "unresolved",
@@ -326,7 +425,7 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         unsupported = self.run_external(
             "unresolved",
             environment_overrides={"FAKE_CANDIDATE_MODE": "unsupported"},
-            collector_arguments=["--verify-candidate", "candidate:0"],
+            collector_arguments=["--verify-candidate", candidate_key],
         )
 
         self.assertEqual(missing.returncode, clawbar_collect.ExitCode.OK, missing.stderr)
@@ -345,6 +444,7 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         tailscale_status = {
             "Peer": {
                 "nodekey:PRIVATE-A": {
+                    "ID": "PRIVATE-A",
                     "HostName": "gateway-alpha",
                     "DNSName": "gateway-alpha.example.ts.net.",
                     "Online": True,
@@ -356,17 +456,18 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
             environment_overrides={"FAKE_TAILSCALE_STATUS": json.dumps(tailscale_status)},
         )
         self.assertEqual(setup.returncode, clawbar_collect.ExitCode.OK, setup.stderr)
+        candidate = json.loads(setup.stdout)["setup"]["candidates"][0]
 
         failed = self.run_external(
             "unresolved",
             environment_overrides={"FAKE_CANDIDATE_MODE": "failed"},
-            collector_arguments=["--verify-candidate", "candidate:0"],
+            collector_arguments=["--verify-candidate", candidate["key"]],
         )
 
         self.assertEqual(failed.returncode, clawbar_collect.ExitCode.OK, failed.stderr)
         snapshot = json.loads(failed.stdout)
         self.assertEqual(snapshot["gateway"], {"state": "setup_required"})
-        self.assertEqual(snapshot["setup"]["candidates"], [{"key": "candidate:0", "name": "gateway-alpha"}])
+        self.assertEqual(snapshot["setup"]["candidates"], [candidate])
         self.assertEqual(
             snapshot["setup"]["error"],
             "The selected device could not be verified. Check Tailscale or choose another device.",
@@ -377,6 +478,7 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         tailscale_status = {
             "Peer": {
                 "nodekey:PRIVATE-A": {
+                    "ID": "PRIVATE-A",
                     "HostName": "gateway-alpha",
                     "DNSName": "gateway-alpha.example.ts.net.",
                     "Online": True,
@@ -388,13 +490,14 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
             environment_overrides={"FAKE_TAILSCALE_STATUS": json.dumps(tailscale_status)},
         )
         self.assertEqual(setup.returncode, clawbar_collect.ExitCode.OK, setup.stderr)
+        candidate_key = json.loads(setup.stdout)["setup"]["candidates"][0]["key"]
 
         started_at = time.monotonic()
         timed_out = self.run_external(
             "unresolved",
             timeout=14,
             environment_overrides={"FAKE_GATEWAY_DELAY": "30"},
-            collector_arguments=["--verify-candidate", "candidate:0"],
+            collector_arguments=["--verify-candidate", candidate_key],
         )
         elapsed = time.monotonic() - started_at
 

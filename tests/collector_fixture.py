@@ -235,7 +235,7 @@ class CollectorFixture:
                 refresh_interval=30,
                 openclaw_command=[str(self.command_path)],
                 collection_deadline=deadline,
-                node_key_secret=b"clawbar-test-node-key-secret-32!",
+                local_key_secret=b"clawbar-test-node-key-secret-32!",
             )
 
     def run_external(
