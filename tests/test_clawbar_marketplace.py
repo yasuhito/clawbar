@@ -52,6 +52,11 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("color: root.barSignalColor", widget)
         self.assertNotIn("String(root.barCount)", widget)
 
+    def test_panel_omits_the_rejected_shortcut_footer(self) -> None:
+        panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
+
+        self.assertNotIn("j/k · arrows", panel)
+
     def test_demo_publishes_all_twelve_sanitized_scenarios(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)

@@ -623,16 +623,6 @@ KeyboardPanel {
           }
         }
 
-        Text {
-          width: parent.width
-          text: root.setupVisible
-            ? "j/k · arrows  Move    Enter  Verify    r  Refresh    Esc  Close"
-            : "j/k · arrows  Move    Enter  Expand    r  Refresh    o  Automation history    Esc  Close"
-          wrapMode: Text.Wrap
-          color: root.dim
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
-        }
       }
     }
   }
