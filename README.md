@@ -60,7 +60,7 @@ snapshot becomes Stale after three configured refresh intervals.
 Press Clawbar to open the panel.
 
 - `j`, `k`, Up, Down: move selection
-- Enter: expand or collapse the selected Node, or verify a selected Gateway candidate
+- Enter: verify the selected Gateway candidate
 - `r`: request a non-blocking refresh
 - `o`: open official read-only recent-run history for the selected Automation
 - Escape: close the panel

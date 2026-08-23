@@ -76,7 +76,6 @@ function candidateRow(item, index) {
     key: String(item.key || ""),
     sectionIndex: index,
     item: item,
-    expandable: false,
     typeLabel: "Gateway candidate",
     timestamp: "",
     missingTimestampLabel: "",
@@ -92,13 +91,18 @@ function nodeRow(item, index, historical, observedAt) {
     key: String(item.key || ""),
     sectionIndex: index,
     item: item,
-    expandable: true,
     typeLabel: "Node",
     timestamp: item.lastSeenAt || "",
     missingTimestampLabel: "No observation timestamp",
     historical: historical,
     observedAt: observedAt
   }
+}
+
+function nodeMetadataLabel(item) {
+  var parts = [item && item.platform, item && item.model, item && item.version]
+    .filter(function(value) { return !!value })
+  return parts.length > 0 ? parts.join(" · ") : "No additional Operational Metadata"
 }
 
 function agentRow(item, index, historical, observedAt) {
@@ -108,7 +112,6 @@ function agentRow(item, index, historical, observedAt) {
     key: String(item.key || "agent:" + item.name),
     sectionIndex: index,
     item: item,
-    expandable: false,
     typeLabel: "Agent",
     timestamp: result.completedAt || "",
     missingTimestampLabel: "No completion timestamp",
@@ -123,7 +126,6 @@ function automationRow(item, index, historical, observedAt) {
     key: item.id ? "automation:" + item.id : "",
     sectionIndex: index,
     item: item,
-    expandable: false,
     typeLabel: "Automation",
     timestamp: item.lastRunAt || "",
     missingTimestampLabel: "No runs yet",
@@ -159,13 +161,6 @@ function reconcileSelection(rows, selectedKey, indexHint) {
   var retained = indexForKey(rows, selectedKey)
   var index = retained >= 0 ? retained : Math.max(0, Math.min(indexHint, rows.length - 1))
   return { key: rows[index].key, index: index }
-}
-
-function reconcileExpanded(rows, expandedKeys) {
-  var retained = {}
-  for (var i = 0; i < rows.length; i++)
-    if (rows[i].expandable && expandedKeys[rows[i].key]) retained[rows[i].key] = true
-  return retained
 }
 
 function moveFocus(index, count, delta) {
@@ -403,6 +398,6 @@ if (typeof module !== "undefined") {
     barCount: barCount,
     indexForKey: indexForKey,
     reconcileSelection: reconcileSelection,
-    reconcileExpanded: reconcileExpanded
+    nodeMetadataLabel: nodeMetadataLabel
   }
 }

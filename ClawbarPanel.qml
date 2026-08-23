@@ -12,7 +12,6 @@ KeyboardPanel {
   property string summary: ""
   property string selectedKey: ""
   property int selectedIndexHint: 0
-  property var expandedKeys: ({})
   property bool verifyingCandidate: false
 
   signal automationHistoryRequested(string automationId)
@@ -49,7 +48,6 @@ KeyboardPanel {
     var selection = Logic.reconcileSelection(rows, selectedKey, selectedIndexHint)
     selectedKey = selection.key
     selectedIndexHint = selection.index < 0 ? 0 : selection.index
-    expandedKeys = Logic.reconcileExpanded(rows, expandedKeys)
   }
 
   function selectRow(row) {
@@ -85,17 +83,8 @@ KeyboardPanel {
   }
 
   function activateSelection() {
-    if (!selectedRow) return
-    if (selectedRow.kind === "candidate") {
-      if (!verifyingCandidate)
-        candidateVerificationRequested(selectedRow.key)
-      return
-    }
-    if (!selectedRow.expandable) return
-    var next = Object.assign({}, expandedKeys)
-    next[selectedRow.key] = !next[selectedRow.key]
-    expandedKeys = next
-    Qt.callLater(root.ensureSelectionVisible)
+    if (selectedRow && selectedRow.kind === "candidate" && !verifyingCandidate)
+      candidateVerificationRequested(selectedRow.key)
   }
 
 
@@ -352,10 +341,9 @@ KeyboardPanel {
             required property int index
             readonly property var row: root.rows[root.candidates.length + index]
             readonly property bool selected: !!row && root.selectedKey === row.key
-            readonly property bool expanded: !!row && !!root.expandedKeys[row.key]
             readonly property var signal: Logic.signalPresentation(modelData.state)
             width: contentColumn.width
-            height: Style.space(expanded ? 72 : 48)
+            height: Style.space(40)
             radius: Style.cornerRadius
             opacity: root.historical ? 0.55 : 1
             color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
@@ -364,35 +352,12 @@ KeyboardPanel {
 
             MouseArea {
               anchors.fill: parent
-              onClicked: {
-                root.selectRow(nodeRow.row)
-                root.activateSelection()
-              }
-            }
-
-            Text {
-              anchors.left: parent.left
-              anchors.leftMargin: Style.space(8)
-              anchors.verticalCenter: nodeTitle.verticalCenter
-              text: nodeRow.expanded ? "▾" : "›"
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-            }
-
-            Rectangle {
-              anchors.left: parent.left
-              anchors.leftMargin: Style.space(29)
-              anchors.verticalCenter: parent.verticalCenter
-              width: 1
-              height: parent.height + Style.space(4)
-              color: root.dim
-              opacity: 0.4
+              onClicked: root.selectRow(nodeRow.row)
             }
 
             SignalPoint {
               anchors.left: parent.left
-              anchors.leftMargin: Style.space(24)
+              anchors.leftMargin: Style.space(9)
               anchors.verticalCenter: nodeTitle.verticalCenter
               kind: nodeRow.signal.shape
               color: root.signalColor(nodeRow.signal.tone)
@@ -401,11 +366,10 @@ KeyboardPanel {
             Text {
               id: nodeTitle
               anchors.left: parent.left
-              anchors.leftMargin: Style.space(38)
+              anchors.leftMargin: Style.space(26)
               anchors.right: nodeState.left
               anchors.rightMargin: Style.space(8)
-              anchors.top: parent.top
-              anchors.topMargin: Style.space(9)
+              anchors.verticalCenter: parent.verticalCenter
               text: nodeRow.modelData.name
               elide: Text.ElideRight
               color: root.foreground
@@ -425,33 +389,6 @@ KeyboardPanel {
               font.pixelSize: Style.font.caption
             }
 
-            Text {
-              visible: nodeRow.expanded
-              anchors.left: nodeTitle.left
-              anchors.right: parent.right
-              anchors.rightMargin: Style.space(8)
-              anchors.bottom: parent.bottom
-              anchors.bottomMargin: Style.space(8)
-              text: {
-                var parts = [nodeRow.modelData.platform, nodeRow.modelData.model, nodeRow.modelData.version]
-                  .filter(function(value) { return !!value })
-                if (root.historical) {
-                  var observed = Logic.relativeTime(root.observedAt, root.nowMs)
-                  parts.unshift(
-                    (nodeRow.modelData.state === "healthy" ? "Healthy" : "Offline")
-                      + (observed ? " · " + observed : "")
-                  )
-                } else {
-                  var age = Logic.relativeTime(nodeRow.modelData.lastSeenAt, root.nowMs)
-                  if (age) parts.push("Seen " + age)
-                }
-                return parts.length > 0 ? parts.join(" · ") : "No additional Operational Metadata"
-              }
-              elide: Text.ElideRight
-              color: root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-            }
           }
         }
 
@@ -615,8 +552,13 @@ KeyboardPanel {
                 return prefix + automationLines.join("\n")
               }
               var absolute = Logic.absoluteLocalTime(root.selectedRow.timestamp)
-              return prefix + root.selectedRow.typeLabel + " · " + root.selectedRow.item.name
-                + (absolute ? "\nObserved " + absolute : "\n" + root.selectedRow.missingTimestampLabel)
+              var heading = prefix + root.selectedRow.typeLabel + " · " + root.selectedRow.item.name
+              var observation = absolute
+                ? "Observed " + absolute
+                : root.selectedRow.missingTimestampLabel
+              if (root.selectedRow.kind === "node")
+                return [heading, Logic.nodeMetadataLabel(root.selectedRow.item), observation].join("\n")
+              return heading + "\n" + observation
             }
             color: root.foreground
             font.family: root.fontFamily

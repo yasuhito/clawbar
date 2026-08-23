@@ -202,7 +202,7 @@ test("Agent Activity remains independent from previous Task Result", () => {
   assert.equal(observerRow.missingTimestampLabel, "No completion timestamp")
 })
 
-test("selection and expansion follow stable keys through reorder and removal", () => {
+test("Node selection follows stable keys without expansion state", () => {
   const firstRows = Logic.panelRows({
     fleet: {
       available: true,
@@ -216,14 +216,25 @@ test("selection and expansion follow stable keys through reorder and removal", (
   const reorderedRows = [firstRows[1], firstRows[0]]
 
   const retained = Logic.reconcileSelection(reorderedRows, "node:b", 1)
-  const expanded = Logic.reconcileExpanded(reorderedRows, { "node:a": true, "node:b": true })
   const removed = Logic.reconcileSelection([firstRows[0]], retained.key, retained.index)
 
   assert.deepEqual(retained, { key: "node:b", index: 0 })
-  assert.deepEqual(expanded, { "node:b": true, "node:a": true })
   assert.deepEqual(removed, { key: "node:a", index: 0 })
   assert.equal(firstRows[0].missingTimestampLabel, "No observation timestamp")
   assert.notEqual(firstRows[0].key, firstRows[1].key)
+})
+
+test("Node metadata label keeps available Operational Metadata", () => {
+  assert.equal(
+    Logic.nodeMetadataLabel({
+      platform: "macOS 26.5.1",
+      model: "MacBookPro18,3",
+      version: "2026.7.1"
+    }),
+    "macOS 26.5.1 · MacBookPro18,3 · 2026.7.1"
+  )
+  assert.equal(Logic.nodeMetadataLabel({ platform: "linux" }), "linux")
+  assert.equal(Logic.nodeMetadataLabel({}), "No additional Operational Metadata")
 })
 
 test("Automations follow Agents and retain selection by stable hidden id", () => {
@@ -247,7 +258,6 @@ test("Automations follow Agents and retain selection by stable hidden id", () =>
     "automation:Successful"
   ])
   assert.equal(rows[2].key, "automation:failure-id")
-  assert.equal(rows[2].expandable, false)
   const reordered = rows.slice(0, 2).concat([rows[3], rows[2]])
   assert.deepEqual(
     Logic.reconcileSelection(reordered, "automation:failure-id", 2),
