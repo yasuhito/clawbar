@@ -331,8 +331,7 @@ def build_current_snapshot(
     degraded = fleet is None or agents is None or automations is None
     gateway_state = "degraded" if degraded else "healthy"
     automation_items = automations or []
-    critical_items = sum(node.get("state") == "offline" for node in (fleet or []))
-    critical_items += sum(
+    critical_items = sum(
         automation.get("enabled") is True and automation.get("lastResult") == "error"
         for automation in automation_items
     )

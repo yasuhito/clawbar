@@ -259,8 +259,17 @@ def snapshot_for(scenario: str, now: datetime) -> dict[str, Any]:
         snapshot["automations"]["items"][0] = automation(
             "morning", "Morning review", now, result="error", failures=3
         )
-        snapshot["bar"] = {"kind": "attention", "count": 3, "severity": "critical"}
-    elif scenario not in {"healthy", "recovery"}:
+        snapshot["automations"]["items"].insert(
+            1,
+            automation("nightly", "Nightly sync", now, result="error", failures=2),
+        )
+        snapshot["bar"] = {"kind": "attention", "count": 2, "severity": "critical"}
+    elif scenario == "recovery":
+        snapshot["automations"]["items"].insert(
+            1,
+            automation("nightly", "Nightly sync", now),
+        )
+    elif scenario != "healthy":
         raise ValueError(f"Unknown scenario: {scenario}")
     snapshot["demoScenario"] = scenario
     return snapshot

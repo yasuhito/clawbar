@@ -127,6 +127,12 @@ class MarketplaceContractTest(unittest.TestCase):
             healthy.pop("demoScenario")
             working.pop("demoScenario")
             self.assertNotEqual(healthy, working)
+            grouped = snapshots["grouped-incidents"]
+            self.assertEqual(grouped["bar"], {"kind": "attention", "count": 2, "severity": "critical"})
+            self.assertEqual(
+                [node["state"] for node in grouped["fleet"]["nodes"]],
+                ["healthy", "offline", "offline"],
+            )
 
 
     def test_demo_reproduces_grouped_incidents_and_recovery_without_private_content(self) -> None:
@@ -199,8 +205,8 @@ class MarketplaceContractTest(unittest.TestCase):
                 for line in notification_log.read_text(encoding="utf-8").splitlines()
             ]
             self.assertEqual(len(notifications), 2)
-            self.assertIn("3 Incidents started", notifications[0][2])
-            self.assertIn("3 Incidents recovered", notifications[1][2])
+            self.assertIn("2 Incidents started", notifications[0][2])
+            self.assertIn("2 Incidents recovered", notifications[1][2])
 
             serialized = (root / "state" / "clawbar" / "snapshot.json").read_text(encoding="utf-8")
             for prohibited in (

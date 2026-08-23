@@ -382,12 +382,18 @@ test("signal semantics follow the prototype dot and color legend", () => {
   ]) {
     assert.deepEqual(Logic.signalPresentation(state), { shape: "circle", tone, label })
   }
+  assert.deepEqual(Logic.nodeSignalPresentation("offline"), {
+    shape: "circle",
+    tone: "muted",
+    label: "Offline"
+  })
   assert.deepEqual(Logic.signalPresentation("disabled"), { shape: "dotted", tone: "disabled", label: "Disabled" })
   assert.deepEqual(Logic.signalPresentation("idle"), { shape: "none", tone: "idle", label: "" })
   assert.equal(Logic.signalColor("critical", "fg", "accent", "urgent", "dim"), "urgent")
   assert.equal(Logic.signalColor("warning", "fg", "accent", "urgent", "dim"), "accent")
   assert.equal(Logic.signalColor("working", "fg", "accent", "urgent", "dim"), "accent")
   assert.equal(Logic.signalColor("disabled", "fg", "accent", "urgent", "dim"), "dim")
+  assert.equal(Logic.signalColor("muted", "fg", "accent", "urgent", "dim"), "dim")
   assert.equal(Logic.signalColor("healthy", "fg", "accent", "urgent", "dim"), "fg")
   assert.equal(Logic.signalColor("healthy", "fg", "accent", "urgent", "dim", "green"), "green")
   assert.equal(Logic.signalColor("warning", "fg", "accent", "urgent", "dim", "green", "yellow"), "yellow")

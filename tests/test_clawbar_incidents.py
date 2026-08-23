@@ -4,6 +4,7 @@ import json
 import unittest
 from pathlib import Path
 
+from scripts import clawbar_incidents
 from tests.collector_fixture import CollectorFixture
 
 
@@ -31,10 +32,16 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
         return {"nodeId": node_id, "displayName": name, "connected": True}
 
     @staticmethod
-    def automation(*, enabled: bool = True, result: str = "error") -> dict[str, object]:
+    def automation(
+        *,
+        automation_id: str = "morning-review",
+        name: str = "Morning review",
+        enabled: bool = True,
+        result: str = "error",
+    ) -> dict[str, object]:
         return {
-            "id": "morning-review",
-            "name": "Morning review",
+            "id": automation_id,
+            "name": name,
             "enabled": enabled,
             "schedule": {"kind": "cron"},
             "state": {"lastRunStatus": result, "consecutiveErrors": 1 if result == "error" else 0},
@@ -47,12 +54,6 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
                 {"FAKE_STDOUT": json.dumps({"rpc": {"ok": True}})},
                 23,
                 "Gateway: Configuration Error",
-            ),
-            (
-                "offline node",
-                {"FAKE_NODES": json.dumps({"nodes": [self.offline_node("node-1", "studio-ops")]})},
-                0,
-                "studio-ops: Offline",
             ),
             (
                 "automation failure",
@@ -97,6 +98,7 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
 
     def test_non_incident_states_stay_quiet(self) -> None:
         self.collect()
+        self.collect(nodes=[self.offline_node("node-1", "studio-ops")])
         self.collect(extra={"FAKE_EXIT": "9", "FAKE_STDOUT": "connection broken"})
         self.collect(extra={"FAKE_NODES": "not-json"})
         self.collect(automations=[self.automation(enabled=False)])
@@ -138,18 +140,21 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
 
 
     def test_no_data_does_not_repeat_a_still_current_incident(self) -> None:
-        offline = [self.offline_node("node-1", "studio-ops")]
-        self.collect(nodes=offline)
+        failed = [self.automation()]
+        self.collect(automations=failed)
         (self.root / "external-state" / "clawbar" / "snapshot.json").unlink()
         self.collect(extra={"FAKE_EXIT": "9", "FAKE_STDOUT": "connection broken"})
-        self.collect(nodes=offline)
+        self.collect(automations=failed)
 
         self.assertEqual(len(self.read_notifications()), 1)
 
     def test_simultaneous_starts_are_grouped_once(self) -> None:
         result = self.collect(
             nodes=[self.offline_node("node-1", "studio-ops"), self.offline_node("node-2", "archive-box")],
-            automations=[self.automation()],
+            automations=[
+                self.automation(),
+                self.automation(automation_id="nightly-sync", name="Nightly sync"),
+            ],
         )
 
         self.assertEqual(result.returncode, 0)
@@ -158,12 +163,12 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
             [[
                 "--app-name=Clawbar",
                 "--urgency=critical",
-                "Clawbar: 3 Incidents started",
-                "studio-ops: Offline; archive-box: Offline; Morning review: Automation Failure",
+                "Clawbar: 2 Incidents started",
+                "Morning review: Automation Failure; Nightly sync: Automation Failure",
             ]],
         )
 
-    def test_repeated_failed_and_recovered_states_do_not_repeat(self) -> None:
+    def test_offline_node_transitions_stay_quiet(self) -> None:
         offline = [self.offline_node("node-1", "studio-ops")]
         healthy = [self.healthy_node("node-1", "studio-ops")]
 
@@ -172,32 +177,46 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
         self.collect(nodes=healthy)
         self.collect(nodes=healthy)
 
-        self.assertEqual(
-            self.read_notifications(),
-            [
-                [
-                    "--app-name=Clawbar",
-                    "--urgency=critical",
-                    "Clawbar: Incident started",
-                    "studio-ops: Offline",
-                ],
-                [
-                    "--app-name=Clawbar",
-                    "--urgency=normal",
-                    "Clawbar: Incident recovered",
-                    "studio-ops: Recovered",
-                ],
-            ],
-        )
+        self.assertEqual(self.read_notifications(), [])
+
+    def test_legacy_node_incident_is_purged_without_recovery(self) -> None:
+        previous = {
+            "schemaVersion": 1,
+            "incidents": {
+                "node:legacy": {"label": "studio-ops", "state": "Offline"},
+            },
+        }
+        snapshot = {
+            "gateway": {"state": "healthy"},
+            "fleet": {
+                "available": True,
+                "nodes": [{"key": "node:legacy", "name": "studio-ops", "state": "offline"}],
+            },
+            "automations": {"available": True, "items": []},
+        }
+
+        state, starts, recoveries = clawbar_incidents.reconcile_incidents(snapshot, previous)
+
+        self.assertEqual(state["incidents"], {})
+        self.assertEqual(starts, [])
+        self.assertEqual(recoveries, [])
 
     def test_simultaneous_recoveries_are_grouped_once(self) -> None:
+        failed = [
+            self.automation(),
+            self.automation(automation_id="nightly-sync", name="Nightly sync"),
+        ]
+        recovered = [
+            self.automation(result="ok"),
+            self.automation(automation_id="nightly-sync", name="Nightly sync", result="ok"),
+        ]
         self.collect(
             nodes=[self.offline_node("node-1", "studio-ops"), self.offline_node("node-2", "archive-box")],
-            automations=[self.automation()],
+            automations=failed,
         )
         self.collect(
             nodes=[self.healthy_node("node-1", "studio-ops"), self.healthy_node("node-2", "archive-box")],
-            automations=[self.automation(result="ok")],
+            automations=recovered,
         )
 
         self.assertEqual(len(self.read_notifications()), 2)
@@ -206,15 +225,15 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
             [
                 "--app-name=Clawbar",
                 "--urgency=normal",
-                "Clawbar: 3 Incidents recovered",
-                "studio-ops: Recovered; archive-box: Recovered; Morning review: Recovered",
+                "Clawbar: 2 Incidents recovered",
+                "Morning review: Recovered; Nightly sync: Recovered",
             ],
         )
 
     def test_removed_target_ends_monitoring_without_recovery(self) -> None:
-        self.collect(nodes=[self.offline_node("node-1", "studio-ops")])
-        self.collect(nodes=[])
-        self.collect(nodes=[self.healthy_node("node-1", "studio-ops")])
+        self.collect(automations=[self.automation()])
+        self.collect(automations=[])
+        self.collect(automations=[self.automation(result="ok")])
 
         self.assertEqual(len(self.read_notifications()), 1)
 
@@ -226,10 +245,10 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(len(self.read_notifications()), 1)
 
     def test_new_desktop_login_may_notify_current_incident_again(self) -> None:
-        offline = [self.offline_node("node-1", "studio-ops")]
-        self.collect(nodes=offline)
+        failed = [self.automation()]
+        self.collect(automations=failed)
         self.collect(
-            nodes=offline,
+            automations=failed,
             extra={"XDG_RUNTIME_DIR": str(self.root / "next-login")},
         )
 
@@ -237,8 +256,13 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
 
     def test_dispatch_failure_preserves_snapshot_and_transition_state(self) -> None:
         offline = [self.offline_node("node-1", "studio-ops")]
-        first = self.collect(nodes=offline, extra={"FAKE_NOTIFICATION_EXIT": "7"})
-        second = self.collect(nodes=offline)
+        failed = [self.automation()]
+        first = self.collect(
+            nodes=offline,
+            automations=failed,
+            extra={"FAKE_NOTIFICATION_EXIT": "7"},
+        )
+        second = self.collect(nodes=offline, automations=failed)
 
         self.assertEqual(first.returncode, 0)
         self.assertEqual(second.returncode, 0)

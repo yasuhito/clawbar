@@ -341,7 +341,8 @@ KeyboardPanel {
             required property int index
             readonly property var row: root.rows[root.candidates.length + index]
             readonly property bool selected: !!row && root.selectedKey === row.key
-            readonly property var signal: Logic.signalPresentation(modelData.state)
+            readonly property bool offline: modelData.state === "offline"
+            readonly property var signal: Logic.nodeSignalPresentation(modelData.state)
             width: contentColumn.width
             height: Style.space(40)
             radius: Style.cornerRadius
@@ -372,10 +373,10 @@ KeyboardPanel {
               anchors.verticalCenter: parent.verticalCenter
               text: nodeRow.modelData.name
               elide: Text.ElideRight
-              color: root.foreground
+              color: nodeRow.offline ? root.dim : root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
-              font.bold: true
+              font.bold: !nodeRow.offline
             }
 
             Text {

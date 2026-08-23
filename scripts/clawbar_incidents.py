@@ -70,25 +70,9 @@ def reconcile_incidents(
     elif gateway_state in {"healthy", "degraded"}:
         recover("gateway", "Gateway")
 
-    fleet = snapshot.get("fleet")
-    if isinstance(fleet, dict) and fleet.get("available") is True and isinstance(fleet.get("nodes"), list):
-        observed_nodes: set[str] = set()
-        for node in fleet["nodes"]:
-            if not isinstance(node, dict):
-                continue
-            key = node.get("key")
-            label = node.get("name")
-            if not isinstance(key, str) or not isinstance(label, str):
-                continue
-            incident_key = f"node:{key}"
-            observed_nodes.add(incident_key)
-            if node.get("state") == "offline":
-                start(incident_key, label, "Offline")
-            else:
-                recover(incident_key, label)
-        for key in tuple(incidents):
-            if key.startswith("node:") and key not in observed_nodes:
-                incidents.pop(key)
+    for key in tuple(incidents):
+        if key.startswith("node:"):
+            incidents.pop(key)
 
     automations = snapshot.get("automations")
     if (

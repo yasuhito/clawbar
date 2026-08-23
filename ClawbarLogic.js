@@ -205,6 +205,7 @@ var SIGNAL_PRESENTATIONS = {
   waiting: { shape: "circle", tone: "warning", label: "Waiting" },
   failed: { shape: "circle", tone: "critical", label: "Failed" },
   offline: { shape: "circle", tone: "critical", label: "Offline" },
+  node_offline: { shape: "circle", tone: "muted", label: "Offline" },
   configuration_error: { shape: "circle", tone: "critical", label: "Configuration Error" },
   degraded: { shape: "circle", tone: "warning", label: "Degraded" },
   unstable: { shape: "circle", tone: "warning", label: "Unstable" },
@@ -222,6 +223,10 @@ function signalPresentation(state) {
   return SIGNAL_PRESENTATIONS[state] || SIGNAL_PRESENTATIONS.unknown
 }
 
+function nodeSignalPresentation(state) {
+  return state === "offline" ? SIGNAL_PRESENTATIONS.node_offline : signalPresentation(state)
+}
+
 function panelSignal(snapshot, state) {
   var base = signalPresentation(state)
   if ((state !== "healthy" && state !== "degraded") || !snapshot || !snapshot.bar
@@ -233,10 +238,6 @@ function panelSignal(snapshot, state) {
   if (Array.isArray(automations) && automations.some(function(item) {
     return item && item.enabled === true && item.lastResult === "error"
   })) return { shape: "circle", tone: "critical", label: "Automation Failure" }
-  var nodes = snapshot.fleet && snapshot.fleet.nodes
-  if (Array.isArray(nodes) && nodes.some(function(item) {
-    return item && item.state === "offline"
-  })) return { shape: "circle", tone: "critical", label: "Offline Node" }
   return { shape: "circle", tone: "critical", label: "1 Incident" }
 }
 
@@ -250,7 +251,7 @@ function signalColor(tone, foreground, accent, urgent, dim, healthy, warning) {
   if (tone === "critical") return urgent
   if (tone === "warning") return warning || accent
   if (tone === "working") return accent
-  if (tone === "disabled") return dim
+  if (tone === "disabled" || tone === "muted") return dim
   if (tone === "healthy" && healthy) return healthy
   return foreground
 }
@@ -397,6 +398,7 @@ if (typeof module !== "undefined") {
     barCount: barCount,
     indexForKey: indexForKey,
     reconcileSelection: reconcileSelection,
-    nodeMetadataLabel: nodeMetadataLabel
+    nodeMetadataLabel: nodeMetadataLabel,
+    nodeSignalPresentation: nodeSignalPresentation
   }
 }

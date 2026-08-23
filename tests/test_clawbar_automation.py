@@ -111,7 +111,7 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(items[5]["kind"], "on-exit")
         self.assertEqual(items[6]["enabled"], False)
         self.assertEqual(snapshot["gateway"], {"state": "healthy"})
-        self.assertEqual(snapshot["bar"], {"count": 2, "kind": "attention", "severity": "critical"})
+        self.assertEqual(snapshot["bar"], {"count": 1, "kind": "attention", "severity": "critical"})
         for sentinel in private_sentinels:
             self.assertNotIn(sentinel, result.stdout)
 

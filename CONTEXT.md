@@ -49,7 +49,7 @@ The set of Nodes reported by the configured Gateway. Nodes form a flat list with
 _Avoid_: Gateways, cluster
 
 **Offline Node**:
-A Node whose unavailable state is reported by the configured Gateway. Clawbar does not infer this state from a direct Node probe.
+A Node whose unavailable state is reported by the configured Gateway. Clawbar does not infer this state from a direct Node probe. Nodes may connect and disconnect routinely, so Offline Node is muted Operational Metadata and never an Attention Item or Incident.
 _Avoid_: Offline Gateway, Unstable Gateway
 
 **Degraded Node**:
@@ -77,7 +77,7 @@ A Fleet snapshot whose age exceeds three configured refresh intervals. It no lon
 _Avoid_: Offline Gateway, Offline Fleet, cached failure
 
 **Incident**:
-A continuous period in which the Gateway is Offline, a Node is reported Offline, a Gateway Target has a Configuration Error, or an Automation has a current failure. It produces at most one failure notification and one recovery notification per desktop login.
+A continuous period in which the Gateway is Offline, a Gateway Target has a Configuration Error, or an Automation has a current failure. It produces at most one failure notification and one recovery notification per desktop login. Offline Node is not an Incident.
 _Avoid_: Alert, event, Gateway Setup Required
 
 **Operational Metadata**:
@@ -97,7 +97,7 @@ The outcome and completion time of an Agent's most recently completed Task: Succ
 _Avoid_: Agent failure, Agent Activity
 
 **Attention Item**:
-An Offline or Unstable Gateway, a Degraded Gateway, an Offline or Degraded Node reported by the Gateway, a Configuration Error, an Automation Failure, or a Stale Snapshot. Gateway-level items may appear before the Fleet tree. Node items stay in the Fleet tree, and Automation items stay in the Automations section; each contributes once to the bar count and is not duplicated in a separate summary. Gateway Setup Required is handled by the setup form.
+An Offline or Unstable Gateway, a Degraded Gateway, a Configuration Error, an Automation Failure, or a Stale Snapshot. Gateway-level items may appear before the Fleet list, and Automation items stay in the Automations section; each contributes once to the bar count and is not duplicated in a separate summary. Offline Node and Gateway Setup Required are excluded.
 _Avoid_: Task failure, notification, setup state
 
 **Empty Fleet**:

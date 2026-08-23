@@ -71,9 +71,10 @@ render a separate status dot or count. The tooltip reports current Attention
 Items while yellow or red. The panel keeps Agents and Automations in independent
 sections because Gateway metadata establishes no Node ownership; an empty Agents
 section is omitted. A green `Healthy` indicator remains visible in the panel
-header. Agent Activity and the previous Task Result remain independent.
-Automation Failure and Offline Node conditions each appear once in their
-respective section.
+header. Agent Activity and the previous Task Result remain independent. Offline
+Nodes appear as muted Operational Metadata and do not affect Attention counts,
+Incidents, or notifications. Automation Failures appear once in the Automations
+section.
 
 ## Privacy boundary
 
@@ -142,11 +143,11 @@ Resume normal scheduled collection after review:
 python scripts/clawbar_demo.py --resume
 ```
 
-`grouped-incidents` starts one grouped notification for two Offline Nodes and
-one Automation Failure. `recovery` restores a healthy Fleet and emits one
-grouped recovery notification. Use `j`/`k`, Enter, and `o` while reviewing the
-panel; `o` remains a read-only OpenClaw handoff and may report unavailable for
-fictional Automation IDs.
+`grouped-incidents` shows two Offline Nodes as muted Operational Metadata and
+starts one grouped notification for two Automation Failures. `recovery`
+restores a healthy Fleet and emits one grouped recovery notification. Use
+`j`/`k`, Enter, and `o` while reviewing the panel; `o` remains a read-only
+OpenClaw handoff and may report unavailable for fictional Automation IDs.
 
 For release review, exercise each scenario in the actual shell at narrow and
 wide panel widths on `white`, `catppuccin-latte`, `flexoki-light`, and
