@@ -60,9 +60,9 @@ snapshot becomes Stale after three configured refresh intervals.
 Press Clawbar to open the panel.
 
 - `j`, `k`, Up, Down: move selection
-- Enter: verify the selected Gateway candidate
+- Enter: verify the selected Gateway candidate, or open selected Automation history
 - `r`: request a non-blocking refresh
-- `o`: open official read-only recent-run history for the selected Automation
+- `o` or the `View run history` button: open official read-only recent-run history for the selected Automation
 - Escape: close the panel
 - Middle-click the bar widget: request a non-blocking refresh
 

@@ -67,6 +67,13 @@ class MarketplaceContractTest(unittest.TestCase):
 
         self.assertNotIn("id: fleetRail", panel)
 
+    def test_panel_exposes_read_only_automation_history_action(self) -> None:
+        panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
+
+        self.assertIn('"View run history"', panel)
+        self.assertIn("onClicked: root.requestAutomationHistory()", panel)
+        self.assertIn("automationHistoryRequested(selectedRow.item.id)", panel)
+
     def test_demo_publishes_all_twelve_sanitized_scenarios(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)

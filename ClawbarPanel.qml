@@ -13,6 +13,7 @@ KeyboardPanel {
   property string selectedKey: ""
   property int selectedIndexHint: 0
   property bool verifyingCandidate: false
+  required property bool automationHistoryBusy
 
   signal automationHistoryRequested(string automationId)
   signal refreshRequested()
@@ -54,6 +55,7 @@ KeyboardPanel {
     if (!row) return
     selectedKey = row.key
     selectedIndexHint = Logic.indexForKey(rows, row.key)
+    Qt.callLater(root.ensureSelectionVisible)
   }
 
   function moveSelection(delta) {
@@ -77,14 +79,26 @@ KeyboardPanel {
     if (!delegate) return
     var top = delegate.mapToItem(contentColumn, 0, 0).y
     var bottom = top + delegate.height
+    if (selectedRow && selectedRow.kind === "automation" && selectedCard.visible) {
+      var cardTop = selectedCard.mapToItem(contentColumn, 0, 0).y
+      bottom = Math.max(bottom, cardTop + selectedCard.height)
+    }
     if (top < panelFlick.contentY) panelFlick.contentY = top
     else if (bottom > panelFlick.contentY + panelFlick.height)
       panelFlick.contentY = Math.max(0, bottom - panelFlick.height)
   }
 
+  function requestAutomationHistory() {
+    if (selectedRow && selectedRow.kind === "automation" && !automationHistoryBusy)
+      automationHistoryRequested(selectedRow.item.id)
+  }
+
   function activateSelection() {
-    if (selectedRow && selectedRow.kind === "candidate" && !verifyingCandidate)
+    if (!selectedRow) return
+    if (selectedRow.kind === "candidate" && !verifyingCandidate)
       candidateVerificationRequested(selectedRow.key)
+    else
+      requestAutomationHistory()
   }
 
 
@@ -109,10 +123,7 @@ KeyboardPanel {
       if (text === "j" || text === "J") root.moveSelection(1)
       else if (text === "k" || text === "K") root.moveSelection(-1)
       else if (text === "r" || text === "R") root.refreshRequested()
-      else if (text === "o" || text === "O") {
-        if (root.selectedRow && root.selectedRow.kind === "automation")
-          root.automationHistoryRequested(root.selectedRow.item.id)
-      }
+      else if (text === "o" || text === "O") root.requestAutomationHistory()
     }
 
     Flickable {
@@ -517,9 +528,11 @@ KeyboardPanel {
         }
 
         Rectangle {
+          id: selectedCard
           visible: root.selectedRow !== null
           width: parent.width
           height: selectedDetail.implicitHeight + Style.space(16)
+            + (historyButton.visible ? historyButton.height + Style.space(8) : 0)
           radius: Style.cornerRadius
           color: Style.selectedFillFor(root.foreground, Color.popups.background)
 
@@ -527,7 +540,7 @@ KeyboardPanel {
             id: selectedDetail
             anchors.left: parent.left
             anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
+            anchors.top: parent.top
             anchors.margins: Style.space(8)
             text: {
               if (!root.selectedRow) return ""
@@ -565,6 +578,23 @@ KeyboardPanel {
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
             wrapMode: Text.Wrap
+          }
+
+          Button {
+            id: historyButton
+            visible: root.selectedRow !== null && root.selectedRow.kind === "automation"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.margins: Style.space(8)
+            text: root.automationHistoryBusy ? "Opening…" : "View run history"
+            enabled: !root.automationHistoryBusy
+            foreground: root.foreground
+            accent: root.accent
+            fontFamily: root.fontFamily
+            fontSize: Style.font.caption
+            bordered: true
+            onClicked: root.requestAutomationHistory()
           }
         }
 

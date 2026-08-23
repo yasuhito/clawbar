@@ -214,6 +214,7 @@ BarWidget {
     nowMs: root.nowMs
     summary: root.summary
     verifyingCandidate: root.collectorService ? root.collectorService.verifyingCandidate : false
+    automationHistoryBusy: historyLauncher.running
     healthy: root.healthyColor
     warning: root.warningColor
     onRefreshRequested: root.requestCollection()
