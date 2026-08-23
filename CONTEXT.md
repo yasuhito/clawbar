@@ -41,7 +41,7 @@ An operational unit managed and reported by the configured Gateway. Clawbar does
 _Avoid_: Gateway, Gateway Target, host, machine
 
 **Node UI Key**:
-A local opaque identifier derived from a private Node identifier with Clawbar's local secret. It preserves selection and expansion across Fleet snapshots; neither the private identifier nor the secret enters the snapshot. If Clawbar cannot derive every Node UI Key, Fleet metadata is unavailable.
+A local opaque identifier derived with Clawbar's local secret from the Node identity used by the Fleet UI. It preserves selection and expansion across reordered Fleet snapshots and replacement registrations. When the Gateway reports several registrations with the same Node display name, Clawbar keeps the freshest connected registration, so one physical Node is not repeated; neither private identifiers nor the secret enter the snapshot. If Clawbar cannot derive every Node UI Key, Fleet metadata is unavailable.
 _Avoid_: Node ID, instance ID, positional index
 
 **Fleet**:

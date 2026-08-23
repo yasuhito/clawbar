@@ -52,11 +52,18 @@ def bounded_text(value: object, fallback: str = "") -> str:
     return value[:80] if value else fallback
 
 
-def timestamp_from_milliseconds(value: object) -> str | None:
+def positive_milliseconds(value: object) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+        return 0.0
+    return float(value)
+
+
+def timestamp_from_milliseconds(value: object) -> str | None:
+    milliseconds = positive_milliseconds(value)
+    if not milliseconds:
         return None
     try:
-        return datetime.fromtimestamp(value / 1000, timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        return datetime.fromtimestamp(milliseconds / 1000, timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     except (OverflowError, OSError, ValueError):
         return None
 
@@ -77,21 +84,59 @@ def opaque_node_key(node_id: object, secret: bytes) -> str | None:
     return _opaque_key(node_id, secret, "node")
 
 
+def freshest_node_registrations(
+    nodes: list[object],
+    secret: bytes,
+) -> list[tuple[str, str, dict[str, Any]]] | None:
+    selected: dict[
+        str,
+        tuple[tuple[bool, float, str], tuple[str, str, dict[str, Any]]],
+    ] = {}
+    order: list[str] = []
+    for raw in nodes:
+        if not isinstance(raw, dict):
+            continue
+        registration_key = opaque_node_key(raw.get("nodeId"), secret)
+        if registration_key is None:
+            return None
+        display_name = bounded_text(raw.get("displayName"))
+        name = display_name or "Unnamed Node"
+        identity = display_name.casefold() if display_name else registration_key
+        key = (
+            _opaque_key(f"node-display-name\0{identity}", secret, "node")
+            if display_name
+            else registration_key
+        )
+        preference = (
+            raw.get("connected") is True,
+            positive_milliseconds(raw.get("lastSeenAtMs")),
+            registration_key,
+        )
+        current = selected.get(identity)
+        if current is not None and current[0] >= preference:
+            continue
+        if current is None:
+            order.append(identity)
+        selected[identity] = (preference, (key, name, raw))
+    return [selected[identity][1] for identity in order[:100]]
+
+
 def sanitize_fleet(payload: object, node_key_secret: bytes | None) -> list[dict[str, Any]] | None:
     if not isinstance(payload, dict) or not isinstance(payload.get("nodes"), list):
         return None
-    if payload["nodes"] and node_key_secret is None:
+    if not payload["nodes"]:
+        return []
+    if node_key_secret is None:
         return None
+    selected = freshest_node_registrations(payload["nodes"], node_key_secret)
+    if selected is None:
+        return None
+
     fleet = []
-    for raw in payload["nodes"][:100]:
-        if not isinstance(raw, dict):
-            continue
-        key = opaque_node_key(raw.get("nodeId"), node_key_secret) if node_key_secret is not None else None
-        if key is None:
-            return None
+    for key, name, raw in selected:
         node = {
             "key": key,
-            "name": bounded_text(raw.get("displayName"), "Unnamed Node"),
+            "name": name,
             "state": "healthy" if raw.get("connected") is True else "offline",
         }
         for source_key, output_key in (("platform", "platform"), ("modelIdentifier", "model"), ("version", "version")):

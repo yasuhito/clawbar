@@ -154,42 +154,15 @@ BarWidget {
     bar: root.bar
     text: ""
     active: false
-    slotSize: root.barCount > 0 ? Style.space(36) : Style.bar.statusSlot
-    opticalSize: root.barCount > 0 ? Style.space(31) : Style.bar.iconCanvas
+    slotSize: Style.bar.statusSlot
+    opticalSize: Style.bar.iconCanvas
     tooltipText: root.summary
     iconComponent: Component {
-      Item {
-        ClawMark {
-          id: barClaw
-          anchors.left: root.barCount > 0 ? parent.left : undefined
-          anchors.horizontalCenter: root.barCount > 0 ? undefined : parent.horizontalCenter
-          anchors.verticalCenter: parent.verticalCenter
-          width: Style.space(10)
-          height: width
-          color: button.foreground
-        }
-
-        SignalPoint {
-          anchors.left: barClaw.right
-          anchors.leftMargin: -Style.space(2)
-          anchors.bottom: barClaw.bottom
-          width: Style.space(6)
-          height: width
-          kind: root.barSignal.shape
-          color: root.barSignalColor
-        }
-
-        Text {
-          visible: root.barCount > 0
-          anchors.left: barClaw.right
-          anchors.leftMargin: Style.space(5)
-          anchors.verticalCenter: parent.verticalCenter
-          text: String(root.barCount)
-          color: button.foreground
-          font.family: button.fontFamily
-          font.pixelSize: Style.font.caption
-          font.bold: true
-        }
+      ClawMark {
+        anchors.centerIn: parent
+        width: Style.space(10)
+        height: width
+        color: root.barSignalColor
       }
     }
     onPressed: function(buttonCode) {

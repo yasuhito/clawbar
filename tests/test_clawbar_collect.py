@@ -718,25 +718,95 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         for sentinel in private_sentinels:
             self.assertNotIn(sentinel, result.stdout)
 
-    def test_node_keys_survive_reorder_and_distinguish_same_names(self) -> None:
+    def test_same_named_node_registrations_collapse_to_freshest_connected_node(self) -> None:
         first_nodes = {
             "nodes": [
-                {"nodeId": "PRIVATE-NODE-A", "displayName": "MacBook Pro", "connected": True},
-                {"nodeId": "PRIVATE-NODE-B", "displayName": "MacBook Pro", "connected": True},
+                {
+                    "nodeId": "PRIVATE-NODE-A",
+                    "displayName": "MacBook Pro",
+                    "connected": True,
+                    "lastSeenAtMs": 1_000,
+                    "version": "old-connected",
+                },
+                {
+                    "nodeId": "PRIVATE-NODE-B",
+                    "displayName": "MacBook Pro",
+                    "connected": True,
+                    "lastSeenAtMs": 2_000,
+                    "version": "current",
+                },
+                {
+                    "nodeId": "PRIVATE-NODE-LEGACY",
+                    "displayName": "MacBook Pro",
+                    "connected": False,
+                    "version": "legacy",
+                },
             ]
         }
         second_nodes = {"nodes": list(reversed(first_nodes["nodes"]))}
+        replacement_nodes = {
+            "nodes": [
+                {
+                    "nodeId": "PRIVATE-NODE-C",
+                    "displayName": "MacBook Pro",
+                    "connected": True,
+                    "lastSeenAtMs": 3_000,
+                    "version": "replacement",
+                }
+            ]
+        }
 
         first = self.run_external("local", environment_overrides={"FAKE_NODES": json.dumps(first_nodes)})
-        first_keys = [node["key"] for node in json.loads(first.stdout)["fleet"]["nodes"]]
         second = self.run_external("local", environment_overrides={"FAKE_NODES": json.dumps(second_nodes)})
-        second_keys = [node["key"] for node in json.loads(second.stdout)["fleet"]["nodes"]]
+        replacement = self.run_external(
+            "local",
+            environment_overrides={"FAKE_NODES": json.dumps(replacement_nodes)},
+        )
+        first_fleet = json.loads(first.stdout)["fleet"]["nodes"]
+        second_fleet = json.loads(second.stdout)["fleet"]["nodes"]
+        replacement_fleet = json.loads(replacement.stdout)["fleet"]["nodes"]
 
         self.assertEqual(first.returncode, clawbar_collect.ExitCode.OK, first.stderr)
         self.assertEqual(second.returncode, clawbar_collect.ExitCode.OK, second.stderr)
-        self.assertEqual(second_keys, list(reversed(first_keys)))
-        self.assertEqual(len(set(first_keys)), 2)
-        self.assertNotIn("PRIVATE-NODE", first.stdout + second.stdout)
+        self.assertEqual(replacement.returncode, clawbar_collect.ExitCode.OK, replacement.stderr)
+        self.assertEqual(len(first_fleet), 1)
+        self.assertEqual(first_fleet, second_fleet)
+        self.assertEqual(first_fleet[0]["name"], "MacBook Pro")
+        self.assertEqual(first_fleet[0]["state"], "healthy")
+        self.assertEqual(first_fleet[0]["version"], "current")
+        self.assertEqual(replacement_fleet[0]["version"], "replacement")
+        self.assertEqual(replacement_fleet[0]["key"], first_fleet[0]["key"])
+        self.assertNotIn("PRIVATE-NODE", first.stdout + second.stdout + replacement.stdout)
+
+    def test_fresh_registration_after_first_hundred_duplicates_is_retained(self) -> None:
+        nodes = [
+            {
+                "nodeId": f"PRIVATE-NODE-{index}",
+                "displayName": "MacBook Pro",
+                "connected": False,
+            }
+            for index in range(100)
+        ]
+        nodes.append(
+            {
+                "nodeId": "PRIVATE-NODE-CURRENT",
+                "displayName": "MacBook Pro",
+                "connected": True,
+                "lastSeenAtMs": 3_000,
+                "version": "current",
+            }
+        )
+
+        result = self.run_external(
+            "local",
+            environment_overrides={"FAKE_NODES": json.dumps({"nodes": nodes})},
+        )
+        fleet = json.loads(result.stdout)["fleet"]["nodes"]
+
+        self.assertEqual(result.returncode, clawbar_collect.ExitCode.OK, result.stderr)
+        self.assertEqual(len(fleet), 1)
+        self.assertEqual(fleet[0]["state"], "healthy")
+        self.assertEqual(fleet[0]["version"], "current")
 
     def test_node_keys_stay_stable_without_runtime_directory(self) -> None:
         nodes = {"nodes": [{"nodeId": "PRIVATE-NODE", "displayName": "Local", "connected": True}]}

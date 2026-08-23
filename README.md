@@ -29,6 +29,8 @@ collection and repeats every 30 seconds. OpenClaw first resolves its normal
 local or configured remote Gateway. If that fails on a Node host, Clawbar uses
 the Gateway connection recorded in OpenClaw-owned Node-host state; it never
 probes Fleet Nodes directly and never stores a Gateway token.
+If the Gateway retains several registrations with the same Node display name,
+Clawbar shows only the freshest connected registration.
 
 If none of those sources resolves a Gateway, the panel shows Gateway Setup
 Required and lists online Tailscale devices under stable, opaque candidate
