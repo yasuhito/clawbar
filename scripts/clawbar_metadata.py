@@ -85,7 +85,7 @@ def opaque_node_key(node_id: object, secret: bytes) -> str | None:
 
 
 def merge_richer_node_details(target: dict[str, Any], source: dict[str, Any]) -> None:
-    for key in ("platform", "modelIdentifier", "version"):
+    for key in ("platform", "modelIdentifier"):
         current = bounded_text(target.get(key))
         candidate = bounded_text(source.get(key))
         if (len(candidate), candidate) > (len(current), current):

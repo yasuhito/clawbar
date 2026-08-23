@@ -742,7 +742,7 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
                     "nodeId": "PRIVATE-NODE-LEGACY",
                     "displayName": "MacBook Pro",
                     "connected": False,
-                    "version": "legacy",
+                    "version": "2026.10.0",
                 },
             ]
         }
