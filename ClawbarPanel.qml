@@ -457,6 +457,8 @@ KeyboardPanel {
 
         Text {
           visible: !root.setupVisible && !root.configurationErrorVisible
+            && (root.agents.length > 0 || (root.state === "degraded" && root.snapshot
+              && root.snapshot.agents && !root.snapshot.agents.available))
           width: parent.width
           topPadding: Style.space(8)
           text: "AGENTS"

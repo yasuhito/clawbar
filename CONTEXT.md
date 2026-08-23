@@ -13,7 +13,7 @@ The endpoint Clawbar connects to. OpenClaw configuration or node-host state reso
 _Avoid_: Node, Gateway
 
 **Gateway Setup Required**:
-No local Gateway is running and neither OpenClaw configuration nor node-host state identifies a remote Gateway. It requires the user to choose and verify a fallback device, uses the yellow state, and is not an Incident.
+No local Gateway is running and neither OpenClaw configuration nor node-host state identifies a remote Gateway. It requires the user to choose and verify a fallback device, uses the yellow state, and is not an Incident. Candidates appear as directly actionable rows rather than a dropdown.
 _Avoid_: Empty Fleet, Offline Gateway, Configuration Error
 
 **Gateway Candidate Key**:
@@ -57,7 +57,7 @@ A Node whose core state is current but whose Task metadata is unavailable. The u
 _Avoid_: Degraded Gateway, Offline Node
 
 **Automation**:
-A scheduled operation managed by the configured Gateway. Clawbar does not assign it to a Node because the supported Gateway metadata establishes no Node ownership.
+A scheduled operation managed by the configured Gateway. Clawbar does not assign it to a Node because the supported Gateway metadata establishes no Node ownership; it appears in the independent Automations section.
 _Avoid_: Node Automation, Task
 
 **Automation ID**:
@@ -89,7 +89,7 @@ Task instructions, message bodies, destinations, account identifiers, and raw er
 _Avoid_: Details, metadata
 
 **Agent Activity**:
-An Agent's present work state: Working, Waiting, or Idle. Waiting and Idle are not Incidents and remain independent of earlier Task Results.
+An Agent's present work state: Working, Waiting, or Idle. The supported Gateway metadata establishes no Node ownership, so Agents appear in an independent Agents section that is omitted when empty. Waiting and Idle are not Incidents and remain independent of earlier Task Results.
 _Avoid_: Agent status
 
 **Task Result**:

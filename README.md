@@ -68,10 +68,12 @@ Press Clawbar to open the panel.
 
 The bar icon changes color with current severity; its compact slot does not
 render a separate status dot or count. The tooltip reports current Attention
-Items while yellow or red. Working Agents remain visible in the panel's Agents
-section. Agent Activity and the previous Task Result remain independent.
-Automation Failure and Offline Node conditions appear once in their natural
-tree section.
+Items while yellow or red. The panel keeps Agents and Automations in independent
+sections because Gateway metadata establishes no Node ownership; an empty Agents
+section is omitted. A green `Healthy` indicator remains visible in the panel
+header. Agent Activity and the previous Task Result remain independent.
+Automation Failure and Offline Node conditions each appear once in their
+respective section.
 
 ## Privacy boundary
 

@@ -57,6 +57,11 @@ class MarketplaceContractTest(unittest.TestCase):
 
         self.assertNotIn("j/k · arrows", panel)
 
+    def test_panel_omits_empty_agents_section(self) -> None:
+        panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
+
+        self.assertIn("root.agents.length > 0", panel)
+
     def test_demo_publishes_all_twelve_sanitized_scenarios(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
