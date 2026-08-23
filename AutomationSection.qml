@@ -115,10 +115,13 @@ Column {
               anchors.right: parent.right
               anchors.rightMargin: Style.space(8)
               anchors.verticalCenter: automationName.verticalCenter
-              text: root.historical ? "Last known" : Logic.automationStatusLabel(automationRow.modelData)
+              width: Math.min(implicitWidth, parent.width * 0.42)
+              text: root.historical ? "Last known" : Logic.automationCompactStatusLabel(automationRow.modelData)
               color: root.historical ? root.dim : root.signalColor(automationRow.signal.tone)
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
+              elide: Text.ElideRight
+              horizontalAlignment: Text.AlignRight
             }
 
             Text {

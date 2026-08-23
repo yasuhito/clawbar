@@ -274,6 +274,16 @@ test("Automation labels distinguish every accepted state", () => {
     Logic.automationStatusLabel({ enabled: true, lastResult: "error", consecutiveFailures: 3 }),
     "Automation Failure · 3 consecutive failures"
   )
+  assert.equal(
+    Logic.automationCompactStatusLabel({ enabled: true, lastResult: "error", consecutiveFailures: 78 }),
+    "Failed · 78×"
+  )
+  assert.equal(
+    Logic.automationCompactStatusLabel({ enabled: true, lastResult: "error", consecutiveFailures: 1 }),
+    "Failed"
+  )
+  assert.equal(Logic.automationCompactStatusLabel({ enabled: true, lastResult: "ok" }), "Healthy")
+  assert.equal(Logic.automationCompactStatusLabel({ enabled: false, lastResult: "error" }), "Disabled")
   assert.equal(Logic.automationStatusLabel({ enabled: true, lastResult: "skipped" }), "Skipped")
   assert.equal(Logic.automationStatusLabel({ enabled: true, lastResult: "none" }), "No runs yet")
   assert.equal(

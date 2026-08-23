@@ -275,10 +275,14 @@ function taskResultLabel(result, nowMilliseconds) {
   return "Task: " + state + (age ? " · " + age : "")
 }
 
+function automationFailureCount(automation) {
+  return Math.max(1, Number(automation && automation.consecutiveFailures) || 0)
+}
+
 function automationStatusLabel(automation) {
   if (!automation || !automation.enabled) return "Disabled"
   if (automation.lastResult === "error") {
-    var failures = Math.max(1, Number(automation.consecutiveFailures) || 0)
+    var failures = automationFailureCount(automation)
     return "Automation Failure"
       + (failures > 1 ? " · " + failures + " consecutive failures" : "")
   }
@@ -289,6 +293,14 @@ function automationStatusLabel(automation) {
     return "Completed"
   if (automation.lastResult === "none") return "No runs yet"
   return "Healthy"
+}
+
+function automationCompactStatusLabel(automation) {
+  if (automation && automation.enabled && automation.lastResult === "error") {
+    var failures = automationFailureCount(automation)
+    return "Failed" + (failures > 1 ? " · " + failures + "×" : "")
+  }
+  return automationStatusLabel(automation)
 }
 
 function automationKindLabel(kind) {
@@ -387,6 +399,7 @@ if (typeof module !== "undefined") {
     absoluteLocalTime: absoluteLocalTime,
     taskResultLabel: taskResultLabel,
     automationStatusLabel: automationStatusLabel,
+    automationCompactStatusLabel: automationCompactStatusLabel,
     automationKindLabel: automationKindLabel,
     automationTimingLabel: automationTimingLabel,
     signalColor: signalColor,
