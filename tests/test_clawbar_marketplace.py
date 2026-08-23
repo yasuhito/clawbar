@@ -53,6 +53,7 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("width: Style.bar.iconCanvas * 0.875", widget)
         self.assertNotIn("String(root.barCount)", widget)
         self.assertIn("root.warningColor", widget)
+        self.assertRegex(widget, r"Color\.muted,\s+null,\s+warningColor")
         self.assertIn("healthy: root.healthyColor", widget)
         self.assertIn("warning: root.warningColor", widget)
 
