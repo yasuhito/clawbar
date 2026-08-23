@@ -155,14 +155,6 @@ test("panel rows preserve Gateway order and keyboard focus wraps", () => {
   assert.equal(Logic.moveFocus(0, 0, 1), -1)
 })
 
-test("panel scrolling accelerates touchpad pixels and mouse wheel steps", () => {
-  assert.equal(Logic.acceleratedScrollPosition(100, -10, 0, 500), 120)
-  assert.equal(Logic.acceleratedScrollPosition(100, 10, 0, 500), 80)
-  assert.equal(Logic.acceleratedScrollPosition(100, 0, -120, 500), 164)
-  assert.equal(Logic.acceleratedScrollPosition(490, -10, 0, 500), 500)
-  assert.equal(Logic.acceleratedScrollPosition(5, 10, 0, 500), 0)
-})
-
 test("keyless Nodes never receive positional identity", () => {
   const snapshot = healthySnapshot(new Date(100000).toISOString())
   snapshot.fleet = {

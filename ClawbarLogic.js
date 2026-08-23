@@ -169,14 +169,6 @@ function moveFocus(index, count, delta) {
   return ((current + delta) % count + count) % count
 }
 
-function acceleratedScrollPosition(current, pixelDelta, angleDelta, maximum) {
-  var pixel = Number(pixelDelta) || 0
-  var wheel = Number(angleDelta) || 0
-  var delta = pixel !== 0 ? pixel : wheel / 120 * 32
-  var next = (Number(current) || 0) - delta * 2
-  return Math.max(0, Math.min(Number(maximum) || 0, next))
-}
-
 function relativeTime(value, nowMilliseconds) {
   var timestamp = Date.parse(String(value || ""))
   if (isNaN(timestamp)) return ""
@@ -402,7 +394,6 @@ if (typeof module !== "undefined") {
     panelSignal: panelSignal,
     configurationGuidance: configurationGuidance,
     barSeverity: barSeverity,
-    acceleratedScrollPosition: acceleratedScrollPosition,
     barCount: barCount,
     indexForKey: indexForKey,
     reconcileSelection: reconcileSelection,
