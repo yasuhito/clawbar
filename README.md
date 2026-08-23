@@ -66,6 +66,12 @@ Press Clawbar to open the panel.
 - Escape: close the panel
 - Middle-click the bar widget: request a non-blocking refresh
 
+Automation history opens in a terminal that remains visible until the user
+closes it. History follows OpenClaw's configured local or remote Gateway so
+OpenClaw can apply its existing authentication. It is unavailable for Node-host
+and verified Tailscale fallback targets because Clawbar does not handle Gateway
+credentials or fall back to a different Gateway.
+
 The bar icon changes color with current severity; its compact slot does not
 render a separate status dot or count. The tooltip reports current Attention
 Items while yellow or red. The panel keeps Agents and Automations in independent

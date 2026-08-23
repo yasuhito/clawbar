@@ -64,6 +64,10 @@ _Avoid_: Node Automation, Task
 The opaque identifier reported by the Gateway for an Automation. Clawbar retains it as non-display Operational Metadata only to preserve selection and open that Automation's read-only history.
 _Avoid_: Automation name, Node UI Key
 
+**Automation History Availability**:
+Read-only recent-run history is available only when OpenClaw itself resolves the current Gateway Target from its local or configured-remote settings. Clawbar verifies that OpenClaw still resolves the Gateway Target recorded for the current snapshot before opening history. Node-host and verified Tailscale fallback targets do not offer history because their explicit URL requires credentials that Clawbar neither handles nor stores.
+_Avoid_: Automation availability, Gateway availability
+
 **Automation Failure**:
 An error result reported by the Gateway for an Automation run. It is immediately actionable, contributes one current Attention Item, and does not change Gateway or Node state. A skipped run is not an Automation Failure.
 _Avoid_: Gateway failure, Node failure, skipped run

@@ -12,6 +12,18 @@ from tests.collector_fixture import CollectorFixture
 
 
 class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
+    @staticmethod
+    def automation_surface(automation_id: str = "stable-automation-id") -> dict[str, object]:
+        return {
+            "jobs": [{
+                "id": automation_id,
+                "name": "Investigate",
+                "enabled": True,
+                "schedule": {"kind": "cron"},
+                "state": {},
+            }]
+        }
+
     def test_executable_sanitizes_orders_and_aggregates_automations(self) -> None:
         private_sentinels = [
             "PRIVATE-PAYLOAD",
@@ -213,20 +225,11 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
         snapshot = json.loads(result.stdout)
         self.assertEqual(snapshot["bar"], {"count": 1, "kind": "working_agents", "severity": "healthy"})
 
-    def test_automation_history_uses_stable_id_and_collected_gateway_target(self) -> None:
+    def test_automation_history_uses_stable_id_and_openclaw_configured_gateway(self) -> None:
         automation_id = "stable-automation-id"
-        automations = {
-            "jobs": [{
-                "id": automation_id,
-                "name": "Investigate",
-                "enabled": True,
-                "schedule": {"kind": "cron"},
-                "state": {},
-            }]
-        }
         collected = self.run_external(
-            "node_host",
-            environment_overrides={"FAKE_AUTOMATIONS": json.dumps(automations)},
+            "configured_remote",
+            environment_overrides={"FAKE_AUTOMATIONS": json.dumps(self.automation_surface(automation_id))},
         )
         self.assertEqual(collected.returncode, clawbar_collect.ExitCode.OK, collected.stderr)
 
@@ -236,7 +239,7 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
             "XDG_STATE_HOME": str(self.root / "external-state"),
             "XDG_RUNTIME_DIR": str(self.root / "runtime"),
             "FAKE_CALL_LOG": str(self.call_log_path),
-            "FAKE_SCENARIO": "local",
+            "FAKE_SCENARIO": "configured_remote",
         })
         history = subprocess.run(
             [
@@ -253,13 +256,48 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
 
         self.assertEqual(history.returncode, 0, history.stderr)
         self.assertEqual(history.stdout, "Official recent Automation runs\n")
-        call = self.read_calls()[-1]
+        calls = self.read_calls()
+        self.assertEqual(calls[-2][:2], ["gateway", "status"])
+        call = calls[-1]
         self.assertEqual(call[:2], ["cron", "runs"])
         self.assertEqual(call[call.index("--id") + 1], automation_id)
-        self.assertEqual(
-            call[call.index("--url") + 1],
-            "wss://node-gateway.example.test:18789/openclaw-gw",
+        self.assertNotIn("--url", call)
+
+    def test_automation_history_rejects_a_changed_openclaw_gateway(self) -> None:
+        automation_id = "stable-automation-id"
+        collected = self.run_external(
+            "configured_remote",
+            environment_overrides={"FAKE_AUTOMATIONS": json.dumps(self.automation_surface(automation_id))},
         )
+        self.assertEqual(collected.returncode, clawbar_collect.ExitCode.OK, collected.stderr)
+        self.call_log_path.unlink(missing_ok=True)
+
+        history = self.run_external(
+            "local",
+            collector_arguments=["--automation-history", automation_id],
+        )
+
+        self.assertEqual(history.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        calls = self.read_calls()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][:2], ["gateway", "status"])
+
+    def test_automation_history_does_not_fall_back_to_a_different_gateway(self) -> None:
+        automation_id = "stable-automation-id"
+        collected = self.run_external(
+            "node_host",
+            environment_overrides={"FAKE_AUTOMATIONS": json.dumps(self.automation_surface(automation_id))},
+        )
+        self.assertEqual(collected.returncode, clawbar_collect.ExitCode.OK, collected.stderr)
+        self.call_log_path.unlink(missing_ok=True)
+
+        history = self.run_external(
+            "node_host",
+            collector_arguments=["--automation-history", automation_id],
+        )
+
+        self.assertEqual(history.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertFalse(self.call_log_path.exists())
 
 
 

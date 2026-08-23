@@ -26,6 +26,8 @@ KeyboardPanel {
   readonly property var nodes: Logic.fleetNodes(snapshot, state)
   readonly property var agents: Logic.agents(snapshot, state)
   readonly property var automations: Logic.automations(snapshot, state)
+  readonly property bool automationHistoryAvailable: !!snapshot
+    && (snapshot.resolutionSource === "local" || snapshot.resolutionSource === "configured_remote")
   readonly property var candidates: Logic.setupCandidates(snapshot, state)
   readonly property bool setupVisible: candidates.length > 0 || state === "setup_required"
     || (state === "configuration_error" && snapshot && snapshot.setup)
@@ -89,7 +91,8 @@ KeyboardPanel {
   }
 
   function requestAutomationHistory() {
-    if (selectedRow && selectedRow.kind === "automation" && !automationHistoryBusy)
+    if (selectedRow && selectedRow.kind === "automation"
+        && automationHistoryAvailable && !automationHistoryBusy)
       automationHistoryRequested(selectedRow.item.id)
   }
 
@@ -563,6 +566,8 @@ KeyboardPanel {
                 if (lastRun) automationLines.push("Last run " + lastRun)
                 if (!nextRun && !lastRun && automation.lastResult === "none")
                   automationLines.push("No run timestamps")
+                if (!root.automationHistoryAvailable)
+                  automationLines.push("Run history unavailable for this Gateway Target")
                 return prefix + automationLines.join("\n")
               }
               var absolute = Logic.absoluteLocalTime(root.selectedRow.timestamp)
@@ -583,6 +588,7 @@ KeyboardPanel {
           Button {
             id: historyButton
             visible: root.selectedRow !== null && root.selectedRow.kind === "automation"
+              && root.automationHistoryAvailable
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom

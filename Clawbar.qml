@@ -128,6 +128,7 @@ BarWidget {
     if (!automationId || historyLauncher.running) return
     historyLauncher.command = [
       "xdg-terminal-exec",
+      "--hold",
       "python3",
       root.collectorPath,
       "--automation-history",

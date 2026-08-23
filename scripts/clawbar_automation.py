@@ -69,10 +69,37 @@ def open_automation_history(
     known_id = isinstance(items, list) and any(
         isinstance(item, dict) and item.get("id") == automation_id for item in items
     )
-    if not known_id or target_url is None:
+    resolution_source = snapshot.get("resolutionSource") if snapshot else None
+    if (
+        not known_id
+        or target_url is None
+        or resolution_source not in {"local", "configured_remote"}
+    ):
         print("Automation history unavailable", file=sys.stderr)
         return command_failed_code
     try:
+        status = subprocess.run(
+            [
+                *openclaw_command,
+                "gateway",
+                "status",
+                "--json",
+                "--require-rpc",
+                "--timeout",
+                str(timeout_milliseconds),
+            ],
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        try:
+            status_payload = json.loads(status.stdout) if status.returncode == 0 else None
+        except json.JSONDecodeError:
+            status_payload = None
+        rpc = status_payload.get("rpc") if isinstance(status_payload, dict) else None
+        if not isinstance(rpc, dict) or rpc.get("ok") is not True or rpc.get("url") != target_url:
+            print("Automation history unavailable", file=sys.stderr)
+            return command_failed_code
         completed = subprocess.run(
             [
                 *openclaw_command,
@@ -82,8 +109,6 @@ def open_automation_history(
                 automation_id,
                 "--limit",
                 "50",
-                "--url",
-                target_url,
                 "--timeout",
                 str(timeout_milliseconds),
             ],

@@ -509,7 +509,7 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(history.returncode, clawbar_collect.ExitCode.OK, history.stderr)
         history_call = self.read_calls()[-1]
         self.assertEqual(history_call[:2], ["cron", "runs"])
-        self.assertEqual(history_call[history_call.index("--url") + 1], "ws://127.0.0.1:18789")
+        self.assertNotIn("--url", history_call)
 
     def test_executable_rejects_unverified_and_unsupported_candidates(self) -> None:
         tailscale_status = {
