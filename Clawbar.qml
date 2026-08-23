@@ -158,11 +158,13 @@ BarWidget {
     opticalSize: Style.bar.iconCanvas
     tooltipText: root.summary
     iconComponent: Component {
-      ClawMark {
-        anchors.centerIn: parent
-        width: Style.space(10)
-        height: width
-        color: root.barSignalColor
+      Item {
+        ClawMark {
+          anchors.centerIn: parent
+          width: 10
+          height: width
+          color: root.barSignalColor
+        }
       }
     }
     onPressed: function(buttonCode) {
