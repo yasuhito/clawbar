@@ -46,6 +46,12 @@ class MarketplaceContractTest(unittest.TestCase):
             self.assertTrue((ROOT / entry_point).is_file())
         self.assertTrue((ROOT / "LICENSE").is_file())
 
+    def test_bar_icon_keeps_color_only_signal(self) -> None:
+        widget = (ROOT / "Clawbar.qml").read_text(encoding="utf-8")
+
+        self.assertIn("color: root.barSignalColor", widget)
+        self.assertNotIn("String(root.barCount)", widget)
+
     def test_demo_publishes_all_twelve_sanitized_scenarios(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)

@@ -726,14 +726,17 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
                     "displayName": "MacBook Pro",
                     "connected": True,
                     "lastSeenAtMs": 1_000,
-                    "version": "old-connected",
+                    "platform": "macOS 26.5.1",
+                    "modelIdentifier": "MacBookPro18,3",
+                    "version": "2026.1.8",
                 },
                 {
                     "nodeId": "PRIVATE-NODE-B",
                     "displayName": "MacBook Pro",
                     "connected": True,
                     "lastSeenAtMs": 2_000,
-                    "version": "current",
+                    "platform": "macos",
+                    "version": "2026.7.1",
                 },
                 {
                     "nodeId": "PRIVATE-NODE-LEGACY",
@@ -773,7 +776,9 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(first_fleet, second_fleet)
         self.assertEqual(first_fleet[0]["name"], "MacBook Pro")
         self.assertEqual(first_fleet[0]["state"], "healthy")
-        self.assertEqual(first_fleet[0]["version"], "current")
+        self.assertEqual(first_fleet[0]["platform"], "macOS 26.5.1")
+        self.assertEqual(first_fleet[0]["model"], "MacBookPro18,3")
+        self.assertEqual(first_fleet[0]["version"], "2026.7.1")
         self.assertEqual(replacement_fleet[0]["version"], "replacement")
         self.assertEqual(replacement_fleet[0]["key"], first_fleet[0]["key"])
         self.assertNotIn("PRIVATE-NODE", first.stdout + second.stdout + replacement.stdout)

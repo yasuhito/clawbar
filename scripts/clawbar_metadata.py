@@ -84,6 +84,14 @@ def opaque_node_key(node_id: object, secret: bytes) -> str | None:
     return _opaque_key(node_id, secret, "node")
 
 
+def merge_richer_node_details(target: dict[str, Any], source: dict[str, Any]) -> None:
+    for key in ("platform", "modelIdentifier", "version"):
+        current = bounded_text(target.get(key))
+        candidate = bounded_text(source.get(key))
+        if (len(candidate), candidate) > (len(current), current):
+            target[key] = candidate
+
+
 def freshest_node_registrations(
     nodes: list[object],
     secret: bytes,
@@ -112,12 +120,16 @@ def freshest_node_registrations(
             positive_milliseconds(raw.get("lastSeenAtMs")),
             registration_key,
         )
+        candidate = dict(raw)
         current = selected.get(identity)
         if current is not None and current[0] >= preference:
+            merge_richer_node_details(current[1][2], candidate)
             continue
         if current is None:
             order.append(identity)
-        selected[identity] = (preference, (key, name, raw))
+        else:
+            merge_richer_node_details(candidate, current[1][2])
+        selected[identity] = (preference, (key, name, candidate))
     return [selected[identity][1] for identity in order[:100]]
 
 
