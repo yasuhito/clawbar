@@ -125,6 +125,19 @@ KeyboardPanel {
       flickableDirection: Flickable.VerticalFlick
       interactive: contentHeight > height
 
+      WheelHandler {
+        target: null
+        onWheel: function(event) {
+          panelFlick.contentY = Logic.acceleratedScrollPosition(
+            panelFlick.contentY,
+            event.pixelDelta.y,
+            event.angleDelta.y,
+            Math.max(0, panelFlick.contentHeight - panelFlick.height)
+          )
+          event.accepted = true
+        }
+      }
+
       Column {
         id: contentColumn
         width: panelFlick.width
