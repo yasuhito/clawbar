@@ -284,6 +284,14 @@ test("Automation labels distinguish every accepted state", () => {
   )
   assert.equal(Logic.automationCompactStatusLabel({ enabled: true, lastResult: "ok" }), "Healthy")
   assert.equal(Logic.automationCompactStatusLabel({ enabled: false, lastResult: "error" }), "Disabled")
+  assert.equal(
+    Logic.automationCompactStatusLabel({ enabled: true, kind: "on-exit", lastResult: "none" }),
+    "Waiting for event"
+  )
+  assert.equal(
+    Logic.automationCompactStatusLabel({ enabled: true, kind: "at", lastResult: "ok", nextRunAt: null }),
+    "Completed"
+  )
   assert.equal(Logic.automationStatusLabel({ enabled: true, lastResult: "skipped" }), "Skipped")
   assert.equal(Logic.automationStatusLabel({ enabled: true, lastResult: "none" }), "No runs yet")
   assert.equal(
