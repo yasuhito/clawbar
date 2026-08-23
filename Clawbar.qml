@@ -161,7 +161,9 @@ BarWidget {
       Item {
         ClawMark {
           anchors.centerIn: parent
-          width: 10
+          // Qt Shape keeps more path whitespace than the prototype SVG; 7/8
+          // of the theme's optical canvas matches its 10px painted footprint.
+          width: Style.bar.iconCanvas * 0.875
           height: width
           color: root.barSignalColor
         }

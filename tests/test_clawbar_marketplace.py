@@ -50,7 +50,7 @@ class MarketplaceContractTest(unittest.TestCase):
         widget = (ROOT / "Clawbar.qml").read_text(encoding="utf-8")
 
         self.assertIn("color: root.barSignalColor", widget)
-        self.assertIn("width: 10", widget)
+        self.assertIn("width: Style.bar.iconCanvas * 0.875", widget)
         self.assertNotIn("String(root.barCount)", widget)
 
     def test_demo_publishes_all_twelve_sanitized_scenarios(self) -> None:

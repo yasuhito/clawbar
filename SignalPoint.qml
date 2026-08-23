@@ -13,10 +13,7 @@ Item {
 
   Loader {
     anchors.centerIn: parent
-    sourceComponent: root.kind === "triangle" ? triangle
-      : root.kind === "diamond" ? diamond
-      : root.kind === "dotted" ? dotted
-      : circle
+    sourceComponent: root.kind === "dotted" ? dotted : circle
   }
 
   Component {
@@ -27,35 +24,6 @@ Item {
       height: width
       radius: width / 2
       color: root.color
-    }
-  }
-
-  Component {
-    id: diamond
-
-    Rectangle {
-      width: Math.min(root.width, root.height) * 0.7
-      height: width
-      rotation: 45
-      color: root.color
-    }
-  }
-
-  Component {
-    id: triangle
-
-    Shape {
-      width: 10
-      height: 10
-      scale: Math.min(root.width, root.height) / 10
-      preferredRendererType: Shape.CurveRenderer
-
-      ShapePath {
-        fillColor: root.color
-        strokeColor: "transparent"
-
-        PathSvg { path: "M5 0L10 9H0Z" }
-      }
     }
   }
 

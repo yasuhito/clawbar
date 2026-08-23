@@ -208,18 +208,18 @@ var SIGNAL_PRESENTATIONS = {
   healthy: { shape: "circle", tone: "healthy", label: "Healthy" },
   succeeded: { shape: "circle", tone: "healthy", label: "Succeeded" },
   working: { shape: "circle", tone: "working", label: "Working" },
-  waiting: { shape: "triangle", tone: "warning", label: "Waiting" },
-  failed: { shape: "diamond", tone: "critical", label: "Failed" },
-  offline: { shape: "diamond", tone: "critical", label: "Offline" },
-  configuration_error: { shape: "diamond", tone: "critical", label: "Configuration Error" },
-  degraded: { shape: "triangle", tone: "warning", label: "Degraded" },
-  unstable: { shape: "triangle", tone: "warning", label: "Unstable" },
-  stale: { shape: "triangle", tone: "warning", label: "Stale" },
-  collecting: { shape: "triangle", tone: "warning", label: "Collecting" },
-  setup_required: { shape: "triangle", tone: "warning", label: "Gateway Setup Required" },
-  no_data: { shape: "triangle", tone: "warning", label: "No data yet" },
-  starting: { shape: "triangle", tone: "warning", label: "Starting" },
-  unknown: { shape: "triangle", tone: "warning", label: "Unavailable" },
+  waiting: { shape: "circle", tone: "warning", label: "Waiting" },
+  failed: { shape: "circle", tone: "critical", label: "Failed" },
+  offline: { shape: "circle", tone: "critical", label: "Offline" },
+  configuration_error: { shape: "circle", tone: "critical", label: "Configuration Error" },
+  degraded: { shape: "circle", tone: "warning", label: "Degraded" },
+  unstable: { shape: "circle", tone: "warning", label: "Unstable" },
+  stale: { shape: "circle", tone: "warning", label: "Stale" },
+  collecting: { shape: "circle", tone: "warning", label: "Collecting" },
+  setup_required: { shape: "circle", tone: "warning", label: "Gateway Setup Required" },
+  no_data: { shape: "circle", tone: "warning", label: "No data yet" },
+  starting: { shape: "circle", tone: "warning", label: "Starting" },
+  unknown: { shape: "circle", tone: "warning", label: "Unavailable" },
   disabled: { shape: "dotted", tone: "disabled", label: "Disabled" },
   idle: { shape: "none", tone: "idle", label: "" }
 }
@@ -228,11 +228,25 @@ function signalPresentation(state) {
   return SIGNAL_PRESENTATIONS[state] || SIGNAL_PRESENTATIONS.unknown
 }
 
-function signalColor(tone, foreground, accent, urgent, dim) {
+function signalColor(tone, foreground, accent, urgent, dim, healthy, warning) {
   if (tone === "critical") return urgent
-  if (tone === "warning" || tone === "working") return accent
+  if (tone === "warning") return warning || accent
+  if (tone === "working") return accent
   if (tone === "disabled") return dim
+  if (tone === "healthy" && healthy) return healthy
   return foreground
+}
+
+function themeColorFromTheme(raw, name, fallback) {
+  var aliases = name === "green" ? ["green", "color2"]
+    : name === "yellow" ? ["yellow", "color3"] : [name]
+  var text = String(raw || "")
+  for (var i = 0; i < aliases.length; i++) {
+    var pattern = new RegExp("^\\s*" + aliases[i] + "\\s*=\\s*[\"']?(#[0-9a-f]{6})", "im")
+    var match = text.match(pattern)
+    if (match) return match[1]
+  }
+  return fallback
 }
 
 function taskResultLabel(result, nowMilliseconds) {
@@ -357,6 +371,7 @@ if (typeof module !== "undefined") {
     automationKindLabel: automationKindLabel,
     automationTimingLabel: automationTimingLabel,
     signalColor: signalColor,
+    themeColorFromTheme: themeColorFromTheme,
     signalPresentation: signalPresentation,
     barSeverity: barSeverity,
     barCount: barCount,
