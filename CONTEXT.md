@@ -45,7 +45,7 @@ A local opaque identifier derived with Clawbar's local secret from the Node iden
 _Avoid_: Node ID, instance ID, positional index
 
 **Fleet**:
-The set of Nodes reported by the configured Gateway.
+The set of Nodes reported by the configured Gateway. Nodes form a flat list with no parent-child relationship, connection order, or topology, so the UI uses status dots without a vertical Fleet rail.
 _Avoid_: Gateways, cluster
 
 **Offline Node**:

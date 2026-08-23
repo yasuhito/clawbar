@@ -62,10 +62,10 @@ class MarketplaceContractTest(unittest.TestCase):
 
         self.assertIn("root.agents.length > 0", panel)
 
-    def test_panel_preserves_the_fleet_rail(self) -> None:
+    def test_panel_omits_the_obsolete_fleet_rail(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
 
-        self.assertIn("id: fleetRail", panel)
+        self.assertNotIn("id: fleetRail", panel)
 
     def test_demo_publishes_all_twelve_sanitized_scenarios(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
