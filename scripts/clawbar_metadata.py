@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 _SECRET_BYTES = 32
+MAX_NODE_REGISTRATIONS = 5_000
 MAX_AUTOMATIONS = 500
 AUTOMATION_KINDS = frozenset({"at", "every", "cron", "on-exit"})
 AUTOMATION_RESULTS = frozenset({"ok", "error", "skipped"})
@@ -85,11 +86,29 @@ def opaque_node_key(node_id: object, secret: bytes) -> str | None:
 
 
 def merge_richer_node_details(target: dict[str, Any], source: dict[str, Any]) -> None:
-    for key in ("platform", "modelIdentifier"):
-        current = bounded_text(target.get(key))
-        candidate = bounded_text(source.get(key))
-        if (len(candidate), candidate) > (len(current), current):
-            target[key] = candidate
+    current_model = bounded_text(target.get("modelIdentifier"))
+    candidate_model = bounded_text(source.get("modelIdentifier"))
+    if not current_model and candidate_model:
+        target["modelIdentifier"] = candidate_model
+
+    current_platform = bounded_text(target.get("platform"))
+    candidate_platform = bounded_text(source.get("platform"))
+    if not candidate_platform:
+        return
+    generic_platforms = {"darwin", "linux", "macos", "win32", "windows"}
+    current_family = current_platform.casefold()
+    candidate_family = candidate_platform.casefold()
+    compatible = candidate_family.startswith(current_family)
+    if current_family == "darwin":
+        compatible = candidate_family.startswith(("darwin", "macos"))
+    elif current_family == "win32":
+        compatible = candidate_family.startswith(("win32", "windows"))
+    if not current_platform or (
+        current_family in generic_platforms
+        and compatible
+        and len(candidate_platform) > len(current_platform)
+    ):
+        target["platform"] = candidate_platform
 
 
 def freshest_node_registrations(
@@ -101,7 +120,7 @@ def freshest_node_registrations(
         tuple[tuple[bool, float, str], tuple[str, str, dict[str, Any]]],
     ] = {}
     order: list[str] = []
-    for raw in nodes:
+    for raw in nodes[:MAX_NODE_REGISTRATIONS]:
         if not isinstance(raw, dict):
             continue
         registration_key = opaque_node_key(raw.get("nodeId"), secret)

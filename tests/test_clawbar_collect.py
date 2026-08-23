@@ -744,6 +744,19 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
                     "connected": False,
                     "version": "2026.10.0",
                 },
+                {
+                    "nodeId": "PRIVATE-STUDIO-CURRENT",
+                    "displayName": "Studio",
+                    "connected": True,
+                    "lastSeenAtMs": 3_000,
+                    "platform": "macOS 27.0",
+                },
+                {
+                    "nodeId": "PRIVATE-STUDIO-LEGACY",
+                    "displayName": "Studio",
+                    "connected": False,
+                    "platform": "macOS 26.5.1",
+                },
             ]
         }
         second_nodes = {"nodes": list(reversed(first_nodes["nodes"]))}
@@ -772,9 +785,11 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(first.returncode, clawbar_collect.ExitCode.OK, first.stderr)
         self.assertEqual(second.returncode, clawbar_collect.ExitCode.OK, second.stderr)
         self.assertEqual(replacement.returncode, clawbar_collect.ExitCode.OK, replacement.stderr)
-        self.assertEqual(len(first_fleet), 1)
-        self.assertEqual(first_fleet, second_fleet)
-        self.assertEqual(first_fleet[0]["name"], "MacBook Pro")
+        self.assertEqual(
+            {node["name"]: node for node in first_fleet},
+            {node["name"]: node for node in second_fleet},
+        )
+        self.assertEqual(len(first_fleet), 2)
         self.assertEqual(first_fleet[0]["state"], "healthy")
         self.assertEqual(first_fleet[0]["platform"], "macOS 26.5.1")
         self.assertEqual(first_fleet[0]["model"], "MacBookPro18,3")
@@ -782,6 +797,8 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(replacement_fleet[0]["version"], "replacement")
         self.assertEqual(replacement_fleet[0]["key"], first_fleet[0]["key"])
         self.assertNotIn("PRIVATE-NODE", first.stdout + second.stdout + replacement.stdout)
+        studio = next(node for node in first_fleet if node["name"] == "Studio")
+        self.assertEqual(studio["platform"], "macOS 27.0")
 
     def test_fresh_registration_after_first_hundred_duplicates_is_retained(self) -> None:
         nodes = [

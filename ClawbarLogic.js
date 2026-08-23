@@ -228,6 +228,30 @@ function signalPresentation(state) {
   return SIGNAL_PRESENTATIONS[state] || SIGNAL_PRESENTATIONS.unknown
 }
 
+function panelSignal(snapshot, state) {
+  var base = signalPresentation(state)
+  if ((state !== "healthy" && state !== "degraded") || !snapshot || !snapshot.bar
+      || snapshot.bar.severity !== "critical") return base
+  var count = Math.max(0, Math.floor(Number(snapshot.bar.count) || 0))
+  if (count > 1) return { shape: "circle", tone: "critical", label: count + " Incidents" }
+  if (count !== 1) return base
+  var automations = snapshot.automations && snapshot.automations.items
+  if (Array.isArray(automations) && automations.some(function(item) {
+    return item && item.enabled === true && item.lastResult === "error"
+  })) return { shape: "circle", tone: "critical", label: "Automation Failure" }
+  var nodes = snapshot.fleet && snapshot.fleet.nodes
+  if (Array.isArray(nodes) && nodes.some(function(item) {
+    return item && item.state === "offline"
+  })) return { shape: "circle", tone: "critical", label: "Offline Node" }
+  return { shape: "circle", tone: "critical", label: "1 Incident" }
+}
+
+function configurationGuidance(state) {
+  if (state !== "configuration_error") return ""
+  return "Target is reachable, but no supported OpenClaw Gateway responded.\n"
+    + "Update gateway.remote.url in OpenClaw settings."
+}
+
 function signalColor(tone, foreground, accent, urgent, dim, healthy, warning) {
   if (tone === "critical") return urgent
   if (tone === "warning") return warning || accent
@@ -373,6 +397,8 @@ if (typeof module !== "undefined") {
     signalColor: signalColor,
     themeColorFromTheme: themeColorFromTheme,
     signalPresentation: signalPresentation,
+    panelSignal: panelSignal,
+    configurationGuidance: configurationGuidance,
     barSeverity: barSeverity,
     barCount: barCount,
     indexForKey: indexForKey,

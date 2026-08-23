@@ -310,6 +310,52 @@ test("bar uses Attention Items for critical Automation state and Working Agents 
   assert.equal(Logic.barCount(snapshot, "healthy"), 3)
 })
 
+test("panel header rolls current Incidents above healthy Gateway state", () => {
+  const snapshot = healthySnapshot(new Date(100000).toISOString())
+  assert.deepEqual(Logic.panelSignal(snapshot, "healthy"), {
+    shape: "circle",
+    tone: "healthy",
+    label: "Healthy"
+  })
+
+  snapshot.bar = { kind: "attention", count: 1, severity: "critical" }
+  snapshot.automations = {
+    available: true,
+    items: [{ enabled: true, lastResult: "error" }]
+  }
+  assert.deepEqual(Logic.panelSignal(snapshot, "healthy"), {
+    shape: "circle",
+    tone: "critical",
+    label: "Automation Failure"
+  })
+
+  snapshot.bar.count = 3
+  assert.deepEqual(Logic.panelSignal(snapshot, "healthy"), {
+    shape: "circle",
+    tone: "critical",
+    label: "3 Incidents"
+  })
+  assert.deepEqual(Logic.panelSignal(snapshot, "degraded"), {
+    shape: "circle",
+    tone: "critical",
+    label: "3 Incidents"
+  })
+  assert.deepEqual(Logic.panelSignal(snapshot, "offline"), {
+    shape: "circle",
+    tone: "critical",
+    label: "Offline"
+  })
+})
+
+test("configuration errors provide private-safe repair guidance", () => {
+  assert.equal(
+    Logic.configurationGuidance("configuration_error"),
+    "Target is reachable, but no supported OpenClaw Gateway responded.\n"
+      + "Update gateway.remote.url in OpenClaw settings."
+  )
+  assert.equal(Logic.configurationGuidance("healthy"), "")
+})
+
 test("signal semantics follow the prototype dot and color legend", () => {
   for (const [state, tone, label] of [
     ["healthy", "healthy", "Healthy"],

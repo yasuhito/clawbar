@@ -29,6 +29,7 @@ KeyboardPanel {
   readonly property var candidates: Logic.setupCandidates(snapshot, state)
   readonly property bool setupVisible: candidates.length > 0 || state === "setup_required"
     || (state === "configuration_error" && snapshot && snapshot.setup)
+  readonly property bool configurationErrorVisible: state === "configuration_error"
   readonly property int selectedIndex: Logic.indexForKey(rows, selectedKey)
   readonly property var selectedRow: selectedIndex >= 0 ? rows[selectedIndex] : null
   readonly property color foreground: bar ? bar.foreground : Color.foreground
@@ -38,7 +39,7 @@ KeyboardPanel {
   required property color healthy
   required property color warning
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
-  readonly property var gatewaySignal: Logic.signalPresentation(state)
+  readonly property var gatewaySignal: Logic.panelSignal(snapshot, state)
 
   focusTarget: keyCatcher
   contentWidth: fittedContentWidth(Style.space(360))
@@ -247,6 +248,16 @@ KeyboardPanel {
           wrapMode: Text.Wrap
         }
 
+        Text {
+          visible: root.configurationErrorVisible && !root.setupVisible
+          width: parent.width
+          text: Logic.configurationGuidance(root.state)
+          color: root.foreground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+          wrapMode: Text.Wrap
+        }
+
         Repeater {
           id: candidateRepeater
           model: root.candidates
@@ -302,7 +313,7 @@ KeyboardPanel {
         }
 
         Text {
-          visible: !root.setupVisible
+          visible: !root.setupVisible && !root.configurationErrorVisible
           width: parent.width
           text: "FLEET"
           color: root.dim
@@ -445,7 +456,7 @@ KeyboardPanel {
         }
 
         Text {
-          visible: !root.setupVisible
+          visible: !root.setupVisible && !root.configurationErrorVisible
           width: parent.width
           topPadding: Style.space(8)
           text: "AGENTS"
@@ -545,7 +556,7 @@ KeyboardPanel {
         AutomationSection {
           id: automationSection
           width: parent.width
-          visible: !root.setupVisible
+          visible: !root.setupVisible && !root.configurationErrorVisible
           section: root.metadata ? root.metadata.automations : null
           automations: root.automations
           rows: root.rows

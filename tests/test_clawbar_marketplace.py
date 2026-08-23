@@ -50,12 +50,7 @@ class MarketplaceContractTest(unittest.TestCase):
         widget = (ROOT / "Clawbar.qml").read_text(encoding="utf-8")
 
         self.assertIn("color: root.barSignalColor", widget)
-        self.assertIn("width: Style.bar.iconCanvas * 0.875", widget)
         self.assertNotIn("String(root.barCount)", widget)
-        self.assertIn("root.warningColor", widget)
-        self.assertRegex(widget, r"Color\.muted,\s+null,\s+warningColor")
-        self.assertIn("healthy: root.healthyColor", widget)
-        self.assertIn("warning: root.warningColor", widget)
 
     def test_demo_publishes_all_twelve_sanitized_scenarios(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

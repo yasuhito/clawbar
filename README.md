@@ -67,10 +67,11 @@ Press Clawbar to open the panel.
 - Middle-click the bar widget: request a non-blocking refresh
 
 The bar icon changes color with current severity; its compact slot does not
-render a separate status dot or count. The tooltip reports the number of
-Working Agents while healthy and current Attention Items while yellow or red.
-Agent Activity and the previous Task Result remain independent. Automation
-Failure and Offline Node conditions appear once in their natural tree section.
+render a separate status dot or count. The tooltip reports current Attention
+Items while yellow or red. Working Agents remain visible in the panel's Agents
+section. Agent Activity and the previous Task Result remain independent.
+Automation Failure and Offline Node conditions appear once in their natural
+tree section.
 
 ## Privacy boundary
 
