@@ -368,6 +368,17 @@ KeyboardPanel {
               onClicked: root.selectRow(nodeRow.row)
             }
 
+            Rectangle {
+              id: fleetRail
+              anchors.left: parent.left
+              anchors.leftMargin: Style.space(14)
+              anchors.verticalCenter: parent.verticalCenter
+              width: 1
+              height: parent.height + Style.space(4)
+              color: root.dim
+              opacity: 0.4
+            }
+
             SignalPoint {
               anchors.left: parent.left
               anchors.leftMargin: Style.space(9)
