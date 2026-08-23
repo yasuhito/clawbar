@@ -1,5 +1,4 @@
 import QtQuick
-import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "ClawbarLogic.js" as Logic
@@ -36,9 +35,8 @@ KeyboardPanel {
   readonly property color dim: Color.muted
   readonly property color accent: Color.accent
   readonly property color urgent: bar ? bar.urgent : Color.urgent
-  property color healthy: foreground
-  property color warning: accent
-  readonly property var themeGeneration: Color.shellValues
+  required property color healthy
+  required property color warning
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property var gatewaySignal: Logic.signalPresentation(state)
 
@@ -103,21 +101,6 @@ KeyboardPanel {
   function signalColor(tone) {
     return Logic.signalColor(tone, foreground, accent, urgent, dim, healthy, warning)
   }
-
-  function loadThemeColors(raw) {
-    healthy = Logic.themeColorFromTheme(raw, "green", foreground)
-    warning = Logic.themeColorFromTheme(raw, "yellow", accent)
-  }
-
-  property FileView themeColors: FileView {
-    path: Color.currentThemePath + "/colors.toml"
-    watchChanges: false
-    printErrors: false
-    onLoaded: root.loadThemeColors(text())
-    onLoadFailed: root.loadThemeColors("")
-  }
-
-  onThemeGenerationChanged: if (themeColors) themeColors.reload()
 
   onRowsChanged: reconcileRows()
   Component.onCompleted: reconcileRows()

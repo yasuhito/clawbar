@@ -16,6 +16,10 @@ BarWidget {
   property bool collectionAttempted: false
   property bool opened: false
   property double nowMs: Date.now()
+  readonly property color signalForeground: bar ? bar.foreground : Color.foreground
+  property color healthyColor: signalForeground
+  property color warningColor: Color.accent
+  readonly property var themeGeneration: Color.shellValues
   property string collectorPath: decodeURIComponent(String(Qt.resolvedUrl("scripts/clawbar_collect.py")).replace(/^file:\/\//, ""))
   property string snapshotPath: {
     var stateHome = Quickshell.env("XDG_STATE_HOME")
@@ -36,11 +40,28 @@ BarWidget {
   )
   readonly property color barSignalColor: Logic.signalColor(
     barSignal.tone,
-    button.foreground,
+    signalForeground,
     Color.accent,
     bar ? bar.urgent : Color.urgent,
-    Color.muted
+    Color.muted,
+    null,
+    warningColor
   )
+
+  function loadThemeColors(raw) {
+    healthyColor = Logic.themeColorFromTheme(raw, "green", signalForeground)
+    warningColor = Logic.themeColorFromTheme(raw, "yellow", Color.accent)
+  }
+
+  property FileView themeColors: FileView {
+    path: Color.currentThemePath + "/colors.toml"
+    watchChanges: false
+    printErrors: false
+    onLoaded: root.loadThemeColors(text())
+    onLoadFailed: root.loadThemeColors("")
+  }
+
+  onThemeGenerationChanged: if (themeColors) themeColors.reload()
 
   function readSnapshot() {
     var action = Logic.requestRefresh(cacheReader.running)
@@ -193,6 +214,8 @@ BarWidget {
     nowMs: root.nowMs
     summary: root.summary
     verifyingCandidate: root.collectorService ? root.collectorService.verifyingCandidate : false
+    healthy: root.healthyColor
+    warning: root.warningColor
     onRefreshRequested: root.requestCollection()
     onAutomationHistoryRequested: function(automationId) {
       root.openAutomationHistory(automationId)
