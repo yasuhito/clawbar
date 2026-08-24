@@ -609,7 +609,7 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(snapshot["fleet"], {"available": True, "nodes": []})
         self.assertEqual(snapshot["agents"], {"available": True, "items": []})
 
-    def test_executable_sanitizes_fleet_activity_and_task_results(self) -> None:
+    def test_executable_sanitizes_registered_agents_and_task_results(self) -> None:
         private_sentinels = [
             "PRIVATE-HOST",
             "PRIVATE-IP",
@@ -685,13 +685,13 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(len(set(node_keys)), 2)
         self.assertTrue(all(key.startswith("node:") for key in node_keys))
         by_name = {agent["name"]: agent for agent in snapshot["agents"]["items"]}
-        self.assertEqual(by_name["planner"]["activity"], "working")
+        self.assertNotIn("activity", by_name["planner"])
         self.assertEqual(by_name["planner"]["taskResult"]["state"], "failed")
-        self.assertEqual(by_name["builder"]["activity"], "waiting")
+        self.assertNotIn("activity", by_name["builder"])
         self.assertEqual(by_name["builder"]["taskResult"], {"state": "none"})
-        self.assertEqual(by_name["observer"]["activity"], "idle")
+        self.assertNotIn("activity", by_name["observer"])
         self.assertEqual(by_name["observer"]["taskResult"]["state"], "succeeded")
-        self.assertEqual(by_name["indexer"]["activity"], "idle")
+        self.assertNotIn("activity", by_name["indexer"])
         self.assertEqual(by_name["indexer"]["taskResult"], {"state": "none"})
         self.assertEqual(snapshot["gateway"], {"state": "healthy"})
         for sentinel in private_sentinels:

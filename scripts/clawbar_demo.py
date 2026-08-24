@@ -71,7 +71,7 @@ def reload_shell() -> None:
 SCENARIOS = (
     "setup-required",
     "healthy",
-    "working-agents",
+    "registered-agents",
     "unstable-gateway",
     "offline-gateway",
     "degraded-gateway",
@@ -123,26 +123,23 @@ def automation(
     }
 
 
-def working_agents(now: datetime) -> list[dict[str, Any]]:
+def registered_agents(now: datetime) -> list[dict[str, Any]]:
     return [
         {
             "key": "agent:demo-planner",
             "name": "Planner",
-            "activity": "working",
             "model": "Fictional model",
             "taskResult": {"state": "failed", "completedAt": timestamp(now, seconds=-540)},
         },
         {
             "key": "agent:demo-builder",
             "name": "Builder",
-            "activity": "waiting",
             "model": "Fictional model",
             "taskResult": {"state": "none"},
         },
         {
             "key": "agent:demo-observer",
             "name": "Observer",
-            "activity": "idle",
             "taskResult": {"state": "succeeded", "completedAt": timestamp(now, seconds=-240)},
         },
     ]
@@ -172,7 +169,7 @@ def healthy_snapshot(now: datetime) -> dict[str, Any]:
                 automation("archive", "Weekly archive", now, enabled=False),
             ],
         },
-        "bar": {"kind": "working_agents", "count": 0, "severity": "healthy"},
+        "bar": {"kind": "none", "count": 0, "severity": "healthy"},
         "lastSuccessAt": generated_at,
         "consecutiveFailures": 0,
     }
@@ -207,9 +204,8 @@ def snapshot_for(scenario: str, now: datetime) -> dict[str, Any]:
                 "guidance": "Choose a Tailscale device to verify as your OpenClaw Gateway.",
             },
         })
-    elif scenario == "working-agents":
-        snapshot["agents"]["items"] = working_agents(now)
-        snapshot["bar"] = {"kind": "working_agents", "count": 1, "severity": "healthy"}
+    elif scenario == "registered-agents":
+        snapshot["agents"]["items"] = registered_agents(now)
     elif scenario in {"unstable-gateway", "offline-gateway"}:
         previous = copy.deepcopy(snapshot)
         state = "unstable" if scenario == "unstable-gateway" else "offline"
@@ -252,7 +248,7 @@ def snapshot_for(scenario: str, now: datetime) -> dict[str, Any]:
     elif scenario == "empty-fleet":
         snapshot["fleet"] = {"available": True, "nodes": []}
     elif scenario == "grouped-incidents":
-        snapshot["agents"]["items"] = working_agents(now)
+        snapshot["agents"]["items"] = registered_agents(now)
         observed_at = snapshot["generatedAt"]
         snapshot["fleet"]["nodes"][1] = node("studio", "Studio", "offline", observed_at)
         snapshot["fleet"]["nodes"][2] = node("archive", "Archive", "offline", observed_at)

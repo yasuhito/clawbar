@@ -13,8 +13,7 @@ Item {
 
   Loader {
     anchors.centerIn: parent
-    sourceComponent: root.kind === "dotted" ? dotted
-      : root.kind === "ring" ? ring : circle
+    sourceComponent: root.kind === "dotted" ? dotted : circle
   }
 
   Component {
@@ -25,19 +24,6 @@ Item {
       height: width
       radius: width / 2
       color: root.color
-    }
-  }
-
-  Component {
-    id: ring
-
-    Rectangle {
-      width: Math.min(root.width, root.height) * 0.8
-      height: width
-      radius: width / 2
-      color: "transparent"
-      border.width: 1
-      border.color: root.color
     }
   }
 

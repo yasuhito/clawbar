@@ -16,7 +16,7 @@ PLUGIN_ID = "io.github.yasuhito.clawbar"
 DEMO_SCENARIOS = (
     "setup-required",
     "healthy",
-    "working-agents",
+    "registered-agents",
     "unstable-gateway",
     "offline-gateway",
     "degraded-gateway",
@@ -86,13 +86,14 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertNotIn("--automation-history", collector)
         self.assertNotIn("open_automation_history", collector)
 
-    def test_idle_agents_use_a_quiet_activity_ring(self) -> None:
+    def test_registered_agents_use_a_static_healthy_dot_without_activity_claims(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
-        point = (ROOT / "SignalPoint.qml").read_text(encoding="utf-8")
+        detail = (ROOT / "AgentDetailCard.qml").read_text(encoding="utf-8")
 
-        self.assertIn('root.kind === "ring" ? ring : circle', point)
-        self.assertIn('modelData.activity !== "idle"', panel)
-        self.assertIn("Accessible.description", panel)
+        self.assertIn('Logic.signalPresentation("healthy")', panel)
+        self.assertIn('Accessible.description: "Registered Agent"', panel)
+        self.assertNotIn("modelData.activity", panel)
+        self.assertNotIn('text: "Activity "', detail)
 
     def test_healthy_row_labels_are_visually_quiet_but_accessible(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
@@ -172,10 +173,10 @@ class MarketplaceContractTest(unittest.TestCase):
                     ):
                         self.assertNotIn(prohibited, serialized)
             healthy = dict(snapshots["healthy"])
-            working = dict(snapshots["working-agents"])
+            registered = dict(snapshots["registered-agents"])
             healthy.pop("demoScenario")
-            working.pop("demoScenario")
-            self.assertNotEqual(healthy, working)
+            registered.pop("demoScenario")
+            self.assertNotEqual(healthy, registered)
             grouped = snapshots["grouped-incidents"]
             self.assertEqual(grouped["bar"], {"kind": "attention", "count": 2, "severity": "critical"})
             self.assertEqual(

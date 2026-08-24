@@ -219,8 +219,7 @@ var SIGNAL_PRESENTATIONS = {
   no_data: { shape: "circle", tone: "warning", label: "No data yet" },
   starting: { shape: "circle", tone: "warning", label: "Starting" },
   unknown: { shape: "circle", tone: "warning", label: "Unavailable" },
-  disabled: { shape: "dotted", tone: "disabled", label: "Disabled" },
-  idle: { shape: "ring", tone: "idle", label: "Idle" }
+  disabled: { shape: "dotted", tone: "disabled", label: "Disabled" }
 }
 
 function signalPresentation(state) {
@@ -255,7 +254,7 @@ function signalColor(tone, foreground, accent, urgent, dim, healthy, warning) {
   if (tone === "critical") return urgent
   if (tone === "warning") return warning || accent
   if (tone === "working") return accent
-  if (tone === "disabled" || tone === "muted" || tone === "idle") return dim
+  if (tone === "disabled" || tone === "muted") return dim
   if (tone === "healthy" && healthy) return healthy
   return foreground
 }
@@ -344,7 +343,8 @@ function barSeverity(snapshot, state) {
 function barCount(snapshot, state) {
   if (state === "collecting" || state === "unknown" || state === "setup_required") return 0
   if (state === "stale" || state === "configuration_error") return 1
-  var count = snapshot && snapshot.bar ? Number(snapshot.bar.count) : 0
+  var count = snapshot && snapshot.bar && snapshot.bar.kind === "attention"
+    ? Number(snapshot.bar.count) : 0
   if (!isFinite(count) || count < 0) count = 0
   count = Math.floor(count)
   if (state === "no_data") return count

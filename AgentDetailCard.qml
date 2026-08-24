@@ -38,14 +38,6 @@ Item {
 
     Text {
       width: parent.width
-      text: "Activity " + Logic.signalPresentation(root.agent.activity).label
-      color: root.foreground
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.caption
-    }
-
-    Text {
-      width: parent.width
       text: {
         if (!root.taskResult || root.taskResult.state === "none") return "Task result None"
         return "Task result " + (root.taskResult.state === "succeeded" ? "Succeeded" : "Failed")

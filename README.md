@@ -74,9 +74,10 @@ Automations in independent sections because Gateway metadata establishes no
 Node ownership; an empty Agents section is omitted. Routine healthy Node and
 Automation rows omit the repeated `Healthy` label while retaining it for
 accessibility; exceptional and historical states remain explicit. A green
-`Healthy` indicator remains visible in the panel header. Agent Activity and the
-previous Task Result remain independent. Offline
-Nodes appear as muted Operational Metadata and do not affect Attention counts,
+`Healthy` indicator remains visible in the panel header. Registered Agents use
+a static green presence dot without claiming health or current activity;
+previous Task Result remains separate. Offline Nodes appear as muted Operational
+Metadata and do not affect Attention counts,
 Incidents, or notifications. Automation Failures appear once in the Automations
 section.
 
@@ -128,7 +129,7 @@ repeat for all twelve accepted states:
 ```sh
 python scripts/clawbar_demo.py setup-required
 python scripts/clawbar_demo.py healthy
-python scripts/clawbar_demo.py working-agents
+python scripts/clawbar_demo.py registered-agents
 python scripts/clawbar_demo.py unstable-gateway
 python scripts/clawbar_demo.py offline-gateway
 python scripts/clawbar_demo.py degraded-gateway

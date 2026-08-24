@@ -168,7 +168,7 @@ test("keyless Nodes never receive positional identity", () => {
   assert.equal(Logic.indexForKey(rows, ""), -1)
 })
 
-test("Agent Activity remains independent from previous Task Result", () => {
+test("registered Agents expose Task Result without claiming current Activity", () => {
   const completedAt = new Date(100000).toISOString()
   const snapshot = healthySnapshot(completedAt)
   snapshot.agents = {
@@ -176,17 +176,14 @@ test("Agent Activity remains independent from previous Task Result", () => {
     items: [
       {
         name: "planner",
-        activity: "working",
         taskResult: { state: "failed", completedAt }
       },
       {
         name: "observer",
-        activity: "idle",
         taskResult: { state: "succeeded", completedAt }
       },
       {
         name: "indexer",
-        activity: "idle",
         taskResult: { state: "none" }
       }
     ]
@@ -345,7 +342,7 @@ test("healthy row labels stay quiet while actionable states remain explicit", ()
   assert.equal(Logic.showAutomationStatusLabel({ enabled: true, lastResult: "ok" }, true), true)
 })
 
-test("bar uses Attention Items for critical Automation state and Working Agents otherwise", () => {
+test("bar uses Attention Items and ignores legacy Working Agent counts", () => {
   const snapshot = healthySnapshot(new Date(100000).toISOString())
   snapshot.bar = { kind: "attention", count: 2, severity: "critical" }
 
@@ -360,7 +357,7 @@ test("bar uses Attention Items for critical Automation state and Working Agents 
   snapshot.bar = { kind: "working_agents", count: 3, severity: "healthy" }
   assert.equal(Logic.snapshotState(snapshot, 100000), "healthy")
   assert.equal(Logic.barSeverity(snapshot, "healthy"), "healthy")
-  assert.equal(Logic.barCount(snapshot, "healthy"), 3)
+  assert.equal(Logic.barCount(snapshot, "healthy"), 0)
 })
 
 test("panel header rolls current Incidents above healthy Gateway state", () => {
@@ -431,13 +428,11 @@ test("signal semantics follow the prototype dot and color legend", () => {
     label: "Offline"
   })
   assert.deepEqual(Logic.signalPresentation("disabled"), { shape: "dotted", tone: "disabled", label: "Disabled" })
-  assert.deepEqual(Logic.signalPresentation("idle"), { shape: "ring", tone: "idle", label: "Idle" })
   assert.equal(Logic.signalColor("critical", "fg", "accent", "urgent", "dim"), "urgent")
   assert.equal(Logic.signalColor("warning", "fg", "accent", "urgent", "dim"), "accent")
   assert.equal(Logic.signalColor("working", "fg", "accent", "urgent", "dim"), "accent")
   assert.equal(Logic.signalColor("disabled", "fg", "accent", "urgent", "dim"), "dim")
   assert.equal(Logic.signalColor("muted", "fg", "accent", "urgent", "dim"), "dim")
-  assert.equal(Logic.signalColor("idle", "fg", "accent", "urgent", "dim"), "dim")
   assert.equal(Logic.signalColor("healthy", "fg", "accent", "urgent", "dim"), "fg")
   assert.equal(Logic.signalColor("healthy", "fg", "accent", "urgent", "dim", "green"), "green")
   assert.equal(Logic.signalColor("warning", "fg", "accent", "urgent", "dim", "green", "yellow"), "yellow")

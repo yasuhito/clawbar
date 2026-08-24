@@ -447,8 +447,7 @@ KeyboardPanel {
             required property int index
             readonly property var row: root.rows[root.candidates.length + root.nodes.length + index]
             readonly property bool selected: !!row && root.selectedKey === row.key
-            readonly property var signal: Logic.signalPresentation(modelData.activity)
-            readonly property bool showActivityText: root.historical || modelData.activity !== "idle"
+            readonly property var signal: Logic.signalPresentation("healthy")
             width: contentColumn.width
             height: agentSummary.height + (selected ? agentDetail.implicitHeight : 0)
             radius: Style.cornerRadius
@@ -457,7 +456,7 @@ KeyboardPanel {
             border.width: selected ? 1 : 0
             border.color: root.accent
             Accessible.name: modelData.name
-            Accessible.description: root.historical ? "Last known" : signal.label
+            Accessible.description: "Registered Agent"
 
             Item {
               id: agentSummary
@@ -481,7 +480,7 @@ KeyboardPanel {
                 id: agentName
                 anchors.left: parent.left
                 anchors.leftMargin: Style.space(26)
-                anchors.right: agentRow.showActivityText ? agentActivity.left : parent.right
+                anchors.right: parent.right
                 anchors.rightMargin: Style.space(8)
                 anchors.top: parent.top
                 anchors.topMargin: Style.space(6)
@@ -491,18 +490,6 @@ KeyboardPanel {
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body
                 font.bold: true
-              }
-
-              Text {
-                id: agentActivity
-                visible: agentRow.showActivityText
-                anchors.right: parent.right
-                anchors.rightMargin: Style.space(8)
-                anchors.verticalCenter: agentName.verticalCenter
-                text: root.historical ? "Last known" : agentRow.signal.label
-                color: root.historical ? root.dim : root.signalColor(agentRow.signal.tone)
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
               }
 
               Text {

@@ -88,12 +88,12 @@ _Avoid_: Task data, message data
 Task instructions, message bodies, destinations, account identifiers, and raw errors. Clawbar never persists or displays them.
 _Avoid_: Details, metadata
 
-**Agent Activity**:
-An Agent's present work state: Working, Waiting, or Idle. The supported Gateway metadata establishes no Node ownership, so Agents appear in an independent Agents section that is omitted when empty. Activity dots use an accent fill for Working, a warning fill for Waiting, and a muted ring for Idle; they do not claim Agent health. Selecting an Agent expands its Activity, Task Result, completion time, and observation time directly beneath the row. Waiting and Idle are not Incidents and remain independent of earlier Task Results.
-_Avoid_: Agent status
+**Registered Agent**:
+An Agent entry reported by the configured Gateway. Its static green dot confirms only that the registration was reported; it does not establish Agent health, online presence, or current activity. The supported Gateway metadata establishes no Node ownership, so Registered Agents appear in an independent Agents section that is omitted when empty. Selecting a Registered Agent expands its Task Result, completion time, and observation time directly beneath the row.
+_Avoid_: Agent Activity, Online Agent, Healthy Agent
 
 **Task Result**:
-The outcome and completion time of an Agent's most recently completed Task: Succeeded, Failed, or None. A Failed Task Result neither changes Agent Activity nor rolls up to Node or Gateway health.
+The outcome and completion time of a Registered Agent's most recently completed Task: Succeeded, Failed, or None. A Failed Task Result establishes neither Agent health nor current activity and does not roll up to Node or Gateway health.
 _Avoid_: Agent failure, Agent Activity
 
 **Attention Item**:

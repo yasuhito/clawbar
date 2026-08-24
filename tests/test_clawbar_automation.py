@@ -167,7 +167,7 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
                 self.assertEqual(snapshot["automations"], expected_automations)
                 self.assertEqual(snapshot["gateway"], expected_gateway)
                 expected_bar = (
-                    {"count": 0, "kind": "working_agents", "severity": "healthy"}
+                    {"count": 0, "kind": "none", "severity": "healthy"}
                     if name == "empty"
                     else {"count": 1, "kind": "attention", "severity": "warning"}
                 )
@@ -209,7 +209,7 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
             ],
         )
 
-    def test_healthy_bar_counts_working_agents(self) -> None:
+    def test_healthy_bar_does_not_count_running_agent_tasks(self) -> None:
         agents = {"agents": [{"id": "planner"}]}
         tasks = {"tasks": [{"agentId": "planner", "status": "running"}]}
 
@@ -219,7 +219,7 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
         )
 
         snapshot = json.loads(result.stdout)
-        self.assertEqual(snapshot["bar"], {"count": 1, "kind": "working_agents", "severity": "healthy"})
+        self.assertEqual(snapshot["bar"], {"count": 0, "kind": "none", "severity": "healthy"})
 
 
 if __name__ == "__main__":

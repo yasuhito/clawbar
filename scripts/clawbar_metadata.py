@@ -207,8 +207,6 @@ def sanitize_agents(agent_payload: object, task_payload: object) -> list[dict[st
             key=task_timestamp,
             reverse=True,
         )
-        statuses = [task.get("status") for task in own_tasks]
-        activity = "working" if "running" in statuses else "waiting" if "queued" in statuses else "idle"
         completed = next(
             (task for task in own_tasks if task.get("status") in {"completed", "failed", "timed_out", "cancelled"}),
             None,
@@ -222,7 +220,6 @@ def sanitize_agents(agent_payload: object, task_payload: object) -> list[dict[st
         agent = {
             "key": f"agent:{agent_id}",
             "name": agent_id,
-            "activity": activity,
             "taskResult": result,
         }
         model = bounded_text(raw.get("model"))
@@ -336,13 +333,12 @@ def build_current_snapshot(
         for automation in automation_items
     )
     attention_items = critical_items + (1 if degraded else 0)
-    working_agents = sum(agent.get("activity") == "working" for agent in (agents or []))
     if critical_items:
         bar = {"kind": "attention", "count": attention_items, "severity": "critical"}
     elif attention_items:
         bar = {"kind": "attention", "count": attention_items, "severity": "warning"}
     else:
-        bar = {"kind": "working_agents", "count": working_agents, "severity": "healthy"}
+        bar = {"kind": "none", "count": 0, "severity": "healthy"}
     automation_section: dict[str, Any] = {
         "available": automations is not None,
         "items": automation_items,
