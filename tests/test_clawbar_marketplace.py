@@ -86,14 +86,18 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertNotIn("--automation-history", collector)
         self.assertNotIn("open_automation_history", collector)
 
-    def test_selected_automation_details_expand_inside_the_row_delegate(self) -> None:
+    def test_selected_operational_rows_expand_details_inside_their_delegates(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
         section = (ROOT / "AutomationSection.qml").read_text(encoding="utf-8")
 
+        self.assertIn("NodeDetailCard {", panel)
+        self.assertIn("visible: nodeRow.selected", panel)
+        self.assertIn("AgentDetailCard {", panel)
+        self.assertIn("visible: agentRow.selected", panel)
         self.assertIn("AutomationDetailCard {", section)
         self.assertIn("visible: automationRow.selected", section)
-        self.assertIn('visible: root.selectedRow !== null && root.selectedRow.kind !== "automation"', panel)
-        self.assertNotIn("selectedCard.mapToItem", panel)
+        self.assertNotIn("id: selectedCard", panel)
+        self.assertNotIn("DetailCard", panel[panel.index("id: candidateRepeater"):panel.index('text: "FLEET"')])
 
     def test_demo_publishes_all_twelve_sanitized_scenarios(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

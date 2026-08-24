@@ -340,52 +340,73 @@ KeyboardPanel {
             readonly property bool offline: modelData.state === "offline"
             readonly property var signal: Logic.nodeSignalPresentation(modelData.state)
             width: contentColumn.width
-            height: Style.space(40)
+            height: nodeSummary.height + (selected ? nodeDetail.implicitHeight : 0)
             radius: Style.cornerRadius
             opacity: root.historical ? 0.55 : 1
             color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
             border.width: selected ? 1 : 0
             border.color: root.accent
 
-            MouseArea {
-              anchors.fill: parent
-              onClicked: root.selectRow(nodeRow.row)
+            Item {
+              id: nodeSummary
+              width: parent.width
+              height: Style.space(40)
+
+              MouseArea {
+                anchors.fill: parent
+                onClicked: root.selectRow(nodeRow.row)
+              }
+
+              SignalPoint {
+                anchors.left: parent.left
+                anchors.leftMargin: Style.space(9)
+                anchors.verticalCenter: nodeTitle.verticalCenter
+                kind: nodeRow.signal.shape
+                color: root.signalColor(nodeRow.signal.tone)
+              }
+
+              Text {
+                id: nodeTitle
+                anchors.left: parent.left
+                anchors.leftMargin: Style.space(26)
+                anchors.right: nodeState.left
+                anchors.rightMargin: Style.space(8)
+                anchors.verticalCenter: parent.verticalCenter
+                text: nodeRow.modelData.name
+                elide: Text.ElideRight
+                color: nodeRow.offline ? root.dim : root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                font.bold: !nodeRow.offline
+              }
+
+              Text {
+                id: nodeState
+                anchors.right: parent.right
+                anchors.rightMargin: Style.space(8)
+                anchors.verticalCenter: nodeTitle.verticalCenter
+                text: root.historical ? "Last known" : nodeRow.signal.label
+                color: root.historical ? root.dim : root.signalColor(nodeRow.signal.tone)
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+              }
             }
 
-            SignalPoint {
+            NodeDetailCard {
+              id: nodeDetail
+              visible: nodeRow.selected
               anchors.left: parent.left
-              anchors.leftMargin: Style.space(9)
-              anchors.verticalCenter: nodeTitle.verticalCenter
-              kind: nodeRow.signal.shape
-              color: root.signalColor(nodeRow.signal.tone)
-            }
-
-            Text {
-              id: nodeTitle
-              anchors.left: parent.left
-              anchors.leftMargin: Style.space(26)
-              anchors.right: nodeState.left
-              anchors.rightMargin: Style.space(8)
-              anchors.verticalCenter: parent.verticalCenter
-              text: nodeRow.modelData.name
-              elide: Text.ElideRight
-              color: nodeRow.offline ? root.dim : root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              font.bold: !nodeRow.offline
-            }
-
-            Text {
-              id: nodeState
               anchors.right: parent.right
-              anchors.rightMargin: Style.space(8)
-              anchors.verticalCenter: nodeTitle.verticalCenter
-              text: root.historical ? "Last known" : nodeRow.signal.label
-              color: root.historical ? root.dim : root.signalColor(nodeRow.signal.tone)
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
+              anchors.top: nodeSummary.bottom
+              height: implicitHeight
+              node: nodeRow.modelData
+              observedAt: nodeRow.row ? nodeRow.row.observedAt : ""
+              historical: root.historical
+              nowMs: root.nowMs
+              foreground: root.foreground
+              dim: root.dim
+              fontFamily: root.fontFamily
             }
-
           }
         }
 
@@ -424,67 +445,90 @@ KeyboardPanel {
             readonly property bool selected: !!row && root.selectedKey === row.key
             readonly property var signal: Logic.signalPresentation(modelData.activity)
             width: contentColumn.width
-            height: Style.space(48)
+            height: agentSummary.height + (selected ? agentDetail.implicitHeight : 0)
             radius: Style.cornerRadius
             opacity: root.historical ? 0.55 : 1
             color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
             border.width: selected ? 1 : 0
             border.color: root.accent
 
-            MouseArea {
-              anchors.fill: parent
-              onClicked: root.selectRow(agentRow.row)
+            Item {
+              id: agentSummary
+              width: parent.width
+              height: Style.space(48)
+
+              MouseArea {
+                anchors.fill: parent
+                onClicked: root.selectRow(agentRow.row)
+              }
+
+              SignalPoint {
+                anchors.left: parent.left
+                anchors.leftMargin: Style.space(9)
+                anchors.verticalCenter: agentName.verticalCenter
+                kind: agentRow.signal.shape
+                color: root.signalColor(agentRow.signal.tone)
+              }
+
+              Text {
+                id: agentName
+                anchors.left: parent.left
+                anchors.leftMargin: Style.space(26)
+                anchors.right: agentActivity.left
+                anchors.rightMargin: Style.space(8)
+                anchors.top: parent.top
+                anchors.topMargin: Style.space(6)
+                text: agentRow.modelData.name
+                elide: Text.ElideRight
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                font.bold: true
+              }
+
+              Text {
+                id: agentActivity
+                anchors.right: parent.right
+                anchors.rightMargin: Style.space(8)
+                anchors.verticalCenter: agentName.verticalCenter
+                text: root.historical ? "Last known" : agentRow.signal.label
+                color: root.historical ? root.dim : root.signalColor(agentRow.signal.tone)
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+
+              Text {
+                anchors.left: agentName.left
+                anchors.right: parent.right
+                anchors.rightMargin: Style.space(8)
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: Style.space(6)
+                text: Logic.taskResultLabel(agentRow.modelData.taskResult, root.nowMs)
+                elide: Text.ElideRight
+                color: agentRow.modelData.taskResult
+                  && agentRow.modelData.taskResult.state === "failed" ? root.urgent : root.dim
+                font.bold: !!agentRow.modelData.taskResult
+                  && agentRow.modelData.taskResult.state === "failed"
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+              }
             }
 
-            SignalPoint {
+            AgentDetailCard {
+              id: agentDetail
+              visible: agentRow.selected
               anchors.left: parent.left
-              anchors.leftMargin: Style.space(9)
-              anchors.verticalCenter: agentName.verticalCenter
-              kind: agentRow.signal.shape
-              color: root.signalColor(agentRow.signal.tone)
-            }
-
-            Text {
-              id: agentName
-              anchors.left: parent.left
-              anchors.leftMargin: Style.space(26)
-              anchors.right: agentActivity.left
-              anchors.rightMargin: Style.space(8)
-              anchors.top: parent.top
-              anchors.topMargin: Style.space(6)
-              text: agentRow.modelData.name
-              elide: Text.ElideRight
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              font.bold: true
-            }
-
-            Text {
-              id: agentActivity
               anchors.right: parent.right
-              anchors.rightMargin: Style.space(8)
-              anchors.verticalCenter: agentName.verticalCenter
-              text: root.historical ? "Last known" : agentRow.signal.label
-              color: root.historical ? root.dim : root.signalColor(agentRow.signal.tone)
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-
-            Text {
-              anchors.left: agentName.left
-              anchors.right: parent.right
-              anchors.rightMargin: Style.space(8)
-              anchors.bottom: parent.bottom
-              anchors.bottomMargin: Style.space(6)
-              text: Logic.taskResultLabel(agentRow.modelData.taskResult, root.nowMs)
-              elide: Text.ElideRight
-              color: agentRow.modelData.taskResult
-                && agentRow.modelData.taskResult.state === "failed" ? root.urgent : root.dim
-              font.bold: !!agentRow.modelData.taskResult
-                && agentRow.modelData.taskResult.state === "failed"
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
+              anchors.top: agentSummary.bottom
+              height: implicitHeight
+              agent: agentRow.modelData
+              observedAt: agentRow.row ? agentRow.row.observedAt : ""
+              historical: root.historical
+              nowMs: root.nowMs
+              foreground: root.foreground
+              dim: root.dim
+              urgent: root.urgent
+              fontFamily: root.fontFamily
             }
           }
         }
@@ -510,45 +554,6 @@ KeyboardPanel {
           onRowSelected: function(row) {
             root.selectRow(row)
           }
-        }
-
-        Rectangle {
-          id: selectedCard
-          visible: root.selectedRow !== null && root.selectedRow.kind !== "automation"
-          width: parent.width
-          height: selectedDetail.implicitHeight + Style.space(16)
-          radius: Style.cornerRadius
-          color: Style.selectedFillFor(root.foreground, Color.popups.background)
-
-          Text {
-            id: selectedDetail
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.margins: Style.space(8)
-            text: {
-              if (!root.selectedRow) return ""
-              var prefix = root.selectedRow.historical
-                ? "Last known · " + Logic.relativeTime(root.selectedRow.observedAt, root.nowMs) + "\n"
-                : ""
-              if (root.selectedRow.kind === "candidate")
-                return "Gateway candidate · " + root.selectedRow.item.name
-                  + (root.verifyingCandidate ? "\nVerifying supported read-only Gateway JSON…" : "\nPress Enter to verify")
-              var absolute = Logic.absoluteLocalTime(root.selectedRow.timestamp)
-              var heading = prefix + root.selectedRow.typeLabel + " · " + root.selectedRow.item.name
-              var observation = absolute
-                ? "Observed " + absolute
-                : root.selectedRow.missingTimestampLabel
-              if (root.selectedRow.kind === "node")
-                return [heading, Logic.nodeMetadataLabel(root.selectedRow.item), observation].join("\n")
-              return heading + "\n" + observation
-            }
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            wrapMode: Text.Wrap
-          }
-
         }
 
       }

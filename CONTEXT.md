@@ -41,7 +41,7 @@ An operational unit managed and reported by the configured Gateway. Clawbar does
 _Avoid_: Gateway, Gateway Target, host, machine
 
 **Node UI Key**:
-A local opaque identifier derived with Clawbar's local secret from the Node identity used by the Fleet UI. It preserves selection across reordered Fleet snapshots and replacement registrations. Node rows do not expand; the selected Node's platform, model, version, and observation time appear in the shared selection card. When the Gateway reports several registrations with the same Node display name, Clawbar keeps the freshest connected registration, so one physical Node is not repeated; neither private identifiers nor the secret enter the snapshot. If Clawbar cannot derive every Node UI Key, Fleet metadata is unavailable.
+A local opaque identifier derived with Clawbar's local secret from the Node identity used by the Fleet UI. It preserves selection across reordered Fleet snapshots and replacement registrations. The selected Node's platform, model, version, and observation time expand directly beneath its row. When the Gateway reports several registrations with the same Node display name, Clawbar keeps the freshest connected registration, so one physical Node is not repeated; neither private identifiers nor the secret enter the snapshot. If Clawbar cannot derive every Node UI Key, Fleet metadata is unavailable.
 _Avoid_: Node ID, instance ID, positional index
 
 **Fleet**:
@@ -89,7 +89,7 @@ Task instructions, message bodies, destinations, account identifiers, and raw er
 _Avoid_: Details, metadata
 
 **Agent Activity**:
-An Agent's present work state: Working, Waiting, or Idle. The supported Gateway metadata establishes no Node ownership, so Agents appear in an independent Agents section that is omitted when empty. Waiting and Idle are not Incidents and remain independent of earlier Task Results.
+An Agent's present work state: Working, Waiting, or Idle. The supported Gateway metadata establishes no Node ownership, so Agents appear in an independent Agents section that is omitted when empty. Selecting an Agent expands its Activity, Task Result, completion time, and observation time directly beneath the row. Waiting and Idle are not Incidents and remain independent of earlier Task Results.
 _Avoid_: Agent status
 
 **Task Result**:
