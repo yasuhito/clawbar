@@ -9,6 +9,10 @@ from tests.collector_fixture import CollectorFixture
 
 
 class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
+    assets_directory = Path(clawbar_incidents.__file__).resolve().parent.parent / "assets"
+    incident_icon = str(assets_directory / "clawbar-incident.svg")
+    recovered_icon = str(assets_directory / "clawbar-recovered.svg")
+
     def collect(
         self,
         *,
@@ -81,7 +85,8 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
                     [
                         "--app-name=Clawbar",
                         "--urgency=critical",
-                        "Clawbar: Incident started",
+                        f"--app-icon={self.incident_icon}",
+                        "Incident detected",
                         expected_body,
                     ],
                 )
@@ -136,7 +141,7 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
 
         notifications = self.read_notifications()
         self.assertEqual(len(notifications), 1)
-        self.assertIn("Clawbar: Incident started", notifications[0])
+        self.assertIn("Incident detected", notifications[0])
 
 
     def test_no_data_does_not_repeat_a_still_current_incident(self) -> None:
@@ -163,7 +168,8 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
             [[
                 "--app-name=Clawbar",
                 "--urgency=critical",
-                "Clawbar: 2 Incidents started",
+                f"--app-icon={self.incident_icon}",
+                "2 incidents detected",
                 "Morning review: Automation Failure; Nightly sync: Automation Failure",
             ]],
         )
@@ -225,10 +231,37 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
             [
                 "--app-name=Clawbar",
                 "--urgency=normal",
-                "Clawbar: 2 Incidents recovered",
+                f"--app-icon={self.recovered_icon}",
+                "2 incidents resolved",
                 "Morning review: Recovered; Nightly sync: Recovered",
             ],
         )
+
+    def test_notification_icons_are_self_contained_plugin_assets(self) -> None:
+        for icon_path, status_color in (
+            (Path(self.incident_icon), "#e5484d"),
+            (Path(self.recovered_icon), "#2f9e44"),
+        ):
+            with self.subTest(icon=icon_path.name):
+                svg = icon_path.read_text(encoding="utf-8").lower()
+                self.assertTrue(icon_path.is_file())
+                self.assertIn("<svg", svg)
+                self.assertIn(status_color, svg)
+                self.assertIn(
+                    "m8.2 10 a5.2 5.2 0 1 0 8.2 20.4",
+                    svg,
+                )
+                self.assertIn("m5.6 12.2 c5.2 5.6 10.4 1.4 15.6 2", svg)
+                self.assertIn("openclaw's canonical chat working claw", svg)
+                self.assertIn('transform="rotate(-10 8.6 11)"', svg)
+                self.assertNotIn("href=", svg)
+
+        recovery_arguments = clawbar_incidents.notification_arguments(
+            [{"label": "Morning review", "state": "Recovered"}],
+            recovered=True,
+        )
+        self.assertEqual(recovery_arguments[-2], "Incident resolved")
+        self.assertEqual(recovery_arguments[2], f"--app-icon={self.recovered_icon}")
 
     def test_removed_target_ends_monitoring_without_recovery(self) -> None:
         self.collect(automations=[self.automation()])

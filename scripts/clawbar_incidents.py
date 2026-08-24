@@ -16,6 +16,7 @@ else:
 INCIDENT_STATE_SCHEMA_VERSION = 1
 NOTIFICATION_TIMEOUT_SECONDS = 0.25
 MAX_NOTIFICATION_DETAILS = 3
+NOTIFICATION_ASSETS_DIRECTORY = Path(__file__).resolve().parent.parent / "assets"
 
 
 def default_incident_state_path() -> Path | None:
@@ -107,17 +108,19 @@ def reconcile_incidents(
 def notification_arguments(changes: list[dict[str, str]], *, recovered: bool) -> list[str]:
     count = len(changes)
     noun = "Incident" if count == 1 else "Incidents"
-    action = "recovered" if recovered else "started"
+    action = "resolved" if recovered else "detected"
     urgency = "normal" if recovered else "critical"
     body_parts = [
         f"{change['label']}: {change['state']}" for change in changes[:MAX_NOTIFICATION_DETAILS]
     ]
     if count > MAX_NOTIFICATION_DETAILS:
         body_parts.append(f"+{count - MAX_NOTIFICATION_DETAILS} more")
+    icon_name = "clawbar-recovered.svg" if recovered else "clawbar-incident.svg"
     return [
         "--app-name=Clawbar",
         f"--urgency={urgency}",
-        f"Clawbar: {'' if count == 1 else f'{count} '}{noun} {action}",
+        f"--app-icon={NOTIFICATION_ASSETS_DIRECTORY / icon_name}",
+        f"{'' if count == 1 else f'{count} '}{noun.lower() if count > 1 else noun} {action}",
         "; ".join(body_parts),
     ]
 

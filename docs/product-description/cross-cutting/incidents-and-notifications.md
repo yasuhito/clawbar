@@ -6,7 +6,7 @@ Clawbar distinguishes visible Attention Items from notification-producing Incide
 
 ## The simple case
 
-A healthy Automation starts failing. The next successful collection makes its row critical, increments the bar Attention count once, and sends `Clawbar: Incident started` with `{Automation name}: Automation Failure`.
+A healthy Automation starts failing. The next successful collection makes its row critical, increments the bar Attention count once, and sends `Incident detected` with a Clawbar incident icon and `{Automation name}: Automation Failure`.
 
 Further failing collections stay quiet. When the same enabled Automation later reports a non-error result, Clawbar sends one recovery notification and removes that Incident.
 
@@ -41,7 +41,7 @@ Simultaneous starts or recoveries are grouped. The body includes at most three `
 
 ### Settled
 
-Starts use critical urgency; recoveries use normal urgency. A removed or disabled Automation ends monitoring silently rather than claiming recovery. Gateway Setup Required also drops Gateway monitoring without recovery.
+Starts use critical urgency and the two-path claw shown beside elapsed time in OpenClaw chat, with a red warning badge at its lower-left edge. Their concise title says `Incident detected`, or `{N} incidents detected` when grouped. Recoveries use normal urgency and the same mark with a green completion badge; their title says `Incident resolved` or `{N} incidents resolved`. Placing the badge opposite the claw tip keeps the mark's rightward direction readable toward the notification text. The notification app name remains `Clawbar`, while the visible title omits the redundant `Clawbar:` prefix. A removed or disabled Automation ends monitoring silently rather than claiming recovery. Gateway Setup Required also drops Gateway monitoring without recovery.
 
 ## Variants
 
@@ -75,7 +75,7 @@ Starts use critical urgency; recoveries use normal urgency. A removed or disable
 
 **Notifications and Incidents.** This document owns start, continuation, grouping, recovery, silent unmonitoring, urgency, detail limit, and per-login deduplication.
 
-**Theme and accessibility.** Desktop notification rendering belongs to the environment; panel and bar retain explicit state if notifications are unavailable.
+**Theme and accessibility.** Notification icons are self-contained plugin assets rather than theme icon names, so their source and state remain recognizable across icon themes and notification history. The visible title and body still carry explicit state text; panel and bar retain explicit state if notifications are unavailable.
 
 **Plugin lifecycle.** Incident state is under `XDG_RUNTIME_DIR`, so a new login can notify an already current Incident once again. Disable/removal stops later reconciliation.
 

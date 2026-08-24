@@ -46,6 +46,6 @@ The Python collector fixtures and JavaScript tests can establish failure counts,
 
 ## Results so far
 
-No hand-verification pass has been completed. On 2026-08-24, the source-derived checks passed against the described implementation: 72 Python tests, 20 JavaScript presentation tests, `git diff --check`, and the product-description link checker (30 files, 158 relative links, no broken links). These checks support drafting but do not verify the running interface.
+No complete hand-verification pass has been completed. On 2026-08-25, the source-derived checks passed against the described implementation: 76 Python tests, 23 JavaScript presentation tests, `git diff --check`, `qmllint`, Omarchy plugin validation, and the product-description link checker (30 files, 158 relative links, no broken links). These checks support drafting but do not replace a complete running-interface verification pass.
 
 An Omarchy Shell process and Clawbar Snapshot were present, but native interaction could not be authorized: the available computer-use driver refused its inspection tool because that tool had no reviewed risk classification. No pointer, keyboard, tooltip, focus, accessibility-tree, theme, notification, or lifecycle claim was therefore marked as observed. All Result cells remain `—`, every feature document remains `drafted`, and the entries in `bug-triage.md` are code-supported but unconfirmed in the running product.

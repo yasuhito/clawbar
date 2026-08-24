@@ -52,6 +52,29 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("color: root.barSignalColor", widget)
         self.assertNotIn("String(root.barCount)", widget)
 
+    def test_bar_icon_uses_openclaw_right_claw_with_contextual_motion(self) -> None:
+        widget = (ROOT / "Clawbar.qml").read_text(encoding="utf-8")
+        mark = (ROOT / "ClawMark.qml").read_text(encoding="utf-8")
+        service = (ROOT / "ClawbarService.qml").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "M8.2 10 A5.2 5.2 0 1 0 8.2 20.4",
+            mark,
+        )
+        self.assertIn("M5.6 12.2 C5.2 5.6 10.4 1.4 15.6 2", mark)
+        self.assertIn("icons-tools.ts", mark)
+        self.assertIn("property real jawAngle: -10", mark)
+        self.assertIn("origin.x: 8.6", mark)
+        self.assertIn("origin.y: 11", mark)
+        self.assertIn("property bool animated: false", mark)
+        self.assertIn("loops: Animation.Infinite", mark)
+        self.assertIn('property: "jawAngle"; to: -26; duration: 96', mark)
+        self.assertIn('property: "jawAngle"; to: 4; duration: 144', mark)
+        self.assertIn("PauseAnimation { duration: 1392 }", mark)
+        self.assertIn("button.tooltipHovered", widget)
+        self.assertIn("collectorService.collecting", widget)
+        self.assertIn("readonly property bool collecting:", service)
+
     def test_panel_omits_the_rejected_shortcut_footer(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
 
@@ -128,6 +151,22 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("visible: automationRow.selected", section)
         self.assertNotIn("id: selectedCard", panel)
         self.assertNotIn("DetailCard", panel[panel.index("id: candidateRepeater"):panel.index('text: "FLEET"')])
+
+    def test_operational_details_use_compact_single_line_timestamps(self) -> None:
+        details = "\n".join(
+            (ROOT / path).read_text(encoding="utf-8")
+            for path in (
+                "NodeDetailCard.qml",
+                "AgentDetailCard.qml",
+                "AutomationDetailCard.qml",
+            )
+        )
+
+        self.assertIn("Logic.compactAbsoluteLocalTime", details)
+        self.assertNotIn("wrapMode: Text.Wrap", details)
+        self.assertIn("wrapMode: Text.NoWrap", details)
+        self.assertIn("elide: Text.ElideRight", details)
+        self.assertIn("Accessible.description", details)
 
     def test_demo_publishes_all_twelve_sanitized_scenarios(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -267,8 +306,10 @@ class MarketplaceContractTest(unittest.TestCase):
                 for line in notification_log.read_text(encoding="utf-8").splitlines()
             ]
             self.assertEqual(len(notifications), 2)
-            self.assertIn("2 Incidents started", notifications[0][2])
-            self.assertIn("2 Incidents recovered", notifications[1][2])
+            self.assertTrue(notifications[0][2].endswith("/assets/clawbar-incident.svg"))
+            self.assertEqual(notifications[0][3], "2 incidents detected")
+            self.assertTrue(notifications[1][2].endswith("/assets/clawbar-recovered.svg"))
+            self.assertEqual(notifications[1][3], "2 incidents resolved")
 
             serialized = (root / "state" / "clawbar" / "snapshot.json").read_text(encoding="utf-8")
             for prohibited in (
