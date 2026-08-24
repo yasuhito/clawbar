@@ -2,7 +2,7 @@
 
 ## Summary
 
-Clawbar follows Omarchy Shell typography, spacing, popup sizing, selected fill, foreground, accent, urgent, and muted colors. It supplements color with signal shape, state text, tooltip summaries, historical labels, timestamps, keyboard navigation, and selected borders.
+Clawbar follows Omarchy Shell typography, spacing, popup sizing, selected fill, foreground, accent, urgent, and muted colors. It adjusts secondary and semantic colors toward the theme foreground only when needed to preserve readable contrast on normal and selected surfaces. It supplements color with signal shape, state text, tooltip summaries, historical labels, timestamps, keyboard navigation, and selected borders.
 
 ## The simple case
 
@@ -35,7 +35,7 @@ No accessibility Action requires Gateway response. Theme reload and Snapshot cha
 
 ### While waiting
 
-Selected rows remain identified by fill and border. Historical rows use reduced opacity plus text. Long names and statuses elide within bounded row widths; detail text wraps.
+Selected rows remain identified by fill and border. Unselected historical rows use reduced opacity plus text; a selected historical row restores text opacity for readability while retaining explicit Last known wording, age, and the panel-level stale state. Long names and statuses elide within bounded row widths; detail text wraps.
 
 ### Settled
 

@@ -101,6 +101,8 @@ class MarketplaceContractTest(unittest.TestCase):
 
         self.assertIn("Logic.readableColor(rawDim, foreground, panelSurface, 4.5)", panel)
         self.assertIn("readonly property color selectedDim", panel)
+        self.assertIn("nodeRow.selected ? root.selectedSignalColor", panel)
+        self.assertIn(': root.signalColor("critical")', panel)
         self.assertIn("root.selectedDim", panel)
         self.assertIn("required property color selectedDim", section)
         self.assertIn("root.selectedDim", section)

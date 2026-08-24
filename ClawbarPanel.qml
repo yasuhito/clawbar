@@ -377,7 +377,8 @@ KeyboardPanel {
                 anchors.leftMargin: Style.space(9)
                 anchors.verticalCenter: nodeTitle.verticalCenter
                 kind: nodeRow.signal.shape
-                color: root.signalColor(nodeRow.signal.tone)
+                color: nodeRow.selected ? root.selectedSignalColor(nodeRow.signal.tone)
+                  : root.signalColor(nodeRow.signal.tone)
               }
 
               Text {
@@ -516,7 +517,8 @@ KeyboardPanel {
                 elide: Text.ElideRight
                 color: agentRow.modelData.taskResult
                   && agentRow.modelData.taskResult.state === "failed"
-                    ? (agentRow.selected ? root.selectedSignalColor("critical") : root.urgent)
+                    ? (agentRow.selected ? root.selectedSignalColor("critical")
+                      : root.signalColor("critical"))
                     : (agentRow.selected ? root.selectedDim : root.dim)
                 font.bold: !!agentRow.modelData.taskResult
                   && agentRow.modelData.taskResult.state === "failed"
