@@ -89,7 +89,7 @@ Task instructions, message bodies, destinations, account identifiers, and raw er
 _Avoid_: Details, metadata
 
 **Agent Activity**:
-An Agent's present work state: Working, Waiting, or Idle. The supported Gateway metadata establishes no Node ownership, so Agents appear in an independent Agents section that is omitted when empty. Selecting an Agent expands its Activity, Task Result, completion time, and observation time directly beneath the row. Waiting and Idle are not Incidents and remain independent of earlier Task Results.
+An Agent's present work state: Working, Waiting, or Idle. The supported Gateway metadata establishes no Node ownership, so Agents appear in an independent Agents section that is omitted when empty. Activity dots use an accent fill for Working, a warning fill for Waiting, and a muted ring for Idle; they do not claim Agent health. Selecting an Agent expands its Activity, Task Result, completion time, and observation time directly beneath the row. Waiting and Idle are not Incidents and remain independent of earlier Task Results.
 _Avoid_: Agent status
 
 **Task Result**:

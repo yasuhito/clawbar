@@ -220,7 +220,7 @@ var SIGNAL_PRESENTATIONS = {
   starting: { shape: "circle", tone: "warning", label: "Starting" },
   unknown: { shape: "circle", tone: "warning", label: "Unavailable" },
   disabled: { shape: "dotted", tone: "disabled", label: "Disabled" },
-  idle: { shape: "none", tone: "idle", label: "" }
+  idle: { shape: "ring", tone: "idle", label: "Idle" }
 }
 
 function signalPresentation(state) {
@@ -255,7 +255,7 @@ function signalColor(tone, foreground, accent, urgent, dim, healthy, warning) {
   if (tone === "critical") return urgent
   if (tone === "warning") return warning || accent
   if (tone === "working") return accent
-  if (tone === "disabled" || tone === "muted") return dim
+  if (tone === "disabled" || tone === "muted" || tone === "idle") return dim
   if (tone === "healthy" && healthy) return healthy
   return foreground
 }

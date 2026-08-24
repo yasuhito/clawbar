@@ -86,6 +86,14 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertNotIn("--automation-history", collector)
         self.assertNotIn("open_automation_history", collector)
 
+    def test_idle_agents_use_a_quiet_activity_ring(self) -> None:
+        panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
+        point = (ROOT / "SignalPoint.qml").read_text(encoding="utf-8")
+
+        self.assertIn('root.kind === "ring" ? ring : circle', point)
+        self.assertIn('modelData.activity !== "idle"', panel)
+        self.assertIn("Accessible.description", panel)
+
     def test_healthy_row_labels_are_visually_quiet_but_accessible(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
         section = (ROOT / "AutomationSection.qml").read_text(encoding="utf-8")
