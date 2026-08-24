@@ -46,7 +46,7 @@ This section starts with facts established during scope and grows as foundations
 - One failed collection after prior success produces Unstable Gateway; two consecutive failures produce Offline Gateway. An initial failure with no prior success produces No data.
 - Gateway Setup Required is warning-colored but is not an Incident and contributes zero Attention Items.
 - Offline Node is muted Operational Metadata, not an Attention Item or Incident.
-- Registered Agent and Task Result are independent; neither claims current Agent Activity.
+- Registered Agent and Task Result are independent; neither claims current activity.
 - Automations are independent of Nodes. An enabled Automation Failure creates one Attention Item; disabled or skipped Automations do not.
 - The panel has one selection across Gateway candidates, Nodes, Agents, and Automations. Stable keys retain selection across reordered snapshots; if the selected row disappears, selection stays near its prior index.
 - The documents use `Gateway`, `Gateway Target`, `Fleet`, `Node`, `Registered Agent`, `Task Result`, `Automation`, `Attention Item`, `Incident`, `Operational Metadata`, and `Private Content` as defined in the glossary and source `CONTEXT.md`.

@@ -205,7 +205,7 @@ function timeUntil(value, nowMilliseconds) {
 var SIGNAL_PRESENTATIONS = {
   healthy: { shape: "circle", tone: "healthy", label: "Healthy" },
   succeeded: { shape: "circle", tone: "healthy", label: "Succeeded" },
-  working: { shape: "circle", tone: "working", label: "Working" },
+  registered_agent: { shape: "circle", tone: "registered", label: "Registered Agent" },
   waiting: { shape: "circle", tone: "warning", label: "Waiting" },
   failed: { shape: "circle", tone: "critical", label: "Failed" },
   offline: { shape: "circle", tone: "critical", label: "Offline" },
@@ -253,7 +253,7 @@ function configurationGuidance(state) {
 function signalColor(tone, foreground, accent, urgent, dim, healthy, warning) {
   if (tone === "critical") return urgent
   if (tone === "warning") return warning || accent
-  if (tone === "working") return accent
+  if (tone === "registered") return healthy || foreground
   if (tone === "disabled" || tone === "muted") return dim
   if (tone === "healthy" && healthy) return healthy
   return foreground

@@ -86,11 +86,11 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertNotIn("--automation-history", collector)
         self.assertNotIn("open_automation_history", collector)
 
-    def test_registered_agents_use_a_static_healthy_dot_without_activity_claims(self) -> None:
+    def test_registered_agents_use_a_static_green_dot_without_activity_claims(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
         detail = (ROOT / "AgentDetailCard.qml").read_text(encoding="utf-8")
 
-        self.assertIn('Logic.signalPresentation("healthy")', panel)
+        self.assertIn('Logic.signalPresentation("registered_agent")', panel)
         self.assertIn('Accessible.description: "Registered Agent"', panel)
         self.assertNotIn("modelData.activity", panel)
         self.assertNotIn('text: "Activity "', detail)

@@ -447,7 +447,7 @@ KeyboardPanel {
             required property int index
             readonly property var row: root.rows[root.candidates.length + root.nodes.length + index]
             readonly property bool selected: !!row && root.selectedKey === row.key
-            readonly property var signal: Logic.signalPresentation("healthy")
+            readonly property var signal: Logic.signalPresentation("registered_agent")
             width: contentColumn.width
             height: agentSummary.height + (selected ? agentDetail.implicitHeight : 0)
             radius: Style.cornerRadius

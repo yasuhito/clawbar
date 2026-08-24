@@ -69,7 +69,7 @@ Detail states Task Result without claiming current activity. `None` means no pre
 
 **Selection and navigation.** Agent rows follow Nodes and precede Automations. Empty Agents add no heading or rows.
 
-**Notifications and Incidents.** Registered Agents and Failed Task Results are not Attention Items or Incidents. The bar does not count Working Agents.
+**Notifications and Incidents.** Registered Agents and Failed Task Results are not Attention Items or Incidents. The bar does not derive a count from Agent registrations or Task execution.
 
 **Theme and accessibility.** Each current Registered Agent uses a static green dot. Its accessible description says `Registered Agent`; the dot does not mean Healthy or Online. Failed result uses urgent color and bold text.
 

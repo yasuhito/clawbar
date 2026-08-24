@@ -52,7 +52,7 @@ test("first collection exposes Collecting then No data yet", () => {
 test("stale and failed collections render retained rows as historical", () => {
   const observedAt = new Date(100000).toISOString()
   const fleet = { available: true, nodes: [{ key: "node:old", name: "studio", state: "offline" }] }
-  const agents = { available: true, items: [{ key: "agent:old", name: "planner", activity: "working" }] }
+  const agents = { available: true, items: [{ key: "agent:old", name: "planner" }] }
   const automations = {
     available: true,
     items: [{ id: "cron-old", name: "Morning review", enabled: true, lastResult: "error" }]
@@ -410,7 +410,6 @@ test("signal semantics follow the prototype dot and color legend", () => {
   for (const [state, tone, label] of [
     ["healthy", "healthy", "Healthy"],
     ["succeeded", "healthy", "Succeeded"],
-    ["working", "working", "Working"],
     ["waiting", "warning", "Waiting"],
     ["failed", "critical", "Failed"],
     ["offline", "critical", "Offline"],
@@ -427,10 +426,15 @@ test("signal semantics follow the prototype dot and color legend", () => {
     tone: "muted",
     label: "Offline"
   })
+  assert.deepEqual(Logic.signalPresentation("registered_agent"), {
+    shape: "circle",
+    tone: "registered",
+    label: "Registered Agent"
+  })
   assert.deepEqual(Logic.signalPresentation("disabled"), { shape: "dotted", tone: "disabled", label: "Disabled" })
   assert.equal(Logic.signalColor("critical", "fg", "accent", "urgent", "dim"), "urgent")
   assert.equal(Logic.signalColor("warning", "fg", "accent", "urgent", "dim"), "accent")
-  assert.equal(Logic.signalColor("working", "fg", "accent", "urgent", "dim"), "accent")
+  assert.equal(Logic.signalColor("registered", "fg", "accent", "urgent", "dim", "green"), "green")
   assert.equal(Logic.signalColor("disabled", "fg", "accent", "urgent", "dim"), "dim")
   assert.equal(Logic.signalColor("muted", "fg", "accent", "urgent", "dim"), "dim")
   assert.equal(Logic.signalColor("healthy", "fg", "accent", "urgent", "dim"), "fg")

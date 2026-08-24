@@ -62,7 +62,7 @@ If all rows disappear, selection clears. When rows later return, the retained in
 
 Selection, not an independent disclosure control, determines detail. There is no separate expanded/collapsed state for each row. Selecting a different operational row collapses the prior inline card and expands the new row's card.
 
-The Node summary owns its name and state; the inline detail adds available platform/model/version, last-seen time, and collection observation time. The Agent summary owns its name, current Activity, and compact previous Task Result; the inline detail states Activity and Task Result separately with completion and observation times. Automation detail contains bounded status, kind, and timing. Candidate rows do not expand a detail card; their `Verify` label changes to `Verifying…` while the selected candidate is being checked.
+The Node summary owns its name and state; the inline detail adds available platform/model/version, last-seen time, and collection observation time. The Agent summary owns its name, static registration marker, and compact previous Task Result; the inline detail adds Task Result completion and observation times without claiming current activity. Automation detail contains bounded status, kind, and timing. Candidate rows do not expand a detail card; their `Verify` label changes to `Verifying…` while the selected candidate is being checked.
 
 Historical selections prefix detail with Last known and its observation age. Stable selection does not turn old metadata into current state.
 
@@ -122,4 +122,4 @@ Historical selections prefix detail with Last known and its observation age. Sta
 - Confirm accessible focus indication and announced detail changes for keyboard-only and screen-reader use.
 - Confirm the exact behavior of Left and Right keys through the shared panel key catcher.
 
-Verified against Clawbar commit `f08496e`.
+Verified against Clawbar commit `e1af66c`.
