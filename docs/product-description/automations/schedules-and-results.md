@@ -39,7 +39,7 @@ The row remains navigable. Relative next and last times recalculate each second 
 
 ### Settled
 
-Detail names kind as Scheduled, Repeating, One-time, Event-driven, or Unknown and presents full state. Disabled, Skipped, No runs yet, Waiting for event, Completed, Healthy, and Automation Failure remain distinct.
+Detail names kind as Scheduled, Repeating, One-time, Event-driven, or Unknown and presents full state. Kind/status, next run, and last run use separate scan-friendly lines; times use compact local formatting and expose the full local timestamp through accessible descriptions. Disabled, Skipped, No runs yet, Waiting for event, Completed, Healthy, and Automation Failure remain distinct.
 
 ## Variants
 

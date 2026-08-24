@@ -2,11 +2,13 @@
 
 ## Summary
 
-The bar widget compresses Clawbar state into a colored claw mark and tooltip. It does not show a separate dot or numeric badge. The mark uses healthy, warning, or critical color; the tooltip names the Gateway condition and appends the current Attention count when severity is not healthy.
+The bar widget compresses Clawbar state into a colored, right-facing claw mark and tooltip. It does not show a separate dot or numeric badge. The mark copies the two-path claw used beside elapsed time in OpenClaw chat, uses healthy, warning, or critical color, and the tooltip names the Gateway condition and appends the current Attention count when severity is not healthy.
 
 ## The simple case
 
 With a current healthy local Gateway and no Attention Item, the claw uses the theme's green and the tooltip says `Local OpenClaw Gateway healthy`. Opening the panel reveals the fuller status.
+
+The closed-bar tooltip retains the Attention Item count. In the open panel, when the header already shows a numeric Incident label such as `2 Incidents`, the Gateway summary omits the duplicate Attention Item count and states only Gateway health and resolution source. Other warning and critical presentations keep the Attention Item count when the header does not show that number.
 
 An enabled Automation Failure makes the claw critical even while Gateway reachability remains healthy. A warning state such as Degraded or Stale uses the theme's yellow.
 
@@ -26,11 +28,11 @@ The widget derives signal from the current in-memory Snapshot and presentation s
 
 ### Invoked
 
-A normal press toggles the panel; middle-click requests [manual refresh](manual-refresh.md). The signal itself is not a separate control.
+A normal press toggles the panel; middle-click requests [manual refresh](manual-refresh.md). Hovering starts a restrained flex-and-snap microinteraction. The signal itself is not a separate control.
 
 ### Waiting begins
 
-Panel toggling settles immediately. A refresh may wait, but an existing signal remains visible without a busy overlay.
+Panel toggling settles immediately. A refresh may wait, but an existing signal remains visible without a busy overlay. While collection runs, the same flex-and-snap motion gives activity feedback without adding another indicator.
 
 ### While waiting
 
@@ -72,7 +74,7 @@ A consumed Snapshot recalculates severity, count, summary, and color. In Develop
 
 **Notifications and Incidents.** Current Incident severity rolls up to critical; count is spoken in tooltip text but is not drawn as a badge.
 
-**Theme and accessibility.** Green and yellow come from the active Omarchy theme when available; critical uses the shell urgent color. Tooltip text prevents color from being the only summary.
+**Theme and accessibility.** Green and yellow come from the active Omarchy theme when available; critical uses the shell urgent color. Tooltip text prevents color from being the only summary. Motion carries no status information: the claw keeps its readable resting pose whenever the animation is not running.
 
 **Plugin lifecycle.** Enable creates one widget instance in the right section by default; disable or removal removes it.
 
@@ -82,7 +84,7 @@ A consumed Snapshot recalculates severity, count, summary, and color. In Develop
 - One critical Automation shows `1 Attention Item` in the tooltip; several use plural wording.
 - Stale overrides an old critical state and displays warning severity with one current Attention Item.
 - Missing theme green or yellow falls back to shell foreground or accent colors.
-- The claw occupies the standard status slot but its painted footprint is optically reduced.
+- The right-facing claw occupies the standard status slot and points toward the surrounding status content.
 
 ## Open questions and verification
 

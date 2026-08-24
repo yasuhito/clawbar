@@ -34,6 +34,8 @@ Item {
       color: root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
+      wrapMode: Text.NoWrap
+      elide: Text.ElideRight
     }
 
     Text {
@@ -46,30 +48,44 @@ Item {
       font.bold: root.taskFailed
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
+      wrapMode: Text.NoWrap
+      elide: Text.ElideRight
     }
 
     Text {
       width: parent.width
       text: {
-        var completed = Logic.absoluteLocalTime(root.taskResult.completedAt)
+        var completed = Logic.compactAbsoluteLocalTime(root.taskResult.completedAt, root.nowMs)
         return completed ? "Completed " + completed : "No completion timestamp"
       }
+      Accessible.name: text
+      Accessible.description: {
+        var full = Logic.absoluteLocalTime(root.taskResult.completedAt)
+        return full ? "Full local time " + full : ""
+      }
       color: root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
-      wrapMode: Text.Wrap
+      wrapMode: Text.NoWrap
+      elide: Text.ElideRight
     }
 
     Text {
       width: parent.width
       text: {
-        var observed = Logic.absoluteLocalTime(root.observedAt)
+        var observed = Logic.compactAbsoluteLocalTime(root.observedAt, root.nowMs)
         return observed ? "Observed " + observed : ""
+      }
+      Accessible.name: text
+      Accessible.description: {
+        var full = Logic.absoluteLocalTime(root.observedAt)
+        return full ? "Full local time " + full : ""
       }
       color: root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
-      wrapMode: Text.Wrap
+      wrapMode: Text.NoWrap
+      elide: Text.ElideRight
     }
   }
 }

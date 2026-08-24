@@ -104,6 +104,21 @@ test("refresh interval normalization uses one policy", () => {
   assert.equal(Logic.normalizeRefreshInterval("invalid"), 30)
 })
 
+test("compact local timestamps stay scan-friendly and retain meaningful dates", () => {
+  const current = new Date(2026, 7, 24, 17, 44)
+  const previousYear = new Date(2025, 11, 3, 6, 5)
+
+  assert.equal(
+    Logic.compactAbsoluteLocalTime(current.toISOString(), current.getTime()),
+    "Aug 24, 17:44"
+  )
+  assert.equal(
+    Logic.compactAbsoluteLocalTime(previousYear.toISOString(), current.getTime()),
+    "Dec 3, 2025, 06:05"
+  )
+  assert.equal(Logic.compactAbsoluteLocalTime("invalid", current.getTime()), "")
+})
+
 test("queued refreshes coalesce and wait for a stopped process", () => {
   let requested = Logic.requestRefresh(true)
   assert.deepEqual(requested, { start: false, pending: true })
@@ -358,6 +373,25 @@ test("bar uses Attention Items and ignores legacy Working Agent counts", () => {
   assert.equal(Logic.snapshotState(snapshot, 100000), "healthy")
   assert.equal(Logic.barSeverity(snapshot, "healthy"), "healthy")
   assert.equal(Logic.barCount(snapshot, "healthy"), 0)
+})
+
+test("panel omits a duplicated Attention count only when its header shows an Incident count", () => {
+  assert.equal(
+    Logic.panelSummary("healthy", "local", 2, "critical", "2 Incidents"),
+    "Local OpenClaw Gateway healthy"
+  )
+  assert.equal(
+    Logic.panelSummary("healthy", "local", 1, "critical", "1 Incident"),
+    "Local OpenClaw Gateway healthy"
+  )
+  assert.equal(
+    Logic.panelSummary("healthy", "local", 1, "critical", "Automation Failure"),
+    "Local OpenClaw Gateway healthy · 1 Attention Item"
+  )
+  assert.equal(
+    Logic.panelSummary("degraded", "local", 1, "warning", "Degraded"),
+    "OpenClaw Gateway metadata degraded · 1 Attention Item"
+  )
 })
 
 test("panel header rolls current Incidents above healthy Gateway state", () => {

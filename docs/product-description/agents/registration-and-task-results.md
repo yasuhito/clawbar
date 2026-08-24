@@ -39,7 +39,7 @@ The current row remains navigable during collection. The registration marker is 
 
 ### Settled
 
-Detail states Task Result without claiming current activity. `None` means no previous completed result is available. Missing completion time says `No completion timestamp`; available times use local absolute formatting.
+Detail states Task Result without claiming current activity. `None` means no previous completed result is available. Missing completion time says `No completion timestamp`; available completion and observation times use compact single-line local formatting, while accessible descriptions retain the full local timestamp.
 
 ## Variants
 

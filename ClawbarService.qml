@@ -15,12 +15,14 @@ Item {
   property int refreshIntervalSeconds: Logic.normalizeRefreshInterval(
     Quickshell.env("CLAWBAR_REFRESH_INTERVAL_SECONDS")
   )
+  readonly property bool collecting: collector.running || candidateVerifier.running
+    || refreshPending || candidatePending !== ""
   readonly property bool verifyingCandidate: candidateVerifier.running || candidatePending !== ""
 
   signal collectionFinished()
 
   function busy() {
-    return collector.running || candidateVerifier.running
+    return collecting
   }
 
   function requestCollection() {

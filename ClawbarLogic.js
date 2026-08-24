@@ -190,6 +190,28 @@ function absoluteLocalTime(value) {
   return isNaN(timestamp) ? "" : new Date(timestamp).toLocaleString()
 }
 
+var COMPACT_MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+]
+
+function compactAbsoluteLocalTime(value, nowMilliseconds) {
+  var timestamp = Date.parse(String(value || ""))
+  if (isNaN(timestamp)) return ""
+
+  var date = new Date(timestamp)
+  var reference = new Date(
+    typeof nowMilliseconds === "number" ? nowMilliseconds : Date.now()
+  )
+  var dateLabel = COMPACT_MONTHS[date.getMonth()] + " " + date.getDate()
+  if (date.getFullYear() !== reference.getFullYear())
+    dateLabel += ", " + date.getFullYear()
+
+  var hours = String(date.getHours()).padStart(2, "0")
+  var minutes = String(date.getMinutes()).padStart(2, "0")
+  return dateLabel + ", " + hours + ":" + minutes
+}
+
 function timeUntil(value, nowMilliseconds) {
   var timestamp = Date.parse(String(value || ""))
   if (isNaN(timestamp)) return ""
@@ -410,7 +432,7 @@ function barCount(snapshot, state) {
   return count
 }
 
-function summary(state, resolutionSource, count, severity) {
+function summary(state, resolutionSource, count, severity, includeAttentionCount) {
   var text
   if (state === "healthy") {
     if (resolutionSource === "tailscale") text = "Verified Tailscale OpenClaw Gateway healthy"
@@ -426,9 +448,14 @@ function summary(state, resolutionSource, count, severity) {
   else if (state === "setup_required") text = "OpenClaw Gateway setup required"
   else if (state === "no_data") text = "No OpenClaw Gateway data yet"
   else text = "OpenClaw Gateway status unavailable"
-  if (severity !== "healthy" && count > 0)
+  if (includeAttentionCount !== false && severity !== "healthy" && count > 0)
     text += count === 1 ? " · 1 Attention Item" : " · " + count + " Attention Items"
   return text
+}
+
+function panelSummary(state, resolutionSource, count, severity, panelSignalLabel) {
+  var headerShowsIncidentCount = /^\d+ Incidents?$/.test(String(panelSignalLabel || ""))
+  return summary(state, resolutionSource, count, severity, !headerShowsIncidentCount)
 }
 
 function requestRefresh(running) {
@@ -451,6 +478,7 @@ if (typeof module !== "undefined") {
     normalizeRefreshInterval: normalizeRefreshInterval,
     snapshotState: snapshotState,
     summary: summary,
+    panelSummary: panelSummary,
     requestRefresh: requestRefresh,
     consumeRefresh: consumeRefresh,
     historicalState: historicalState,
@@ -465,6 +493,7 @@ if (typeof module !== "undefined") {
     relativeTime: relativeTime,
     timeUntil: timeUntil,
     absoluteLocalTime: absoluteLocalTime,
+    compactAbsoluteLocalTime: compactAbsoluteLocalTime,
     taskResultLabel: taskResultLabel,
     automationStatusLabel: automationStatusLabel,
     automationCompactStatusLabel: automationCompactStatusLabel,

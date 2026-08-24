@@ -102,6 +102,7 @@ A later success replaces historical rows with current metadata. The selection fo
 
 - Healthy Gateway plus one Automation Failure is critical at the bar and may say `Automation Failure` in the header while Gateway reachability remains healthy.
 - More than one current Incident yields a count label such as `3 Incidents` in the header.
+- When the header shows a numeric Incident count, the Gateway summary does not repeat the same number as Attention Items. The bar tooltip retains its count because the closed bar has no numeric header.
 - Degraded Gateway plus Automation Failures can be critical rather than merely warning.
 - Stale takes precedence over an old Offline Gateway and changes current severity from critical to warning.
 - Historical Offline Nodes remain visible but muted and still do not count.

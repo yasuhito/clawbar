@@ -35,7 +35,7 @@ No accessibility Action requires Gateway response. Theme reload and Snapshot cha
 
 ### While waiting
 
-Selected rows remain identified by fill and border. Unselected historical rows use reduced opacity plus text; a selected historical row restores text opacity for readability while retaining explicit Last known wording, age, and the panel-level stale state. Long names and statuses elide within bounded row widths; detail text wraps.
+Selected rows remain identified by fill and border. Unselected historical rows use reduced opacity plus text; a selected historical row restores text opacity for readability while retaining explicit Last known wording, age, and the panel-level stale state. Long names, statuses, and detail lines elide within bounded row widths instead of changing row height. Visible absolute times use a compact local form; accessible descriptions retain the full local timestamp.
 
 ### Settled
 
@@ -82,7 +82,7 @@ A theme generation change reloads green and yellow aliases; missing values use s
 - Healthy and warning theme aliases can fall back to foreground and accent if absent.
 - Disabled Automation uses a dotted ring; Registered Agent uses a static green dot with no visible activity label.
 - Healthy routine Node and Automation labels may be visually omitted while exceptional and historical labels stay explicit.
-- Narrow panel rows elide names and status; detail wraps.
+- Narrow panel rows elide names, status, and detail lines while preserving full timestamps in accessible descriptions.
 - The developer demonstration prefix prevents fictional state from appearing current.
 - Reduced-motion behavior is inherited and not explicit in Clawbar source.
 

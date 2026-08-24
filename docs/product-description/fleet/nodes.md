@@ -39,7 +39,7 @@ The user can navigate during collection. Selection follows the Node UI Key acros
 
 ### Settled
 
-The selected row expands Node detail. Missing platform/model/version becomes `No additional Operational Metadata`; missing last-seen time becomes `No observation timestamp`. Historical rows add Last known age and reduced opacity.
+The selected row expands Node detail. Platform/model/version, last-seen time, and observation time each occupy one scan-friendly line. Absolute times use compact local formatting such as `Aug 24, 17:44`; the full local timestamp remains in the accessible description. Missing platform/model/version becomes `No additional Operational Metadata`; missing last-seen time becomes `No observation timestamp`. Historical rows add Last known age and reduced opacity.
 
 ## Variants
 

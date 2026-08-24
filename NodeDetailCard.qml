@@ -30,6 +30,8 @@ Item {
       color: root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
+      wrapMode: Text.NoWrap
+      elide: Text.ElideRight
     }
 
     Text {
@@ -38,31 +40,44 @@ Item {
       color: root.foreground
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
-      wrapMode: Text.Wrap
+      wrapMode: Text.NoWrap
+      elide: Text.ElideRight
     }
 
     Text {
       width: parent.width
       text: {
-        var lastSeen = Logic.absoluteLocalTime(root.node.lastSeenAt)
+        var lastSeen = Logic.compactAbsoluteLocalTime(root.node.lastSeenAt, root.nowMs)
         return lastSeen ? "Last seen " + lastSeen : "No observation timestamp"
       }
+      Accessible.name: text
+      Accessible.description: {
+        var full = Logic.absoluteLocalTime(root.node.lastSeenAt)
+        return full ? "Full local time " + full : ""
+      }
       color: root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
-      wrapMode: Text.Wrap
+      wrapMode: Text.NoWrap
+      elide: Text.ElideRight
     }
 
     Text {
       width: parent.width
       text: {
-        var observed = Logic.absoluteLocalTime(root.observedAt)
+        var observed = Logic.compactAbsoluteLocalTime(root.observedAt, root.nowMs)
         return observed ? "Observed " + observed : ""
+      }
+      Accessible.name: text
+      Accessible.description: {
+        var full = Logic.absoluteLocalTime(root.observedAt)
+        return full ? "Full local time " + full : ""
       }
       color: root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
-      wrapMode: Text.Wrap
+      wrapMode: Text.NoWrap
+      elide: Text.ElideRight
     }
   }
 }

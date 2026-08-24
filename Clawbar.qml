@@ -34,6 +34,11 @@ BarWidget {
   readonly property bool developerDemo: !!lastSnapshot && typeof lastSnapshot.demoScenario === "string"
   readonly property string baseSummary: Logic.summary(state, resolutionSource, barCount, barSeverity)
   readonly property string summary: developerDemo ? "Developer demo · " + baseSummary : baseSummary
+  readonly property string basePanelSummary: Logic.panelSummary(
+    state, resolutionSource, barCount, barSeverity, Logic.panelSignal(lastSnapshot, state).label
+  )
+  readonly property string panelSummary: developerDemo
+    ? "Developer demo · " + basePanelSummary : basePanelSummary
   readonly property var barSignal: Logic.signalPresentation(
     barSeverity === "critical" ? "failed" : barSeverity === "warning" ? "waiting" : "healthy"
   )
@@ -165,11 +170,11 @@ BarWidget {
       Item {
         ClawMark {
           anchors.centerIn: parent
-          // Qt Shape keeps more path whitespace than the prototype SVG; 7/8
-          // of the theme's optical canvas matches its 10px painted footprint.
-          width: Style.bar.iconCanvas * 0.875
+          width: Style.bar.iconCanvas
           height: width
           color: root.barSignalColor
+          animated: button.tooltipHovered
+            || (!!root.collectorService && root.collectorService.collecting)
         }
       }
     }
@@ -195,7 +200,7 @@ BarWidget {
     snapshot: root.lastSnapshot
     state: root.state
     nowMs: root.nowMs
-    summary: root.summary
+    summary: root.panelSummary
     verifyingCandidate: root.collectorService ? root.collectorService.verifyingCandidate : false
     healthy: root.healthyColor
     warning: root.warningColor

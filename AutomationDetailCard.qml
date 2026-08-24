@@ -20,30 +20,73 @@ Item {
     anchors.right: parent.right
     anchors.top: parent.top
     anchors.margins: Style.space(8)
-    spacing: Style.space(8)
+    spacing: Style.space(4)
+
+    Text {
+      visible: root.historical
+      width: parent.width
+      text: "Last known · " + Logic.relativeTime(root.automation.lastRunAt, root.nowMs)
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      wrapMode: Text.NoWrap
+      elide: Text.ElideRight
+    }
 
     Text {
       width: parent.width
-      text: {
-        var lines = []
-        if (root.historical)
-          lines.push("Last known · " + Logic.relativeTime(root.automation.lastRunAt, root.nowMs))
-        lines.push(
-          Logic.automationKindLabel(root.automation.kind)
-            + " · " + Logic.automationStatusLabel(root.automation)
-        )
-        var nextRun = Logic.absoluteLocalTime(root.automation.nextRunAt)
-        var lastRun = Logic.absoluteLocalTime(root.automation.lastRunAt)
-        if (nextRun) lines.push("Next run " + nextRun)
-        if (lastRun) lines.push("Last run " + lastRun)
-        if (!nextRun && !lastRun && root.automation.lastResult === "none")
-          lines.push("No run timestamps")
-        return lines.join("\n")
-      }
+      text: Logic.automationKindLabel(root.automation.kind)
+        + " · " + Logic.automationStatusLabel(root.automation)
       color: root.foreground
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
-      wrapMode: Text.Wrap
+      wrapMode: Text.NoWrap
+      elide: Text.ElideRight
+    }
+
+    Text {
+      visible: !!Logic.compactAbsoluteLocalTime(root.automation.nextRunAt, root.nowMs)
+      width: parent.width
+      text: "Next run " + Logic.compactAbsoluteLocalTime(root.automation.nextRunAt, root.nowMs)
+      Accessible.name: text
+      Accessible.description: {
+        var full = Logic.absoluteLocalTime(root.automation.nextRunAt)
+        return full ? "Full local time " + full : ""
+      }
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      wrapMode: Text.NoWrap
+      elide: Text.ElideRight
+    }
+
+    Text {
+      visible: !!Logic.compactAbsoluteLocalTime(root.automation.lastRunAt, root.nowMs)
+      width: parent.width
+      text: "Last run " + Logic.compactAbsoluteLocalTime(root.automation.lastRunAt, root.nowMs)
+      Accessible.name: text
+      Accessible.description: {
+        var full = Logic.absoluteLocalTime(root.automation.lastRunAt)
+        return full ? "Full local time " + full : ""
+      }
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      wrapMode: Text.NoWrap
+      elide: Text.ElideRight
+    }
+
+    Text {
+      visible: !Logic.compactAbsoluteLocalTime(root.automation.nextRunAt, root.nowMs)
+        && !Logic.compactAbsoluteLocalTime(root.automation.lastRunAt, root.nowMs)
+        && root.automation.lastResult === "none"
+      width: parent.width
+      text: "No run timestamps"
+      color: root.dim
+      font.family: root.fontFamily
+      font.pixelSize: Style.font.caption
+      wrapMode: Text.NoWrap
+      elide: Text.ElideRight
     }
   }
 }
