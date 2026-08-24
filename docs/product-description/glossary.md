@@ -36,9 +36,9 @@ The vocabulary used across these documents. When a document uses one of these te
 
 **Agent.** A named OpenClaw agent reported by the Gateway. Clawbar shows it independently of Nodes because the supported metadata does not establish Node ownership.
 
-**Agent Activity.** An Agent's current work state: Working, Waiting, or Idle. Activity is independent of the Agent's previous Task Result.
+**Registered Agent.** An Agent entry reported by the configured Gateway. Its green dot confirms only registration, not health, online presence, or current activity.
 
-**Task Result.** The outcome and completion time of an Agent's most recently completed Task: Succeeded, Failed, or None. A Failed Task Result does not change Agent Activity and is not an Incident.
+**Task Result.** The outcome and completion time of a Registered Agent's most recently completed Task: Succeeded, Failed, or None. A Failed Task Result does not establish Agent health or current activity and is not an Incident.
 
 **Automation.** A scheduled operation managed by the Gateway and shown in the independent Automations section. Clawbar can observe it but cannot create, edit, retry, cancel, enable, disable, or delete it.
 

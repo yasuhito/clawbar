@@ -22,7 +22,7 @@ The documents are for people who need to understand or change Clawbar: designers
 - Describe the experience, not the code. “A second refresh request waits for the current collection and then causes one more collection” rather than “`refreshPending` becomes true.”
 - Technical detail goes in block quotes prefixed with `Technical note:`. Use it only when the mechanism changes what the user would expect.
 - Use sentence case for headings.
-- Use the vocabulary in the [glossary](glossary.md), especially Gateway, Gateway Target, Fleet, Node, Agent Activity, Task Result, Automation Failure, Attention Item, Incident, and Last Known Metadata.
+- Use the vocabulary in the [glossary](glossary.md), especially Gateway, Gateway Target, Fleet, Node, Registered Agent, Task Result, Automation Failure, Attention Item, Incident, and Last Known Metadata.
 - Every document ends with the Clawbar commit it was checked against and a list of open questions.
 - State surprising behavior plainly. Do not turn missing evidence into an assumed behavior.
 
@@ -135,7 +135,7 @@ fleet/
   nodes.md                              Node rows, deduplication, state, metadata, and selection
 
 agents/
-  activity-and-task-results.md          Agent rows and the independence of current activity and previous result
+  registration-and-task-results.md      Registered Agent rows and previous Task Result
 
 automations/
   schedules-and-results.md              Automation kinds, timing, enabled state, failures, and details
@@ -169,7 +169,7 @@ Status is one of `not started`, `drafted`, or `verified`.
 | gateway/fallback-setup.md | drafted |
 | gateway/health-and-last-known-state.md | drafted |
 | fleet/nodes.md | drafted |
-| agents/activity-and-task-results.md | drafted |
+| agents/registration-and-task-results.md | drafted |
 | automations/schedules-and-results.md | drafted |
 | cross-cutting/privacy-boundary.md | drafted |
 | cross-cutting/incidents-and-notifications.md | drafted |

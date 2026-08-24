@@ -12,8 +12,7 @@ This document owns the meaning and relationship of the objects. Feature document
 flowchart TD
     G[Gateway] --> F[Fleet]
     F --> N[Nodes]
-    G --> A[Agents]
-    A --> AC[Current Agent Activity]
+    G --> A[Registered Agents]
     A --> TR[Previous Task Result]
     G --> AU[Automations]
     AU --> AF[Current Automation result]
@@ -39,11 +38,11 @@ An Offline Node is routine muted metadata. It does not roll up to Gateway health
 
 ## Agents and Tasks
 
-Agents appear after the Fleet and are omitted as a section when the list is empty. Agent Activity is current: Working, Waiting, or Idle. Task Result is historical: Succeeded, Failed, or None for the latest completed Task.
+Registered Agents appear after the Fleet and are omitted as a section when the list is empty. A static green dot confirms that the Gateway reported the registration; it does not establish health, online presence, or current activity. Task Result is historical: Succeeded, Failed, or None for the latest completed Task.
 
-The two dimensions remain independent. An Agent may be Working while its previous Task Result says Failed. A Failed Task Result is visible metadata but is not an Attention Item or Incident.
+Registration and previous Task Result remain independent. A Registered Agent may have a Failed result without becoming a failed Agent. Failed Task Result is visible metadata but is not an Attention Item or Incident.
 
-Clawbar does not display Task instructions, message content, destinations, accounts, raw failures, or Node ownership. It uses Task records only to derive bounded activity and result state.
+Clawbar does not display Task instructions, message content, destinations, accounts, raw failures, session events, current activity, or Node ownership. It uses Task records only to derive the bounded previous result.
 
 ## Automations
 
@@ -83,14 +82,14 @@ Metadata collections are bounded. When a section exceeds its accepted limit or c
 
 **Notifications and Incidents.** Offline Gateway, Configuration Error, and Automation Failure form Incident periods. Offline Nodes and Failed Task Results do not.
 
-**Theme and accessibility.** Shape, color, text, opacity, and explicit labels distinguish state. Healthy routine labels may be visually quiet while remaining available to accessibility semantics. Idle Agent uses a muted outline ring, omits repeated row text, and retains `Idle` in its accessible description and selected detail.
+**Theme and accessibility.** Shape, color, text, opacity, and explicit labels distinguish state. Healthy routine labels may be visually quiet while remaining available to accessibility semantics. A Registered Agent uses a static green dot and exposes `Registered Agent` accessibly without claiming health or activity.
 
 **Plugin lifecycle.** Disabling or removing Clawbar stops observation. It does not alter Gateway, Node, Agent, Task, or Automation state.
 
 ## Open questions and verification
 
 - Confirm how Degraded Node is represented in the current running panel; source vocabulary defines it, but fixture coverage should be observed.
-- Confirm the shell exposes the explicit accessible name and description for healthy Node and Automation rows and for the muted Idle Agent ring.
+- Confirm the shell exposes the explicit accessible name and description for healthy Node and Automation rows and for the Registered Agent dot.
 - Confirm the user-visible result when each metadata section hits its bound; automated tests establish availability state but not every layout consequence.
 
-Verified against Clawbar commit `f08496e`.
+Verified against Clawbar commit `e1af66c`.

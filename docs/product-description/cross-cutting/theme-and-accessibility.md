@@ -6,7 +6,7 @@ Clawbar follows Omarchy Shell typography, spacing, popup sizing, selected fill, 
 
 ## The simple case
 
-The bar uses a theme green for Healthy, theme yellow for warning, and shell urgent color for critical. The panel header repeats Gateway status with a signal and label. Rows use filled circles for current active states, a dotted ring for disabled Automation, and a quiet muted outline ring for Idle Agent.
+The bar uses a theme green for Healthy, theme yellow for warning, and shell urgent color for critical. The panel header repeats Gateway status with a signal and label. Rows use filled circles for current states and reported Registered Agents, plus a dotted ring for disabled Automation. A Registered Agent's green dot confirms registration only, not health or current activity.
 
 The user opens the panel, navigates with arrows or `j`/`k`, activates a candidate with Enter, refreshes with `r`, and closes with Escape.
 
@@ -80,7 +80,7 @@ A theme generation change reloads green and yellow aliases; missing values use s
 ## Edge cases
 
 - Healthy and warning theme aliases can fall back to foreground and accent if absent.
-- Disabled Automation uses a dotted ring; Idle Agent uses a muted outline ring and omits the repeated visible `Idle` row label.
+- Disabled Automation uses a dotted ring; Registered Agent uses a static green dot with no visible activity label.
 - Healthy routine Node and Automation labels may be visually omitted while exceptional and historical labels stay explicit.
 - Narrow panel rows elide names and status; detail wraps.
 - The developer demonstration prefix prevents fictional state from appearing current.
@@ -91,6 +91,6 @@ A theme generation change reloads green and yellow aliases; missing values use s
 - Inspect the accessibility tree for every row kind, selected state, hidden healthy label, and dynamic detail.
 - Verify contrast on white, catppuccin-latte, flexoki-light, and vantablack themes.
 - Verify narrow and wide panels, keyboard-only use, focus return, and reduced motion.
-- Visually omitted healthy Node and Automation labels have explicit accessible descriptions in source; confirm the shell exposes them, and inspect Agent/candidate semantics separately.
+- Visually omitted healthy Node and Automation labels and the Registered Agent marker have explicit accessible descriptions in source; confirm the shell exposes them, and inspect candidate semantics separately.
 
-Verified against Clawbar commit `f08496e`.
+Verified against Clawbar commit `e1af66c`.
