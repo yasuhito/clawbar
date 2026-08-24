@@ -81,10 +81,6 @@ KeyboardPanel {
     if (!delegate) return
     var top = delegate.mapToItem(contentColumn, 0, 0).y
     var bottom = top + delegate.height
-    if (selectedRow && selectedRow.kind === "automation" && selectedCard.visible) {
-      var cardTop = selectedCard.mapToItem(contentColumn, 0, 0).y
-      bottom = Math.max(bottom, cardTop + selectedCard.height)
-    }
     if (top < panelFlick.contentY) panelFlick.contentY = top
     else if (bottom > panelFlick.contentY + panelFlick.height)
       panelFlick.contentY = Math.max(0, bottom - panelFlick.height)
@@ -525,17 +521,19 @@ KeyboardPanel {
           historical: root.historical
           signalColor: root.signalColor
           showUnavailable: root.state === "degraded"
+          automationHistoryAvailable: root.automationHistoryAvailable
+          automationHistoryBusy: root.automationHistoryBusy
           onRowSelected: function(row) {
             root.selectRow(row)
           }
+          onAutomationHistoryRequested: root.requestAutomationHistory()
         }
 
         Rectangle {
           id: selectedCard
-          visible: root.selectedRow !== null
+          visible: root.selectedRow !== null && root.selectedRow.kind !== "automation"
           width: parent.width
           height: selectedDetail.implicitHeight + Style.space(16)
-            + (historyButton.visible ? historyButton.height + Style.space(8) : 0)
           radius: Style.cornerRadius
           color: Style.selectedFillFor(root.foreground, Color.popups.background)
 
@@ -553,23 +551,6 @@ KeyboardPanel {
               if (root.selectedRow.kind === "candidate")
                 return "Gateway candidate · " + root.selectedRow.item.name
                   + (root.verifyingCandidate ? "\nVerifying supported read-only Gateway JSON…" : "\nPress Enter to verify")
-              if (root.selectedRow.kind === "automation") {
-                var automation = root.selectedRow.item
-                var automationLines = ["Automation · " + automation.name]
-                automationLines.push(
-                  Logic.automationKindLabel(automation.kind)
-                    + " · " + Logic.automationStatusLabel(automation)
-                )
-                var nextRun = Logic.absoluteLocalTime(automation.nextRunAt)
-                var lastRun = Logic.absoluteLocalTime(automation.lastRunAt)
-                if (nextRun) automationLines.push("Next run " + nextRun)
-                if (lastRun) automationLines.push("Last run " + lastRun)
-                if (!nextRun && !lastRun && automation.lastResult === "none")
-                  automationLines.push("No run timestamps")
-                if (!root.automationHistoryAvailable)
-                  automationLines.push("Run history unavailable for this Gateway Target")
-                return prefix + automationLines.join("\n")
-              }
               var absolute = Logic.absoluteLocalTime(root.selectedRow.timestamp)
               var heading = prefix + root.selectedRow.typeLabel + " · " + root.selectedRow.item.name
               var observation = absolute
@@ -585,23 +566,6 @@ KeyboardPanel {
             wrapMode: Text.Wrap
           }
 
-          Button {
-            id: historyButton
-            visible: root.selectedRow !== null && root.selectedRow.kind === "automation"
-              && root.automationHistoryAvailable
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            anchors.margins: Style.space(8)
-            text: root.automationHistoryBusy ? "Opening…" : "View run history"
-            enabled: !root.automationHistoryBusy
-            foreground: root.foreground
-            accent: root.accent
-            fontFamily: root.fontFamily
-            fontSize: Style.font.caption
-            bordered: true
-            onClicked: root.requestAutomationHistory()
-          }
         }
 
       }

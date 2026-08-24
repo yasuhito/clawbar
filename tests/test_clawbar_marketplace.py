@@ -69,9 +69,12 @@ class MarketplaceContractTest(unittest.TestCase):
 
     def test_panel_exposes_read_only_automation_history_action(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
+        section = (ROOT / "AutomationSection.qml").read_text(encoding="utf-8")
+        detail = (ROOT / "AutomationDetailCard.qml").read_text(encoding="utf-8")
 
-        self.assertIn('"View run history"', panel)
-        self.assertIn("onClicked: root.requestAutomationHistory()", panel)
+        self.assertIn('"View run history"', detail)
+        self.assertIn("onClicked: root.historyRequested()", detail)
+        self.assertIn("onHistoryRequested: root.automationHistoryRequested()", section)
         self.assertIn("automationHistoryRequested(selectedRow.item.id)", panel)
 
     def test_automation_history_uses_omarchy_floating_terminal(self) -> None:
@@ -80,6 +83,15 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn('"--app-id=org.omarchy.terminal",', widget)
         self.assertNotIn('"--app-id",', widget)
         self.assertIn('"--hold",', widget)
+
+    def test_selected_automation_details_expand_inside_the_row_delegate(self) -> None:
+        panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
+        section = (ROOT / "AutomationSection.qml").read_text(encoding="utf-8")
+
+        self.assertIn("AutomationDetailCard {", section)
+        self.assertIn("visible: automationRow.selected", section)
+        self.assertIn('visible: root.selectedRow !== null && root.selectedRow.kind !== "automation"', panel)
+        self.assertNotIn("selectedCard.mapToItem", panel)
 
     def test_demo_publishes_all_twelve_sanitized_scenarios(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
