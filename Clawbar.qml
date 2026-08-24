@@ -128,6 +128,8 @@ BarWidget {
     if (!automationId || historyLauncher.running) return
     historyLauncher.command = [
       "xdg-terminal-exec",
+      "--app-id",
+      "org.omarchy.terminal",
       "--hold",
       "python3",
       root.collectorPath,

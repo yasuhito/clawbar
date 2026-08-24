@@ -66,8 +66,9 @@ Press Clawbar to open the panel.
 - Escape: close the panel
 - Middle-click the bar widget: request a non-blocking refresh
 
-Automation history opens in a terminal that remains visible until the user
-closes it. History follows OpenClaw's configured local or remote Gateway so
+Automation history opens in Omarchy's standard floating terminal, which
+remains visible until the user closes it and does not resize tiled application
+windows. History follows OpenClaw's configured local or remote Gateway so
 OpenClaw can apply its existing authentication. It is unavailable for Node-host
 and verified Tailscale fallback targets because Clawbar does not handle Gateway
 credentials or fall back to a different Gateway.

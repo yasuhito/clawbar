@@ -74,6 +74,12 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("onClicked: root.requestAutomationHistory()", panel)
         self.assertIn("automationHistoryRequested(selectedRow.item.id)", panel)
 
+    def test_automation_history_uses_omarchy_floating_terminal(self) -> None:
+        widget = (ROOT / "Clawbar.qml").read_text(encoding="utf-8")
+
+        self.assertIn('"--app-id",\n      "org.omarchy.terminal",', widget)
+        self.assertIn('"--hold",', widget)
+
     def test_demo_publishes_all_twelve_sanitized_scenarios(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
