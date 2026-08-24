@@ -339,6 +339,7 @@ KeyboardPanel {
             readonly property bool selected: !!row && root.selectedKey === row.key
             readonly property bool offline: modelData.state === "offline"
             readonly property var signal: Logic.nodeSignalPresentation(modelData.state)
+            readonly property bool showStatus: Logic.showNodeStatusLabel(modelData.state, root.historical)
             width: contentColumn.width
             height: nodeSummary.height + (selected ? nodeDetail.implicitHeight : 0)
             radius: Style.cornerRadius
@@ -346,6 +347,8 @@ KeyboardPanel {
             color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
             border.width: selected ? 1 : 0
             border.color: root.accent
+            Accessible.name: modelData.name
+            Accessible.description: root.historical ? "Last known" : signal.label
 
             Item {
               id: nodeSummary
@@ -369,7 +372,7 @@ KeyboardPanel {
                 id: nodeTitle
                 anchors.left: parent.left
                 anchors.leftMargin: Style.space(26)
-                anchors.right: nodeState.left
+                anchors.right: nodeRow.showStatus ? nodeState.left : parent.right
                 anchors.rightMargin: Style.space(8)
                 anchors.verticalCenter: parent.verticalCenter
                 text: nodeRow.modelData.name
@@ -382,6 +385,7 @@ KeyboardPanel {
 
               Text {
                 id: nodeState
+                visible: nodeRow.showStatus
                 anchors.right: parent.right
                 anchors.rightMargin: Style.space(8)
                 anchors.verticalCenter: nodeTitle.verticalCenter

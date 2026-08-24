@@ -86,6 +86,15 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertNotIn("--automation-history", collector)
         self.assertNotIn("open_automation_history", collector)
 
+    def test_healthy_row_labels_are_visually_quiet_but_accessible(self) -> None:
+        panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
+        section = (ROOT / "AutomationSection.qml").read_text(encoding="utf-8")
+
+        self.assertIn("Logic.showNodeStatusLabel", panel)
+        self.assertIn("Logic.showAutomationStatusLabel", section)
+        self.assertIn("Accessible.description", panel)
+        self.assertIn("Accessible.description", section)
+
     def test_selected_operational_rows_expand_details_inside_their_delegates(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
         section = (ROOT / "AutomationSection.qml").read_text(encoding="utf-8")

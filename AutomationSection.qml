@@ -73,6 +73,7 @@ Column {
         : !modelData.enabled ? "disabled"
         : modelData.lastResult === "ok" ? "succeeded" : "healthy"
       readonly property var signal: Logic.signalPresentation(signalState)
+      readonly property bool showStatus: Logic.showAutomationStatusLabel(modelData, root.historical)
       width: root.width
       height: automationSummary.height + (selected ? automationDetail.implicitHeight : 0)
       radius: Style.cornerRadius
@@ -80,6 +81,8 @@ Column {
       color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
       border.width: selected ? 1 : 0
       border.color: root.accent
+      Accessible.name: modelData.name
+      Accessible.description: root.historical ? "Last known" : Logic.automationStatusLabel(modelData)
 
       Item {
         id: automationSummary
@@ -103,7 +106,7 @@ Column {
           id: automationName
           anchors.left: parent.left
           anchors.leftMargin: Style.space(26)
-          anchors.right: automationStatus.left
+          anchors.right: automationRow.showStatus ? automationStatus.left : parent.right
           anchors.rightMargin: Style.space(8)
           anchors.top: parent.top
           anchors.topMargin: Style.space(6)
@@ -117,6 +120,7 @@ Column {
 
         Text {
           id: automationStatus
+          visible: automationRow.showStatus
           anchors.right: parent.right
           anchors.rightMargin: Style.space(8)
           anchors.verticalCenter: automationName.verticalCenter

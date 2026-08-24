@@ -105,6 +105,10 @@ function nodeMetadataLabel(item) {
   return parts.length > 0 ? parts.join(" · ") : "No additional Operational Metadata"
 }
 
+function showNodeStatusLabel(state, historical) {
+  return historical || state !== "healthy"
+}
+
 function agentRow(item, index, historical, observedAt) {
   var result = item.taskResult || {}
   return {
@@ -303,6 +307,12 @@ function automationCompactStatusLabel(automation) {
   return automationStatusLabel(automation)
 }
 
+function showAutomationStatusLabel(automation, historical) {
+  if (historical || !automation || !automation.enabled) return true
+  if (automation.lastResult !== "ok") return true
+  return automation.kind === "at" && !automation.nextRunAt
+}
+
 function automationKindLabel(kind) {
   if (kind === "cron") return "Scheduled"
   if (kind === "every") return "Repeating"
@@ -400,6 +410,7 @@ if (typeof module !== "undefined") {
     taskResultLabel: taskResultLabel,
     automationStatusLabel: automationStatusLabel,
     automationCompactStatusLabel: automationCompactStatusLabel,
+    showAutomationStatusLabel: showAutomationStatusLabel,
     automationKindLabel: automationKindLabel,
     automationTimingLabel: automationTimingLabel,
     signalColor: signalColor,
@@ -412,6 +423,7 @@ if (typeof module !== "undefined") {
     indexForKey: indexForKey,
     reconcileSelection: reconcileSelection,
     nodeMetadataLabel: nodeMetadataLabel,
+    showNodeStatusLabel: showNodeStatusLabel,
     nodeSignalPresentation: nodeSignalPresentation
   }
 }

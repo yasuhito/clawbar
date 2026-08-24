@@ -320,6 +320,31 @@ test("Automation labels distinguish every accepted state", () => {
   assert.equal(Logic.automationKindLabel("on-exit"), "Event-driven")
 })
 
+test("healthy row labels stay quiet while actionable states remain explicit", () => {
+  assert.equal(Logic.showNodeStatusLabel("healthy", false), false)
+  assert.equal(Logic.showNodeStatusLabel("offline", false), true)
+  assert.equal(Logic.showNodeStatusLabel("healthy", true), true)
+
+  assert.equal(
+    Logic.showAutomationStatusLabel(
+      { enabled: true, kind: "cron", lastResult: "ok", nextRunAt: "2026-08-25T00:00:00Z" },
+      false
+    ),
+    false
+  )
+  assert.equal(
+    Logic.showAutomationStatusLabel(
+      { enabled: true, kind: "at", lastResult: "ok", nextRunAt: null },
+      false
+    ),
+    true
+  )
+  assert.equal(Logic.showAutomationStatusLabel({ enabled: true, lastResult: "error" }, false), true)
+  assert.equal(Logic.showAutomationStatusLabel({ enabled: false, lastResult: "ok" }, false), true)
+  assert.equal(Logic.showAutomationStatusLabel({ enabled: true, lastResult: "none" }, false), true)
+  assert.equal(Logic.showAutomationStatusLabel({ enabled: true, lastResult: "ok" }, true), true)
+})
+
 test("bar uses Attention Items for critical Automation state and Working Agents otherwise", () => {
   const snapshot = healthySnapshot(new Date(100000).toISOString())
   snapshot.bar = { kind: "attention", count: 2, severity: "critical" }

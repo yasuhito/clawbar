@@ -71,9 +71,11 @@ Items while yellow or red. Selecting a Node, Agent, or Automation expands its
 bounded Operational Metadata directly beneath that row; selecting another row
 moves the single expanded detail with the selection. The panel keeps Agents and
 Automations in independent sections because Gateway metadata establishes no
-Node ownership; an empty Agents section is omitted. A green `Healthy` indicator
-remains visible in the panel
-header. Agent Activity and the previous Task Result remain independent. Offline
+Node ownership; an empty Agents section is omitted. Routine healthy Node and
+Automation rows omit the repeated `Healthy` label while retaining it for
+accessibility; exceptional and historical states remain explicit. A green
+`Healthy` indicator remains visible in the panel header. Agent Activity and the
+previous Task Result remain independent. Offline
 Nodes appear as muted Operational Metadata and do not affect Attention counts,
 Incidents, or notifications. Automation Failures appear once in the Automations
 section.
