@@ -77,7 +77,8 @@ class MarketplaceContractTest(unittest.TestCase):
     def test_automation_history_uses_omarchy_floating_terminal(self) -> None:
         widget = (ROOT / "Clawbar.qml").read_text(encoding="utf-8")
 
-        self.assertIn('"--app-id",\n      "org.omarchy.terminal",', widget)
+        self.assertIn('"--app-id=org.omarchy.terminal",', widget)
+        self.assertNotIn('"--app-id",', widget)
         self.assertIn('"--hold",', widget)
 
     def test_demo_publishes_all_twelve_sanitized_scenarios(self) -> None:
