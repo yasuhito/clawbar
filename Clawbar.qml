@@ -20,7 +20,6 @@ BarWidget {
   property color healthyColor: signalForeground
   property color warningColor: Color.accent
   readonly property var themeGeneration: Color.shellValues
-  property string collectorPath: decodeURIComponent(String(Qt.resolvedUrl("scripts/clawbar_collect.py")).replace(/^file:\/\//, ""))
   property string snapshotPath: {
     var stateHome = Quickshell.env("XDG_STATE_HOME")
     var base = stateHome ? stateHome : Quickshell.env("HOME") + "/.local/state"
@@ -124,21 +123,6 @@ BarWidget {
     opened = false
   }
 
-  function openAutomationHistory(automationId) {
-    if (!automationId || historyLauncher.running) return
-    historyLauncher.command = [
-      "xdg-terminal-exec",
-      "--app-id=org.omarchy.terminal",
-      "--hold",
-      "python3",
-      root.collectorPath,
-      "--automation-history",
-      automationId
-    ]
-    historyLauncher.running = true
-  }
-
-
   Component.onCompleted: readSnapshot()
 
   implicitWidth: button.implicitWidth
@@ -160,9 +144,6 @@ BarWidget {
     onExited: function(exitCode) {
       Qt.callLater(function() { root.consumeCacheRead(exitCode) })
     }
-  }
-  Process {
-    id: historyLauncher
   }
   Timer {
     interval: 1000
@@ -216,13 +197,9 @@ BarWidget {
     nowMs: root.nowMs
     summary: root.summary
     verifyingCandidate: root.collectorService ? root.collectorService.verifyingCandidate : false
-    automationHistoryBusy: historyLauncher.running
     healthy: root.healthyColor
     warning: root.warningColor
     onRefreshRequested: root.requestCollection()
-    onAutomationHistoryRequested: function(automationId) {
-      root.openAutomationHistory(automationId)
-    }
     onCandidateVerificationRequested: function(candidateKey) {
       root.verifyCandidate(candidateKey)
     }

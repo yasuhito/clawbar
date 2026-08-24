@@ -60,18 +60,10 @@ snapshot becomes Stale after three configured refresh intervals.
 Press Clawbar to open the panel.
 
 - `j`, `k`, Up, Down: move selection
-- Enter: verify the selected Gateway candidate, or open selected Automation history
+- Enter: verify the selected Gateway candidate
 - `r`: request a non-blocking refresh
-- `o` or the `View run history` button: open official read-only recent-run history for the selected Automation
 - Escape: close the panel
 - Middle-click the bar widget: request a non-blocking refresh
-
-Automation history opens in Omarchy's standard floating terminal, which
-remains visible until the user closes it and does not resize tiled application
-windows. History follows OpenClaw's configured local or remote Gateway so
-OpenClaw can apply its existing authentication. It is unavailable for Node-host
-and verified Tailscale fallback targets because Clawbar does not handle Gateway
-credentials or fall back to a different Gateway.
 
 The bar icon changes color with current severity; its compact slot does not
 render a separate status dot or count. The tooltip reports current Attention
@@ -96,16 +88,15 @@ Tailscale identifiers, or raw errors. Tailscale device identifiers are HMACed
 with Clawbar's local secret into stable candidate keys before entering a
 snapshot. QML reads only `$XDG_STATE_HOME/clawbar/snapshot.json` (or
 `~/.local/state/clawbar/snapshot.json`). Private mode-`0600` state beside the
-snapshot maps opaque candidate keys to Tailscale targets, binds Automation
-history to the current snapshot's Gateway Target, and separately remembers a
+snapshot maps opaque candidate keys to Tailscale targets and remembers a
 verified Tailscale fallback. Automatic resolution never replaces that fallback.
 None of these state files contains a token, password, or other credential.
 Incident deduplication state and the local key secret are per-login data under
 `XDG_RUNTIME_DIR`.
 
-The only context action invokes OpenClaw's official read-only Automation run
-history command for an ID already present in the current snapshot. Clawbar
-cannot create, edit, retry, cancel, enable, disable, or delete OpenClaw work.
+Selecting an Automation reveals only its bounded Operational Metadata.
+Clawbar cannot create, edit, retry, cancel, enable, disable, or delete OpenClaw
+work.
 
 ## Update, disable, and remove
 
@@ -153,8 +144,7 @@ python scripts/clawbar_demo.py --resume
 `grouped-incidents` shows two Offline Nodes as muted Operational Metadata and
 starts one grouped notification for two Automation Failures. `recovery`
 restores a healthy Fleet and emits one grouped recovery notification. Use
-`j`/`k`, Enter, and `o` while reviewing the panel; `o` remains a read-only
-OpenClaw handoff and may report unavailable for fictional Automation IDs.
+`j`/`k` and Enter while reviewing the panel.
 
 For release review, exercise each scenario in the actual shell at narrow and
 wide panel widths on `white`, `catppuccin-latte`, `flexoki-light`, and

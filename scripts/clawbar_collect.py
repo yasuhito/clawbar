@@ -15,10 +15,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 if __package__:
-    from .clawbar_automation import (
-        collect_automation_surface,
-        open_automation_history,
-    )
+    from .clawbar_automation import collect_automation_surface
     from .clawbar_gateway import (
         CollectionDeadlineExceeded,
         GatewayTarget,
@@ -43,12 +40,9 @@ if __package__:
         load_snapshot,
         utc_now,
     )
-    from .clawbar_target_state import GatewayTargetState, collected_target_url
+    from .clawbar_target_state import GatewayTargetState
 else:
-    from clawbar_automation import (
-        collect_automation_surface,
-        open_automation_history,
-    )
+    from clawbar_automation import collect_automation_surface
     from clawbar_gateway import (
         CollectionDeadlineExceeded,
         GatewayTarget,
@@ -73,7 +67,7 @@ else:
         load_snapshot,
         utc_now,
     )
-    from clawbar_target_state import GatewayTargetState, collected_target_url
+    from clawbar_target_state import GatewayTargetState
 
 SCHEMA_VERSION = 1
 DEFAULT_REFRESH_INTERVAL_SECONDS = 30
@@ -277,20 +271,12 @@ def collect_metadata(
 def publish_current(
     snapshot_path: Path,
     snapshot: dict[str, Any],
-    status: dict[str, Any],
     target: GatewayTarget | None,
 ) -> CollectionResult:
-    current_url = collected_target_url(status, target.url if target else None)
-    verified_fallback_url = (
-        target.url if target is not None and target.source == "tailscale" else None
-    )
-    if current_url is not None or verified_fallback_url is not None:
-        GatewayTargetState(snapshot_path, SCHEMA_VERSION).record_success(
-            snapshot["generatedAt"],
-            snapshot["resolutionSource"],
-            current_url,
-            verified_fallback_url=verified_fallback_url,
-        )
+    target_state = GatewayTargetState(snapshot_path, SCHEMA_VERSION)
+    if target is not None and target.source == "tailscale":
+        target_state.record_verified_fallback(target.url)
+    target_state.discard_legacy_current_target()
     return publish(snapshot_path, ExitCode.OK, snapshot)
 
 
@@ -487,7 +473,7 @@ def collect_gateway(
         retained = last_known_metadata(previous)
         if retained and retained.get("fleet", {}).get("available") is True:
             snapshot["lastKnown"] = retained
-    return publish_current(snapshot_path, snapshot, status, target)
+    return publish_current(snapshot_path, snapshot, target)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -501,11 +487,6 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="SECONDS",
     )
     parser.add_argument(
-        "--automation-history",
-        metavar="AUTOMATION_ID",
-        help="open official read-only recent-run history for a collected Automation",
-    )
-    parser.add_argument(
         "--verify-candidate",
         metavar="CANDIDATE_KEY",
         help="verify one enumerated Tailscale candidate and collect from it",
@@ -516,15 +497,6 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = build_parser().parse_args(argv)
     snapshot_path = default_snapshot_path()
-    if arguments.automation_history:
-        return open_automation_history(
-            snapshot_path,
-            arguments.automation_history,
-            ("openclaw",),
-            OPENCLAW_TIMEOUT_MILLISECONDS,
-            int(ExitCode.COMMAND_FAILED),
-            SCHEMA_VERSION,
-        )
     if developer_demo_active():
         snapshot = load_previous_snapshot(snapshot_path)
         if snapshot is not None:

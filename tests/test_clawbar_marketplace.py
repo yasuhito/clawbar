@@ -67,22 +67,24 @@ class MarketplaceContractTest(unittest.TestCase):
 
         self.assertNotIn("id: fleetRail", panel)
 
-    def test_panel_exposes_read_only_automation_history_action(self) -> None:
-        panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
-        section = (ROOT / "AutomationSection.qml").read_text(encoding="utf-8")
-        detail = (ROOT / "AutomationDetailCard.qml").read_text(encoding="utf-8")
+    def test_automation_selection_has_no_run_history_action(self) -> None:
+        sources = "\n".join(
+            (ROOT / path).read_text(encoding="utf-8")
+            for path in (
+                "Clawbar.qml",
+                "ClawbarPanel.qml",
+                "AutomationSection.qml",
+                "AutomationDetailCard.qml",
+            )
+        )
 
-        self.assertIn('"View run history"', detail)
-        self.assertIn("onClicked: root.historyRequested()", detail)
-        self.assertIn("onHistoryRequested: root.automationHistoryRequested()", section)
-        self.assertIn("automationHistoryRequested(selectedRow.item.id)", panel)
+        collector = (ROOT / "scripts" / "clawbar_collect.py").read_text(encoding="utf-8")
 
-    def test_automation_history_uses_omarchy_floating_terminal(self) -> None:
-        widget = (ROOT / "Clawbar.qml").read_text(encoding="utf-8")
-
-        self.assertIn('"--app-id=org.omarchy.terminal",', widget)
-        self.assertNotIn('"--app-id",', widget)
-        self.assertIn('"--hold",', widget)
+        self.assertNotIn("View run history", sources)
+        self.assertNotIn("automationHistory", sources)
+        self.assertNotIn("historyLauncher", sources)
+        self.assertNotIn("--automation-history", collector)
+        self.assertNotIn("open_automation_history", collector)
 
     def test_selected_automation_details_expand_inside_the_row_delegate(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")

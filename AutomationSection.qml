@@ -18,12 +18,9 @@ Column {
   required property string fontFamily
   required property bool historical
   required property bool showUnavailable
-  required property bool automationHistoryAvailable
-  required property bool automationHistoryBusy
   required property var signalColor
 
   signal rowSelected(var row)
-  signal automationHistoryRequested()
 
   spacing: Style.space(4)
 
@@ -161,13 +158,9 @@ Column {
         automation: automationRow.modelData
         nowMs: root.nowMs
         historical: root.historical
-        historyAvailable: root.automationHistoryAvailable
-        historyBusy: root.automationHistoryBusy
         foreground: root.foreground
         dim: root.dim
-        accent: root.accent
         fontFamily: root.fontFamily
-        onHistoryRequested: root.automationHistoryRequested()
       }
     }
   }

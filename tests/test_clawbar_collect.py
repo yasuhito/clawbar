@@ -386,20 +386,21 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(setup.returncode, clawbar_collect.ExitCode.OK, setup.stderr)
         candidate_key = json.loads(setup.stdout)["setup"]["candidates"][0]["key"]
 
+        state_directory = self.root / "external-state" / "clawbar"
+        legacy_current_target_path = state_directory / "gateway-target.json"
+        legacy_current_target_path.write_text('{"url":"ws://legacy.example.test"}', encoding="utf-8")
+
         verified = self.run_external(
             "unresolved",
             environment_overrides={"FAKE_REPORTED_URL": "ws://127.0.0.1:18789"},
             collector_arguments=["--verify-candidate", candidate_key],
         )
         self.assertEqual(verified.returncode, clawbar_collect.ExitCode.OK, verified.stderr)
-        state_directory = self.root / "external-state" / "clawbar"
         verified_target_path = state_directory / "gateway-verified-target.json"
-        current_target_path = state_directory / "gateway-target.json"
         verified_target = verified_target_path.read_bytes()
         self.assertEqual(json.loads(verified_target)["url"], "ws://gateway-alpha.example.ts.net:18789")
-        self.assertEqual(json.loads(current_target_path.read_bytes())["url"], "ws://127.0.0.1:18789")
-        for path in (verified_target_path, current_target_path):
-            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(verified_target_path.stat().st_mode & 0o777, 0o600)
+        self.assertFalse(legacy_current_target_path.exists())
 
         automatic = self.run_external("configured_remote")
         self.assertEqual(automatic.returncode, clawbar_collect.ExitCode.OK, automatic.stderr)
@@ -463,21 +464,8 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertFalse((state_directory / "gateway-target.json").exists())
         self.assertNotIn("PRIVATE-TOKEN", verified.stdout)
 
-    def test_failed_verified_fallback_write_keeps_previous_current_target_published(self) -> None:
-        automation_id = "stable-automation-id"
-        automations = {
-            "jobs": [{
-                "id": automation_id,
-                "name": "Investigate",
-                "enabled": True,
-                "schedule": {"kind": "cron"},
-                "state": {},
-            }]
-        }
-        initial = self.run_external(
-            "local",
-            environment_overrides={"FAKE_AUTOMATIONS": json.dumps(automations)},
-        )
+    def test_failed_verified_fallback_write_keeps_previous_snapshot_published(self) -> None:
+        initial = self.run_external("local")
         self.assertEqual(initial.returncode, clawbar_collect.ExitCode.OK, initial.stderr)
         initial_snapshot = json.loads(initial.stdout)
 
@@ -501,15 +489,6 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertNotEqual(failed.returncode, clawbar_collect.ExitCode.OK)
         snapshot_path = state_directory / "snapshot.json"
         self.assertEqual(json.loads(snapshot_path.read_text(encoding="utf-8")), initial_snapshot)
-
-        history = self.run_external(
-            "local",
-            collector_arguments=["--automation-history", automation_id],
-        )
-        self.assertEqual(history.returncode, clawbar_collect.ExitCode.OK, history.stderr)
-        history_call = self.read_calls()[-1]
-        self.assertEqual(history_call[:2], ["cron", "runs"])
-        self.assertNotIn("--url", history_call)
 
     def test_executable_rejects_unverified_and_unsupported_candidates(self) -> None:
         tailscale_status = {

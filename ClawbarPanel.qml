@@ -13,9 +13,7 @@ KeyboardPanel {
   property string selectedKey: ""
   property int selectedIndexHint: 0
   property bool verifyingCandidate: false
-  required property bool automationHistoryBusy
 
-  signal automationHistoryRequested(string automationId)
   signal refreshRequested()
   signal candidateVerificationRequested(string candidateKey)
 
@@ -26,8 +24,6 @@ KeyboardPanel {
   readonly property var nodes: Logic.fleetNodes(snapshot, state)
   readonly property var agents: Logic.agents(snapshot, state)
   readonly property var automations: Logic.automations(snapshot, state)
-  readonly property bool automationHistoryAvailable: !!snapshot
-    && (snapshot.resolutionSource === "local" || snapshot.resolutionSource === "configured_remote")
   readonly property var candidates: Logic.setupCandidates(snapshot, state)
   readonly property bool setupVisible: candidates.length > 0 || state === "setup_required"
     || (state === "configuration_error" && snapshot && snapshot.setup)
@@ -86,18 +82,9 @@ KeyboardPanel {
       panelFlick.contentY = Math.max(0, bottom - panelFlick.height)
   }
 
-  function requestAutomationHistory() {
-    if (selectedRow && selectedRow.kind === "automation"
-        && automationHistoryAvailable && !automationHistoryBusy)
-      automationHistoryRequested(selectedRow.item.id)
-  }
-
   function activateSelection() {
-    if (!selectedRow) return
-    if (selectedRow.kind === "candidate" && !verifyingCandidate)
+    if (selectedRow && selectedRow.kind === "candidate" && !verifyingCandidate)
       candidateVerificationRequested(selectedRow.key)
-    else
-      requestAutomationHistory()
   }
 
 
@@ -122,7 +109,6 @@ KeyboardPanel {
       if (text === "j" || text === "J") root.moveSelection(1)
       else if (text === "k" || text === "K") root.moveSelection(-1)
       else if (text === "r" || text === "R") root.refreshRequested()
-      else if (text === "o" || text === "O") root.requestAutomationHistory()
     }
 
     Flickable {
@@ -521,12 +507,9 @@ KeyboardPanel {
           historical: root.historical
           signalColor: root.signalColor
           showUnavailable: root.state === "degraded"
-          automationHistoryAvailable: root.automationHistoryAvailable
-          automationHistoryBusy: root.automationHistoryBusy
           onRowSelected: function(row) {
             root.selectRow(row)
           }
-          onAutomationHistoryRequested: root.requestAutomationHistory()
         }
 
         Rectangle {

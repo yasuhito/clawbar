@@ -95,16 +95,6 @@ class CollectorFixture:
                     sys.stdout.write(output)
                     raise SystemExit(int(os.environ.get("FAKE_AUTOMATIONS_EXIT", "0")))
 
-                if arguments[:2] == ["cron", "runs"]:
-                    if "--url" in arguments and "--token" not in arguments:
-                        sys.stderr.write(
-                            "GatewayExplicitAuthRequiredError: "
-                            "gateway url override requires explicit credentials\\n"
-                        )
-                        raise SystemExit(1)
-                    sys.stdout.write("Official recent Automation runs\\n")
-                    raise SystemExit(int(os.environ.get("FAKE_RUNS_EXIT", "0")))
-
                 if arguments[:2] == ["gateway", "status"]:
                     time.sleep(float(os.environ.get("FAKE_GATEWAY_DELAY", "0")))
                     scenario = os.environ.get("FAKE_SCENARIO", "local")
