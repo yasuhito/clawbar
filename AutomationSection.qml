@@ -13,12 +13,14 @@ Column {
   required property double nowMs
   required property color foreground
   required property color dim
+  required property color selectedDim
   required property color accent
   required property color urgent
   required property string fontFamily
   required property bool historical
   required property bool showUnavailable
   required property var signalColor
+  required property var selectedSignalColor
 
   signal rowSelected(var row)
 
@@ -77,7 +79,7 @@ Column {
       width: root.width
       height: automationSummary.height + (selected ? automationDetail.implicitHeight : 0)
       radius: Style.cornerRadius
-      opacity: root.historical ? 0.55 : 1
+      opacity: root.historical && !selected ? 0.55 : 1
       color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
       border.width: selected ? 1 : 0
       border.color: root.accent
@@ -99,7 +101,8 @@ Column {
           anchors.leftMargin: Style.space(8)
           anchors.verticalCenter: automationName.verticalCenter
           kind: automationRow.signal.shape
-          color: root.signalColor(automationRow.signal.tone)
+          color: automationRow.selected ? root.selectedSignalColor(automationRow.signal.tone)
+            : root.signalColor(automationRow.signal.tone)
         }
 
         Text {
@@ -112,7 +115,8 @@ Column {
           anchors.topMargin: Style.space(6)
           text: automationRow.modelData.name
           elide: Text.ElideRight
-          color: automationRow.modelData.enabled ? root.foreground : root.dim
+          color: automationRow.modelData.enabled ? root.foreground
+            : automationRow.selected ? root.selectedDim : root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
           font.bold: automationRow.modelData.enabled
@@ -126,7 +130,8 @@ Column {
           anchors.verticalCenter: automationName.verticalCenter
           width: Math.min(implicitWidth, parent.width * 0.42)
           text: root.historical ? "Last known" : Logic.automationCompactStatusLabel(automationRow.modelData)
-          color: root.historical ? root.dim : root.signalColor(automationRow.signal.tone)
+          color: automationRow.selected ? root.selectedSignalColor(automationRow.signal.tone)
+            : root.historical ? root.dim : root.signalColor(automationRow.signal.tone)
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
           elide: Text.ElideRight
@@ -146,7 +151,7 @@ Column {
             return last ? "Last " + last : "No runs yet"
           }
           elide: Text.ElideRight
-          color: root.dim
+          color: automationRow.selected ? root.selectedDim : root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
         }
@@ -163,7 +168,7 @@ Column {
         nowMs: root.nowMs
         historical: root.historical
         foreground: root.foreground
-        dim: root.dim
+        dim: root.selectedDim
         fontFamily: root.fontFamily
       }
     }

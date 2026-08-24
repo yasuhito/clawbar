@@ -406,6 +406,24 @@ test("configuration errors provide private-safe repair guidance", () => {
   assert.equal(Logic.configurationGuidance("healthy"), "")
 })
 
+test("theme-aware colors remain readable on normal and selected surfaces", () => {
+  for (const [name, background, foreground, muted, green] of [
+    ["white", "#ffffff", "#000000", "#808080", "#3a3a3a"],
+    ["catppuccin-latte", "#eff1f5", "#4c4f69", "#acb0be", "#40a02b"],
+    ["flexoki-light", "#fffcf0", "#100f0f", "#b7b5ac", "#879a39"],
+    ["vantablack", "#000000", "#ffffff", "#7a7a7a", "#b6b6b6"]
+  ]) {
+    const selectedSurface = Logic.blendColor(foreground, background, 0.18)
+    const secondary = Logic.readableColor(muted, foreground, background, 4.5)
+    const selectedSecondary = Logic.readableColor(secondary, foreground, selectedSurface, 4.5)
+    const selectedGreen = Logic.readableColor(green, foreground, selectedSurface, 4.5)
+
+    assert.ok(Logic.contrastRatio(secondary, background) >= 4.5, `${name} secondary`)
+    assert.ok(Logic.contrastRatio(selectedSecondary, selectedSurface) >= 4.5, `${name} selected secondary`)
+    assert.ok(Logic.contrastRatio(selectedGreen, selectedSurface) >= 4.5, `${name} selected green`)
+  }
+})
+
 test("signal semantics follow the prototype dot and color legend", () => {
   for (const [state, tone, label] of [
     ["healthy", "healthy", "Healthy"],

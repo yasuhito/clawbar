@@ -31,7 +31,13 @@ KeyboardPanel {
   readonly property int selectedIndex: Logic.indexForKey(rows, selectedKey)
   readonly property var selectedRow: selectedIndex >= 0 ? rows[selectedIndex] : null
   readonly property color foreground: bar ? bar.foreground : Color.foreground
-  readonly property color dim: Color.muted
+  readonly property color panelSurface: Color.popups.background
+  readonly property color rawDim: Color.muted
+  readonly property color dim: Logic.readableColor(rawDim, foreground, panelSurface, 4.5)
+  readonly property color selectedSurface: Logic.blendColor(
+    Style.selectedStateColor(foreground, accent), panelSurface, Style.selectedFillAlpha
+  )
+  readonly property color selectedDim: Logic.readableColor(dim, foreground, selectedSurface, 4.5)
   readonly property color accent: Color.accent
   readonly property color urgent: bar ? bar.urgent : Color.urgent
   required property color healthy
@@ -89,7 +95,13 @@ KeyboardPanel {
 
 
   function signalColor(tone) {
-    return Logic.signalColor(tone, foreground, accent, urgent, dim, healthy, warning)
+    var preferred = Logic.signalColor(tone, foreground, accent, urgent, dim, healthy, warning)
+    return Logic.readableColor(preferred, foreground, panelSurface, 4.5)
+  }
+
+  function selectedSignalColor(tone) {
+    var preferred = Logic.signalColor(tone, foreground, accent, urgent, dim, healthy, warning)
+    return Logic.readableColor(preferred, foreground, selectedSurface, 4.5)
   }
 
   onRowsChanged: reconcileRows()
@@ -343,7 +355,7 @@ KeyboardPanel {
             width: contentColumn.width
             height: nodeSummary.height + (selected ? nodeDetail.implicitHeight : 0)
             radius: Style.cornerRadius
-            opacity: root.historical ? 0.55 : 1
+            opacity: root.historical && !selected ? 0.55 : 1
             color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
             border.width: selected ? 1 : 0
             border.color: root.accent
@@ -377,7 +389,7 @@ KeyboardPanel {
                 anchors.verticalCenter: parent.verticalCenter
                 text: nodeRow.modelData.name
                 elide: Text.ElideRight
-                color: nodeRow.offline ? root.dim : root.foreground
+                color: nodeRow.offline ? (nodeRow.selected ? root.selectedDim : root.dim) : root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body
                 font.bold: !nodeRow.offline
@@ -390,7 +402,8 @@ KeyboardPanel {
                 anchors.rightMargin: Style.space(8)
                 anchors.verticalCenter: nodeTitle.verticalCenter
                 text: root.historical ? "Last known" : nodeRow.signal.label
-                color: root.historical ? root.dim : root.signalColor(nodeRow.signal.tone)
+                color: nodeRow.selected ? root.selectedSignalColor(nodeRow.signal.tone)
+                  : root.historical ? root.dim : root.signalColor(nodeRow.signal.tone)
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
               }
@@ -408,7 +421,7 @@ KeyboardPanel {
               historical: root.historical
               nowMs: root.nowMs
               foreground: root.foreground
-              dim: root.dim
+              dim: root.selectedDim
               fontFamily: root.fontFamily
             }
           }
@@ -451,7 +464,7 @@ KeyboardPanel {
             width: contentColumn.width
             height: agentSummary.height + (selected ? agentDetail.implicitHeight : 0)
             radius: Style.cornerRadius
-            opacity: root.historical ? 0.55 : 1
+            opacity: root.historical && !selected ? 0.55 : 1
             color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
             border.width: selected ? 1 : 0
             border.color: root.accent
@@ -473,7 +486,8 @@ KeyboardPanel {
                 anchors.leftMargin: Style.space(9)
                 anchors.verticalCenter: agentName.verticalCenter
                 kind: agentRow.signal.shape
-                color: root.signalColor(agentRow.signal.tone)
+                color: agentRow.selected ? root.selectedSignalColor(agentRow.signal.tone)
+                  : root.signalColor(agentRow.signal.tone)
               }
 
               Text {
@@ -501,7 +515,9 @@ KeyboardPanel {
                 text: Logic.taskResultLabel(agentRow.modelData.taskResult, root.nowMs)
                 elide: Text.ElideRight
                 color: agentRow.modelData.taskResult
-                  && agentRow.modelData.taskResult.state === "failed" ? root.urgent : root.dim
+                  && agentRow.modelData.taskResult.state === "failed"
+                    ? (agentRow.selected ? root.selectedSignalColor("critical") : root.urgent)
+                    : (agentRow.selected ? root.selectedDim : root.dim)
                 font.bold: !!agentRow.modelData.taskResult
                   && agentRow.modelData.taskResult.state === "failed"
                 font.family: root.fontFamily
@@ -521,8 +537,8 @@ KeyboardPanel {
               historical: root.historical
               nowMs: root.nowMs
               foreground: root.foreground
-              dim: root.dim
-              urgent: root.urgent
+              dim: root.selectedDim
+              urgent: root.selectedSignalColor("critical")
               fontFamily: root.fontFamily
             }
           }
@@ -540,11 +556,13 @@ KeyboardPanel {
           nowMs: root.nowMs
           foreground: root.foreground
           dim: root.dim
+          selectedDim: root.selectedDim
           accent: root.accent
           urgent: root.urgent
           fontFamily: root.fontFamily
           historical: root.historical
           signalColor: root.signalColor
+          selectedSignalColor: root.selectedSignalColor
           showUnavailable: root.state === "degraded"
           onRowSelected: function(row) {
             root.selectRow(row)

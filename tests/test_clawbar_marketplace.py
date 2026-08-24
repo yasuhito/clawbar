@@ -95,6 +95,16 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertNotIn("modelData.activity", panel)
         self.assertNotIn('text: "Activity "', detail)
 
+    def test_selected_rows_use_theme_aware_readable_secondary_colors(self) -> None:
+        panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
+        section = (ROOT / "AutomationSection.qml").read_text(encoding="utf-8")
+
+        self.assertIn("Logic.readableColor(rawDim, foreground, panelSurface, 4.5)", panel)
+        self.assertIn("readonly property color selectedDim", panel)
+        self.assertIn("root.selectedDim", panel)
+        self.assertIn("required property color selectedDim", section)
+        self.assertIn("root.selectedDim", section)
+
     def test_healthy_row_labels_are_visually_quiet_but_accessible(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
         section = (ROOT / "AutomationSection.qml").read_text(encoding="utf-8")
