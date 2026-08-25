@@ -1,10 +1,36 @@
 # Clawbar
 
-Clawbar is a read-only OpenClaw Fleet signal board for the Omarchy bar. It
-collects bounded Operational Metadata from one configured Gateway, then renders
-the cached snapshot without blocking Quickshell.
+**See the state of OpenClaw without leaving your Omarchy bar.**
+
+Clawbar is a read-only status surface for your Gateway, Fleet, registered
+Agents, and Automations. The bar shows whether anything needs attention; the
+keyboard-first panel explains what changed without exposing task content,
+messages, credentials, or raw errors.
 
 ![Clawbar showing a fictional Fleet incident](preview.png)
+
+## Install
+
+```sh
+omarchy plugin add https://github.com/yasuhito/clawbar.git --enable
+```
+
+Clawbar appears in the right bar section and starts collecting immediately. It
+uses the Gateway already resolved by OpenClaw, so a normal local or configured
+remote setup needs no second connection configuration.
+
+## What you get
+
+- **One-glance status.** The Claw changes color with current severity; open the
+  panel for Gateway, Node, Agent, Task Result, and Automation context.
+- **Quiet incident notifications.** Clawbar groups failures and recoveries and
+  does not repeat the same notification on every refresh.
+- **A responsive shell.** Collection runs outside QML, has a 12-second deadline,
+  and renders from an atomic cached snapshot without blocking Quickshell.
+- **A strict privacy boundary.** Only bounded Operational Metadata reaches the
+  panel. Clawbar never stores a Gateway token or displays Private Content.
+- **Keyboard-first operation.** Navigate with arrows or `j`/`k`, refresh with
+  `r`, and close with Escape.
 
 ## Requirements
 
@@ -16,19 +42,12 @@ the cached snapshot without blocking Quickshell.
   resolve a local, configured remote, or Node-host Gateway
 
 Clawbar does not install a Python package, daemon, systemd service, or timer.
-One Quickshell service entry point owns the bounded collection schedule.
-
-## Install
-
-```sh
-omarchy plugin add https://github.com/yasuhito/clawbar.git --enable
-```
-
-The widget is placed in the right bar section. Enabling it starts one immediate
-collection and repeats every 30 seconds. OpenClaw first resolves its normal
-local or configured remote Gateway. If that fails on a Node host, Clawbar uses
-the Gateway connection recorded in OpenClaw-owned Node-host state; it never
-probes Fleet Nodes directly and never stores a Gateway token.
+One Quickshell service entry point owns the bounded collection schedule. It
+collects immediately after enablement and repeats every 30 seconds. OpenClaw
+first resolves its normal local or configured remote Gateway. If that fails on
+a Node host, Clawbar uses the Gateway connection recorded in OpenClaw-owned
+Node-host state; it never probes Fleet Nodes directly and never stores a
+Gateway token.
 If the Gateway retains several registrations with the same Node display name,
 Clawbar shows only the freshest connected registration.
 
@@ -65,21 +84,22 @@ Press Clawbar to open the panel.
 - Escape: close the panel
 - Middle-click the bar widget: request a non-blocking refresh
 
-The bar icon changes color with current severity; its compact slot does not
-render a separate status dot or count. The tooltip reports current Attention
-Items while yellow or red. Selecting a Node, Agent, or Automation expands its
-bounded Operational Metadata directly beneath that row; selecting another row
-moves the single expanded detail with the selection. The panel keeps Agents and
-Automations in independent sections because Gateway metadata establishes no
-Node ownership; an empty Agents section is omitted. Routine healthy Node and
-Automation rows omit the repeated `Healthy` label while retaining it for
-accessibility; exceptional and historical states remain explicit. A green
-`Healthy` indicator remains visible in the panel header. Registered Agents use
-a static green presence dot without claiming health or current activity;
-previous Task Result remains separate. Offline Nodes appear as muted Operational
-Metadata and do not affect Attention counts,
-Incidents, or notifications. Automation Failures appear once in the Automations
-section.
+The bar icon changes color with current severity and briefly snaps while
+hovered or collecting; its compact slot does not render a separate status dot
+or count. The tooltip reports current Attention Items while yellow or red. The
+panel keeps Gateway identity and status pinned while its operational rows
+scroll. Selecting a Node, Agent, or Automation expands its bounded Operational
+Metadata directly beneath that row; selecting another row moves the single
+expanded detail with the selection. The panel keeps Agents and Automations in
+independent sections because Gateway metadata establishes no Node ownership; an
+empty Agents section is omitted. Routine healthy Node and Automation rows omit
+the repeated `Healthy` label while retaining it for accessibility; exceptional
+and historical states remain explicit. A green `Healthy` indicator remains
+visible in the panel header. Registered Agents use a static green presence dot
+without claiming health or current activity; previous Task Result remains
+separate. Offline Nodes appear as muted Operational Metadata and do not affect
+Attention counts, Incidents, or notifications. Automation Failures appear once
+in the Automations section.
 
 ## Privacy boundary
 
