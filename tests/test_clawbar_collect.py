@@ -284,6 +284,60 @@ class CollectorCommandTests(CollectorFixture, unittest.TestCase):
 
 class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
 
+    def test_read_theme_colors_prints_a_valid_regular_file(self) -> None:
+        colors_path = self.root / "colors.toml"
+        colors = 'green = "#123456"\nyellow = "#abcdef"\n'
+        colors_path.write_text(colors, encoding="utf-8")
+
+        result = self.run_external(
+            "local",
+            timeout=1,
+            collector_arguments=["--read-theme-colors", str(colors_path)],
+        )
+
+        self.assertEqual(result.returncode, clawbar_collect.ExitCode.OK)
+        self.assertEqual(result.stdout, colors)
+
+    def test_read_theme_colors_rejects_unsafe_files_without_blocking(self) -> None:
+        colors_path = self.root / "colors.toml"
+        os.mkfifo(colors_path)
+
+        fifo_result = self.run_external(
+            "local",
+            timeout=1,
+            collector_arguments=["--read-theme-colors", str(colors_path)],
+        )
+
+        self.assertEqual(fifo_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(fifo_result.stdout, "")
+
+        colors_path.unlink()
+        outside = self.root / "outside-colors.toml"
+        outside.write_text('green = "#123456"\n', encoding="utf-8")
+        colors_path.symlink_to(outside)
+
+        link_result = self.run_external(
+            "local",
+            timeout=1,
+            collector_arguments=["--read-theme-colors", str(colors_path)],
+        )
+
+        self.assertEqual(link_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(link_result.stdout, "")
+
+        colors_path.unlink()
+        with colors_path.open("wb") as output:
+            output.truncate(clawbar_snapshot.MAX_STATE_FILE_BYTES + 1)
+
+        oversized_result = self.run_external(
+            "local",
+            timeout=1,
+            collector_arguments=["--read-theme-colors", str(colors_path)],
+        )
+
+        self.assertEqual(oversized_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(oversized_result.stdout, "")
+
     def test_read_cache_prints_a_valid_regular_snapshot(self) -> None:
         state_directory = self.root / "external-state" / "clawbar"
         state_directory.mkdir(parents=True)

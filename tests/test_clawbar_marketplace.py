@@ -49,6 +49,12 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertNotIn('command: ["cat", root.snapshotPath]', widget)
         self.assertIn('"--read-cache"', widget)
 
+    def test_qml_reads_theme_colors_through_the_bounded_collector_interface(self) -> None:
+        widget = (ROOT / "Clawbar.qml").read_text(encoding="utf-8")
+
+        self.assertNotIn("FileView", widget)
+        self.assertIn('"--read-theme-colors"', widget)
+
     def test_manifest_declares_widget_and_scheduler_service(self) -> None:
         manifest = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
 

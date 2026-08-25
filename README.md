@@ -116,7 +116,10 @@ Clawbar never persists or displays task instructions, message bodies,
 destinations, account identifiers, credentials, host/IP/private Node or
 Tailscale identifiers, or raw errors. Tailscale device identifiers are HMACed
 with Clawbar's local secret into stable candidate keys before entering a
-snapshot. QML reads only `$XDG_STATE_HOME/clawbar/snapshot.json` (or
+snapshot. QML does not open user-controlled files directly. It obtains both the
+snapshot and current theme colors through collector commands that cap each read
+at 8 MiB, accept regular files only, and do not follow a final symbolic link.
+The snapshot is `$XDG_STATE_HOME/clawbar/snapshot.json` (or
 `~/.local/state/clawbar/snapshot.json`). Private mode-`0600` state beside the
 snapshot maps opaque candidate keys to Tailscale targets and remembers a
 verified Tailscale fallback. Automatic resolution never replaces that fallback.

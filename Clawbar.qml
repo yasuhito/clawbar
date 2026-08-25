@@ -13,6 +13,8 @@ BarWidget {
   property string resolutionSource: "unresolved"
   property var lastSnapshot: null
   property bool cacheReadPending: false
+  property bool themeReadPending: false
+  property string themeReadOutput: ""
   property bool collectionAttempted: false
   property bool opened: false
   property string refreshFeedback: "idle"
@@ -21,6 +23,7 @@ BarWidget {
   property color healthyColor: signalForeground
   property color warningColor: Color.accent
   readonly property var themeGeneration: Color.shellValues
+  readonly property string themeColorsPath: Color.currentThemePath + "/colors.toml"
   property string collectorPath: decodeURIComponent(
     String(Qt.resolvedUrl("scripts/clawbar_collect.py")).replace(/^file:\/\//, "")
   )
@@ -63,15 +66,26 @@ BarWidget {
     warningColor = Logic.themeColorFromTheme(raw, "yellow", Color.accent)
   }
 
-  property FileView themeColors: FileView {
-    path: Color.currentThemePath + "/colors.toml"
-    watchChanges: false
-    printErrors: false
-    onLoaded: root.loadThemeColors(text())
-    onLoadFailed: root.loadThemeColors("")
+  function readThemeColors() {
+    if (themeReader.running) {
+      themeReadPending = true
+      return
+    }
+    themeReadOutput = ""
+    themeReader.running = true
   }
 
-  onThemeGenerationChanged: if (themeColors) themeColors.reload()
+  function consumeThemeRead(exitCode) {
+    if (themeReadPending) {
+      themeReadPending = false
+      themeReadOutput = ""
+      themeReader.running = true
+      return
+    }
+    loadThemeColors(exitCode === 0 ? themeReadOutput : "")
+  }
+
+  onThemeGenerationChanged: readThemeColors()
 
   function readSnapshot() {
     var action = Logic.requestRefresh(cacheReader.running)
@@ -141,7 +155,10 @@ BarWidget {
     opened = false
   }
 
-  Component.onCompleted: readSnapshot()
+  Component.onCompleted: {
+    readSnapshot()
+    readThemeColors()
+  }
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -161,6 +178,16 @@ BarWidget {
     }
     onExited: function(exitCode) {
       Qt.callLater(function() { root.consumeCacheRead(exitCode) })
+    }
+  }
+  Process {
+    id: themeReader
+    command: ["python3", root.collectorPath, "--read-theme-colors", root.themeColorsPath]
+    stdout: StdioCollector {
+      onStreamFinished: root.themeReadOutput = text
+    }
+    onExited: function(exitCode) {
+      Qt.callLater(function() { root.consumeThemeRead(exitCode) })
     }
   }
   Timer {

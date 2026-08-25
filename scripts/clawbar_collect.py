@@ -143,10 +143,13 @@ def load_previous_snapshot(path: Path) -> dict[str, Any] | None:
     return load_snapshot(path, SCHEMA_VERSION)
 
 
-
-
-
-
+def print_bounded_text_file(path: Path) -> ExitCode:
+    try:
+        content = read_bounded_regular_file(path).decode("utf-8")
+    except (FileNotFoundError, OSError, UnicodeDecodeError):
+        return ExitCode.COMMAND_FAILED
+    sys.stdout.write(content)
+    return ExitCode.OK
 
 
 def configuration_error_snapshot(
@@ -488,6 +491,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="print the bounded regular snapshot cache without collecting",
     )
     parser.add_argument(
+        "--read-theme-colors",
+        type=Path,
+        metavar="PATH",
+        help="print one bounded regular UTF-8 theme colors file without collecting",
+    )
+    parser.add_argument(
         "--refresh-interval",
         default=DEFAULT_REFRESH_INTERVAL_SECONDS,
         type=parse_refresh_interval,
@@ -504,6 +513,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = build_parser().parse_args(argv)
     snapshot_path = default_snapshot_path()
+    if arguments.read_theme_colors is not None:
+        return int(print_bounded_text_file(arguments.read_theme_colors))
     if arguments.read_cache:
         snapshot = load_previous_snapshot(snapshot_path)
         if snapshot is None:
