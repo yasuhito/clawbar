@@ -24,6 +24,7 @@ Item {
     spacing: Style.space(4)
 
     Text {
+      textFormat: Text.PlainText
       visible: root.historical
       width: parent.width
       text: "Last known · " + Logic.relativeTime(root.observedAt, root.nowMs)
@@ -35,6 +36,7 @@ Item {
     }
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       text: Logic.nodeMetadataLabel(root.node)
       color: root.foreground
@@ -45,6 +47,7 @@ Item {
     }
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       text: {
         var lastSeen = Logic.compactAbsoluteLocalTime(root.node.lastSeenAt, root.nowMs)
@@ -63,6 +66,7 @@ Item {
     }
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       text: {
         var observed = Logic.compactAbsoluteLocalTime(root.observedAt, root.nowMs)

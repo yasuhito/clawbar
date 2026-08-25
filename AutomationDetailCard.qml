@@ -23,6 +23,7 @@ Item {
     spacing: Style.space(4)
 
     Text {
+      textFormat: Text.PlainText
       visible: root.historical
       width: parent.width
       text: "Last known · " + Logic.relativeTime(root.automation.lastRunAt, root.nowMs)
@@ -34,6 +35,7 @@ Item {
     }
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       text: Logic.automationKindLabel(root.automation.kind)
         + " · " + Logic.automationStatusLabel(root.automation)
@@ -45,6 +47,7 @@ Item {
     }
 
     Text {
+      textFormat: Text.PlainText
       visible: !!Logic.compactAbsoluteLocalTime(root.automation.nextRunAt, root.nowMs)
       width: parent.width
       text: "Next run " + Logic.compactAbsoluteLocalTime(root.automation.nextRunAt, root.nowMs)
@@ -61,6 +64,7 @@ Item {
     }
 
     Text {
+      textFormat: Text.PlainText
       visible: !!Logic.compactAbsoluteLocalTime(root.automation.lastRunAt, root.nowMs)
       width: parent.width
       text: "Last run " + Logic.compactAbsoluteLocalTime(root.automation.lastRunAt, root.nowMs)
@@ -77,6 +81,7 @@ Item {
     }
 
     Text {
+      textFormat: Text.PlainText
       visible: !Logic.compactAbsoluteLocalTime(root.automation.nextRunAt, root.nowMs)
         && !Logic.compactAbsoluteLocalTime(root.automation.lastRunAt, root.nowMs)
         && root.automation.lastResult === "none"

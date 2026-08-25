@@ -73,6 +73,10 @@ omarchy restart shell
 The whole collection has a 12-second deadline. A slow or unavailable Gateway
 cannot accumulate overlapping collector processes or block the bar. A healthy
 snapshot becomes Stale after three configured refresh intervals.
+Each command output stream and local state file is limited to 8 MiB. Clawbar
+reads state only from regular files without following a final symbolic link,
+so a replaced FIFO, device, link, or oversized file cannot block collection or
+the bar cache reader.
 
 ## Use
 

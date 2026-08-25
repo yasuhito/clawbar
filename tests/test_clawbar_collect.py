@@ -7,23 +7,98 @@ import os
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 from unittest import mock
 from datetime import datetime
 from pathlib import Path
 
-from scripts import clawbar_collect, clawbar_metadata
+from scripts import clawbar_collect, clawbar_gateway, clawbar_metadata, clawbar_snapshot
 from tests.collector_fixture import CollectorFixture
 
 class MetadataTests(unittest.TestCase):
     def test_secret_created_by_another_collector_is_validated(self) -> None:
         with (
-            mock.patch.object(Path, "read_bytes", side_effect=[FileNotFoundError, b""]),
+            mock.patch.object(
+                clawbar_metadata,
+                "read_bounded_regular_file",
+                side_effect=[FileNotFoundError, b""],
+            ),
             mock.patch.object(os, "open", side_effect=FileExistsError),
         ):
             with self.assertRaisesRegex(OSError, "Invalid Clawbar local key secret"):
                 clawbar_metadata.load_local_key_secret()
+
+    def test_secret_reader_rejects_symbolic_links(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            secret_directory = root / "clawbar"
+            secret_directory.mkdir()
+            target = root / "outside-secret"
+            target.write_bytes(b"x" * 32)
+            (secret_directory / "node-key-secret").symlink_to(target)
+
+            with mock.patch.dict(os.environ, {"XDG_RUNTIME_DIR": str(root)}):
+                with self.assertRaises(OSError):
+                    clawbar_metadata.load_local_key_secret()
+
+
+class BoundedInputTests(unittest.TestCase):
+    def test_gateway_command_rejects_output_over_the_limit(self) -> None:
+        for descriptor in (1, 2):
+            with self.subTest(descriptor=descriptor), self.assertRaises(OSError):
+                clawbar_gateway.run_command(
+                    [
+                        sys.executable,
+                        "-c",
+                        (
+                            "import os; os.write("
+                            f"{descriptor}, b'x' * ({clawbar_gateway.MAX_COMMAND_STREAM_BYTES} + 1))"
+                        ),
+                    ],
+                    time.monotonic() + 2,
+                )
+
+    def test_snapshot_reader_rejects_symbolic_links(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            target = root / "outside.json"
+            target.write_text('{"schemaVersion":1}', encoding="utf-8")
+            link = root / "snapshot.json"
+            link.symlink_to(target)
+
+            self.assertIsNone(clawbar_snapshot.load_snapshot(link, 1))
+
+    def test_snapshot_reader_rejects_files_over_the_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            snapshot = Path(temporary_directory) / "snapshot.json"
+            with snapshot.open("wb") as output:
+                output.truncate(clawbar_snapshot.MAX_STATE_FILE_BYTES + 1)
+
+            self.assertIsNone(clawbar_snapshot.load_snapshot(snapshot, 1))
+
+    def test_snapshot_reader_rejects_fifo_without_waiting_for_a_writer(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            fifo = Path(temporary_directory) / "snapshot.json"
+            os.mkfifo(fifo)
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    (
+                        "from pathlib import Path; "
+                        "from scripts.clawbar_snapshot import load_snapshot; "
+                        "print(load_snapshot(Path(r'" + str(fifo) + "'), 1))"
+                    ),
+                ],
+                cwd=Path(__file__).resolve().parents[1],
+                capture_output=True,
+                text=True,
+                timeout=0.5,
+                check=True,
+            )
+            self.assertEqual(completed.stdout, "None\n")
 
 
 class CollectorCommandTests(CollectorFixture, unittest.TestCase):
@@ -208,6 +283,70 @@ class CollectorCommandTests(CollectorFixture, unittest.TestCase):
 
 
 class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
+
+    def test_read_cache_prints_a_valid_regular_snapshot(self) -> None:
+        state_directory = self.root / "external-state" / "clawbar"
+        state_directory.mkdir(parents=True)
+        snapshot = {"schemaVersion": 1, "gateway": {"state": "healthy"}}
+        (state_directory / "snapshot.json").write_text(
+            json.dumps(snapshot),
+            encoding="utf-8",
+        )
+
+        result = self.run_external(
+            "local",
+            timeout=1,
+            collector_arguments=["--read-cache"],
+        )
+
+        self.assertEqual(result.returncode, clawbar_collect.ExitCode.OK)
+        self.assertEqual(json.loads(result.stdout), snapshot)
+
+    def test_executable_bounds_gateway_command_output(self) -> None:
+        started_at = time.monotonic()
+        result = self.run_external(
+            "local",
+            timeout=2,
+            environment_overrides={
+                "FAKE_GATEWAY_OUTPUT_BYTES": str(
+                    clawbar_gateway.MAX_COMMAND_STREAM_BYTES + 1
+                ),
+            },
+        )
+
+        self.assertEqual(result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(json.loads(result.stdout)["failureKind"], "command_failed")
+        self.assertLess(time.monotonic() - started_at, 2)
+
+    def test_read_cache_rejects_fifo_and_symbolic_link_state(self) -> None:
+        state_directory = self.root / "external-state" / "clawbar"
+        state_directory.mkdir(parents=True)
+        snapshot_path = state_directory / "snapshot.json"
+        os.mkfifo(snapshot_path)
+
+        fifo_result = self.run_external(
+            "local",
+            timeout=1,
+            collector_arguments=["--read-cache"],
+        )
+
+        self.assertEqual(fifo_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(fifo_result.stdout, "")
+
+        snapshot_path.unlink()
+        outside = self.root / "outside.json"
+        outside.write_text('{"schemaVersion":1,"private":"sentinel"}', encoding="utf-8")
+        snapshot_path.symlink_to(outside)
+
+        link_result = self.run_external(
+            "local",
+            timeout=1,
+            collector_arguments=["--read-cache"],
+        )
+
+        self.assertEqual(link_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(link_result.stdout, "")
+        self.assertIn("sentinel", outside.read_text(encoding="utf-8"))
 
     def test_executable_resolves_local_configured_remote_and_node_host_gateways(self) -> None:
         expected_sources = {

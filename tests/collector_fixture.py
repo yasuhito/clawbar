@@ -101,6 +101,15 @@ class CollectorFixture:
 
                 if arguments[:2] == ["gateway", "status"]:
                     time.sleep(float(os.environ.get("FAKE_GATEWAY_DELAY", "0")))
+                    output_bytes = os.environ.get("FAKE_GATEWAY_OUTPUT_BYTES")
+                    if output_bytes is not None:
+                        remaining = int(output_bytes)
+                        chunk = b"x" * min(65536, remaining)
+                        while remaining:
+                            written = min(len(chunk), remaining)
+                            os.write(sys.stdout.fileno(), chunk[:written])
+                            remaining -= written
+                        raise SystemExit(0)
                     scenario = os.environ.get("FAKE_SCENARIO", "local")
                     candidate_mode = os.environ.get("FAKE_CANDIDATE_MODE", "healthy")
                     if "--url" in arguments and scenario == "unresolved":

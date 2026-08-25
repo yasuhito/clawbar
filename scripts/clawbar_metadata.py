@@ -10,6 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+if __package__:
+    from .clawbar_snapshot import read_bounded_regular_file
+else:
+    from clawbar_snapshot import read_bounded_regular_file
+
 _SECRET_BYTES = 32
 MAX_NODE_REGISTRATIONS = 5_000
 MAX_AUTOMATIONS = 500
@@ -31,13 +36,17 @@ def load_local_key_secret() -> bytes:
     secret_path = secret_root / "clawbar" / "node-key-secret"
     secret_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     try:
-        secret = secret_path.read_bytes()
+        secret = read_bounded_regular_file(secret_path, _SECRET_BYTES)
     except FileNotFoundError:
         secret = secrets.token_bytes(_SECRET_BYTES)
         try:
-            descriptor = os.open(secret_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            descriptor = os.open(
+                secret_path,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | getattr(os, "O_NOFOLLOW", 0),
+                0o600,
+            )
         except FileExistsError:
-            secret = secret_path.read_bytes()
+            secret = read_bounded_regular_file(secret_path, _SECRET_BYTES)
         else:
             with os.fdopen(descriptor, "wb") as output:
                 output.write(secret)

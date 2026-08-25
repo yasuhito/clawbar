@@ -6,6 +6,7 @@ import ctypes
 import ipaddress
 import json
 import os
+import selectors
 import signal
 import subprocess
 import time
@@ -27,6 +28,8 @@ SETUP_GUIDANCE = "Choose a Tailscale device to verify as your OpenClaw Gateway."
 NO_TAILSCALE_GUIDANCE = "Connect Tailscale on this device, then refresh to find Gateway candidates."
 KEY_SECRET_ERROR = "Clawbar cannot derive private Gateway Candidate Keys. Repair its local key secret."
 PR_SET_PDEATHSIG = 1
+MAX_COMMAND_STREAM_BYTES = 8 * 1024 * 1024
+COMMAND_READ_CHUNK_BYTES = 64 * 1024
 
 
 @dataclass(frozen=True)
@@ -36,6 +39,10 @@ class GatewayTarget:
 
 
 class CollectionDeadlineExceeded(Exception):
+    pass
+
+
+class CommandOutputExceeded(OSError):
     pass
 
 
@@ -51,21 +58,50 @@ def run_command(command: Sequence[str], deadline_at: float) -> subprocess.Comple
         command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,
         start_new_session=True,
         preexec_fn=terminate_with_parent,
     )
+    stdout = bytearray()
+    stderr = bytearray()
+    selector = selectors.DefaultSelector()
+    assert process.stdout is not None
+    assert process.stderr is not None
+    selector.register(process.stdout, selectors.EVENT_READ, stdout)
+    selector.register(process.stderr, selectors.EVENT_READ, stderr)
     try:
-        stdout, stderr = process.communicate(
-            timeout=seconds_until_deadline(deadline_at),
-        )
-    except subprocess.TimeoutExpired as error:
+        while selector.get_map():
+            events = selector.select(seconds_until_deadline(deadline_at))
+            for key, _ in events:
+                output = key.data
+                chunk = os.read(
+                    key.fd,
+                    min(COMMAND_READ_CHUNK_BYTES, MAX_COMMAND_STREAM_BYTES + 1 - len(output)),
+                )
+                if not chunk:
+                    selector.unregister(key.fileobj)
+                    continue
+                output.extend(chunk)
+                if len(output) > MAX_COMMAND_STREAM_BYTES:
+                    raise CommandOutputExceeded(
+                        f"Command output exceeds {MAX_COMMAND_STREAM_BYTES} bytes"
+                    )
+        return_code = process.wait(timeout=seconds_until_deadline(deadline_at))
+    except (subprocess.TimeoutExpired, CollectionDeadlineExceeded) as error:
         stop_process_group(process)
         raise CollectionDeadlineExceeded from error
     except BaseException:
         stop_process_group(process)
         raise
-    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+    finally:
+        selector.close()
+        process.stdout.close()
+        process.stderr.close()
+    return subprocess.CompletedProcess(
+        command,
+        return_code,
+        stdout.decode("utf-8", errors="replace"),
+        stderr.decode("utf-8", errors="replace"),
+    )
 
 
 def terminate_with_parent() -> None:
@@ -78,20 +114,21 @@ def terminate_with_parent() -> None:
 
 
 def stop_process_group(process: subprocess.Popen[str]) -> None:
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
     if process.poll() is None:
-        try:
-            os.killpg(process.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
         try:
             process.wait(timeout=0.25)
         except subprocess.TimeoutExpired:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            process.wait()
-    process.communicate()
+            pass
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    if process.poll() is None:
+        process.wait()
 
 
 def command_option(arguments: Sequence[str], option: str) -> str | None:

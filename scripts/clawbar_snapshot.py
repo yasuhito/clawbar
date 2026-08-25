@@ -4,20 +4,50 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Collection
 
 
+MAX_STATE_FILE_BYTES = 8 * 1024 * 1024
+READ_CHUNK_BYTES = 64 * 1024
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
+def read_bounded_regular_file(path: Path, max_bytes: int = MAX_STATE_FILE_BYTES) -> bytes:
+    """Read one owner-controlled regular file without following its final link."""
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path, flags)
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise OSError(f"Refusing to read non-regular state file: {path}")
+        if metadata.st_size > max_bytes:
+            raise OSError(f"State file exceeds {max_bytes} bytes: {path}")
+        content = bytearray()
+        while len(content) <= max_bytes:
+            chunk = os.read(
+                descriptor,
+                min(READ_CHUNK_BYTES, max_bytes + 1 - len(content)),
+            )
+            if not chunk:
+                return bytes(content)
+            content.extend(chunk)
+        raise OSError(f"State file exceeds {max_bytes} bytes: {path}")
+    finally:
+        os.close(descriptor)
+
+
 def load_snapshot(path: Path, schema_version: int) -> dict[str, Any] | None:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        raw = read_bounded_regular_file(path)
+        value = json.loads(raw.decode("utf-8"))
+    except (FileNotFoundError, OSError, UnicodeDecodeError, json.JSONDecodeError):
         return None
     if not isinstance(value, dict) or value.get("schemaVersion") != schema_version:
         return None

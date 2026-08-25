@@ -179,6 +179,7 @@ KeyboardPanel {
       }
 
       Text {
+        textFormat: Text.PlainText
         anchors.left: panelClaw.right
         anchors.leftMargin: Style.space(8)
         anchors.top: parent.top
@@ -205,6 +206,7 @@ KeyboardPanel {
         }
 
         Text {
+          textFormat: Text.PlainText
           text: root.gatewaySignal.label
           color: root.signalColor(root.gatewaySignal.tone)
           font.family: root.fontFamily
@@ -214,6 +216,7 @@ KeyboardPanel {
       }
 
       Text {
+        textFormat: Text.PlainText
         anchors.left: parent.left
         anchors.right: observedTime.left
         anchors.rightMargin: Style.space(8)
@@ -227,6 +230,7 @@ KeyboardPanel {
       }
 
       Text {
+        textFormat: Text.PlainText
         id: observedTime
         anchors.right: parent.right
         anchors.bottom: headerDivider.top
@@ -273,6 +277,7 @@ KeyboardPanel {
         spacing: Style.space(4)
 
         Text {
+          textFormat: Text.PlainText
           visible: root.setupVisible
           width: parent.width
           text: "GATEWAY SETUP REQUIRED"
@@ -283,6 +288,7 @@ KeyboardPanel {
         }
 
         Text {
+          textFormat: Text.PlainText
           visible: root.setupVisible
           width: parent.width
           text: root.snapshot && root.snapshot.setup
@@ -295,6 +301,7 @@ KeyboardPanel {
         }
 
         Text {
+          textFormat: Text.PlainText
           visible: root.setupVisible && root.snapshot && root.snapshot.setup
             && !!root.snapshot.setup.error
           width: parent.width
@@ -307,6 +314,7 @@ KeyboardPanel {
         }
 
         Text {
+          textFormat: Text.PlainText
           visible: root.configurationErrorVisible && !root.setupVisible
           width: parent.width
           text: Logic.configurationGuidance(root.state)
@@ -343,6 +351,7 @@ KeyboardPanel {
             }
 
             Text {
+              textFormat: Text.PlainText
               anchors.left: parent.left
               anchors.leftMargin: Style.space(9)
               anchors.right: candidateAction.left
@@ -357,6 +366,7 @@ KeyboardPanel {
             }
 
             Text {
+              textFormat: Text.PlainText
               id: candidateAction
               anchors.right: parent.right
               anchors.rightMargin: Style.space(9)
@@ -371,6 +381,7 @@ KeyboardPanel {
         }
 
         Text {
+          textFormat: Text.PlainText
           visible: !root.setupVisible && !root.configurationErrorVisible
           width: parent.width
           text: "FLEET"
@@ -381,6 +392,7 @@ KeyboardPanel {
         }
 
         Text {
+          textFormat: Text.PlainText
           visible: root.state === "degraded" && root.snapshot
             && root.snapshot.fleet && !root.snapshot.fleet.available
           width: parent.width
@@ -391,6 +403,7 @@ KeyboardPanel {
         }
 
         Text {
+          textFormat: Text.PlainText
           visible: root.metadata && root.metadata.fleet
             && root.metadata.fleet.available && root.nodes.length === 0
           width: parent.width
@@ -447,6 +460,7 @@ KeyboardPanel {
               }
 
               Text {
+                textFormat: Text.PlainText
                 id: nodeTitle
                 anchors.left: parent.left
                 anchors.leftMargin: Style.space(26)
@@ -462,6 +476,7 @@ KeyboardPanel {
               }
 
               Text {
+                textFormat: Text.PlainText
                 id: nodeState
                 visible: nodeRow.showStatus
                 anchors.right: parent.right
@@ -512,6 +527,7 @@ KeyboardPanel {
         }
 
         Text {
+          textFormat: Text.PlainText
           visible: !root.setupVisible && !root.configurationErrorVisible
             && (root.agents.length > 0 || (root.state === "degraded" && root.snapshot
               && root.snapshot.agents && !root.snapshot.agents.available))
@@ -525,6 +541,7 @@ KeyboardPanel {
         }
 
         Text {
+          textFormat: Text.PlainText
           visible: root.state === "degraded" && root.snapshot
             && root.snapshot.agents && !root.snapshot.agents.available
           width: parent.width
@@ -579,6 +596,7 @@ KeyboardPanel {
               }
 
               Text {
+                textFormat: Text.PlainText
                 id: agentName
                 anchors.left: parent.left
                 anchors.leftMargin: Style.space(26)
@@ -595,6 +613,7 @@ KeyboardPanel {
               }
 
               Text {
+                textFormat: Text.PlainText
                 anchors.left: agentName.left
                 anchors.right: parent.right
                 anchors.rightMargin: Style.space(8)

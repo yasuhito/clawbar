@@ -28,6 +28,7 @@ Item {
     spacing: Style.space(4)
 
     Text {
+      textFormat: Text.PlainText
       visible: root.historical
       width: parent.width
       text: "Last known · " + Logic.relativeTime(root.observedAt, root.nowMs)
@@ -39,6 +40,7 @@ Item {
     }
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       text: {
         if (!root.taskResult || root.taskResult.state === "none") return "Task result None"
@@ -53,6 +55,7 @@ Item {
     }
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       text: {
         var completed = Logic.compactAbsoluteLocalTime(root.taskResult.completedAt, root.nowMs)
@@ -71,6 +74,7 @@ Item {
     }
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       text: {
         var observed = Logic.compactAbsoluteLocalTime(root.observedAt, root.nowMs)

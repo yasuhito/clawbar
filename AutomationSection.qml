@@ -35,6 +35,7 @@ Column {
   }
 
   Text {
+    textFormat: Text.PlainText
     width: parent.width
     topPadding: Style.space(8)
     text: "AUTOMATIONS"
@@ -45,6 +46,7 @@ Column {
   }
 
   Text {
+    textFormat: Text.PlainText
     visible: root.showUnavailable && !!root.section && !root.section.available
     width: parent.width
     text: root.section && root.section.reason === "more_than_500"
@@ -56,6 +58,7 @@ Column {
   }
 
   Text {
+    textFormat: Text.PlainText
     visible: !!root.section && root.section.available && root.automations.length === 0
     width: parent.width
     text: "No Automations"
@@ -114,6 +117,7 @@ Column {
         }
 
         Text {
+          textFormat: Text.PlainText
           id: automationName
           anchors.left: parent.left
           anchors.leftMargin: Style.space(26)
@@ -131,6 +135,7 @@ Column {
         }
 
         Text {
+          textFormat: Text.PlainText
           id: automationStatus
           visible: automationRow.showStatus
           anchors.right: parent.right
@@ -147,6 +152,7 @@ Column {
         }
 
         Text {
+          textFormat: Text.PlainText
           anchors.left: automationName.left
           anchors.right: parent.right
           anchors.rightMargin: Style.space(8)

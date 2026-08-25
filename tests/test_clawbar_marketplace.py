@@ -30,6 +30,25 @@ DEMO_SCENARIOS = (
 
 
 class MarketplaceContractTest(unittest.TestCase):
+    def test_qml_treats_all_display_text_as_plain_text(self) -> None:
+        for path in ROOT.glob("*.qml"):
+            source = path.read_text(encoding="utf-8")
+            text_controls = source.count("Text {")
+            if text_controls == 0:
+                continue
+            with self.subTest(path=path.name):
+                self.assertEqual(
+                    source.count("textFormat: Text.PlainText"),
+                    text_controls,
+                    f"every Text control in {path.name} must reject rich-text interpretation",
+                )
+
+    def test_qml_reads_the_snapshot_through_the_bounded_collector_interface(self) -> None:
+        widget = (ROOT / "Clawbar.qml").read_text(encoding="utf-8")
+
+        self.assertNotIn('command: ["cat", root.snapshotPath]', widget)
+        self.assertIn('"--read-cache"', widget)
+
     def test_manifest_declares_widget_and_scheduler_service(self) -> None:
         manifest = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
 

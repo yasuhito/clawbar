@@ -21,11 +21,9 @@ BarWidget {
   property color healthyColor: signalForeground
   property color warningColor: Color.accent
   readonly property var themeGeneration: Color.shellValues
-  property string snapshotPath: {
-    var stateHome = Quickshell.env("XDG_STATE_HOME")
-    var base = stateHome ? stateHome : Quickshell.env("HOME") + "/.local/state"
-    return base + "/clawbar/snapshot.json"
-  }
+  property string collectorPath: decodeURIComponent(
+    String(Qt.resolvedUrl("scripts/clawbar_collect.py")).replace(/^file:\/\//, "")
+  )
   readonly property var collectorService: {
     if (!bar || !bar.shell || typeof bar.shell.serviceFor !== "function") return null
     return bar.shell.serviceFor(root.moduleName)
@@ -150,7 +148,7 @@ BarWidget {
 
   Process {
     id: cacheReader
-    command: ["cat", root.snapshotPath]
+    command: ["python3", root.collectorPath, "--read-cache"]
     stdout: StdioCollector {
       onStreamFinished: {
         try {

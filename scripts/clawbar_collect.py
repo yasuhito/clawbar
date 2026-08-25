@@ -38,6 +38,7 @@ if __package__:
         build_failure_snapshot,
         last_known_metadata,
         load_snapshot,
+        read_bounded_regular_file,
         utc_now,
     )
     from .clawbar_target_state import GatewayTargetState
@@ -65,6 +66,7 @@ else:
         build_failure_snapshot,
         last_known_metadata,
         load_snapshot,
+        read_bounded_regular_file,
         utc_now,
     )
     from clawbar_target_state import GatewayTargetState
@@ -109,8 +111,8 @@ def developer_demo_active() -> bool:
         return False
     try:
         marker = Path(runtime_directory) / "clawbar" / "demo-active"
-        return marker.read_text(encoding="utf-8").strip() == "1"
-    except OSError:
+        return read_bounded_regular_file(marker, 16).decode("utf-8").strip() == "1"
+    except (OSError, UnicodeDecodeError):
         return False
 
 
@@ -481,6 +483,11 @@ def build_parser() -> argparse.ArgumentParser:
         description=f"{__doc__} The whole collection exits within {int(COLLECTION_DEADLINE_SECONDS)} seconds."
     )
     parser.add_argument(
+        "--read-cache",
+        action="store_true",
+        help="print the bounded regular snapshot cache without collecting",
+    )
+    parser.add_argument(
         "--refresh-interval",
         default=DEFAULT_REFRESH_INTERVAL_SECONDS,
         type=parse_refresh_interval,
@@ -497,6 +504,13 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = build_parser().parse_args(argv)
     snapshot_path = default_snapshot_path()
+    if arguments.read_cache:
+        snapshot = load_previous_snapshot(snapshot_path)
+        if snapshot is None:
+            return int(ExitCode.COMMAND_FAILED)
+        json.dump(snapshot, sys.stdout, separators=(",", ":"), sort_keys=True)
+        sys.stdout.write("\n")
+        return int(ExitCode.OK)
     if developer_demo_active():
         snapshot = load_previous_snapshot(snapshot_path)
         if snapshot is not None:
