@@ -46,6 +46,18 @@ KeyboardPanel {
   readonly property var gatewaySignal: Logic.panelSignal(snapshot, state)
 
   /* ───────────────────────────────────────────────────────
+   * DETAIL REVEAL STORYBOARD
+   *
+   *    0ms   selection changes → surface and border update
+   *    0ms   detail opacity 0 → 1 and height 0 → content
+   *  120ms   detail content reaches full opacity
+   *  180ms   detail height settles; selected row stays visible
+   * ─────────────────────────────────────────────────────── */
+  property bool detailMotionEnabled: true
+  readonly property int detailFadeDuration: 120
+  readonly property int detailExpandDuration: 180
+
+  /* ───────────────────────────────────────────────────────
    * SCROLL INDICATOR STORYBOARD
    *
    *    0ms   content moves → thumb becomes clear
@@ -402,14 +414,18 @@ KeyboardPanel {
             readonly property var signal: Logic.nodeSignalPresentation(modelData.state)
             readonly property bool showStatus: Logic.showNodeStatusLabel(modelData.state, root.historical)
             width: contentColumn.width
-            height: nodeSummary.height + (selected ? nodeDetail.implicitHeight : 0)
+            height: nodeSummary.height + nodeDetail.height
             radius: Style.cornerRadius
+            clip: true
             opacity: root.historical && !selected ? 0.55 : 1
             color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
             border.width: selected ? 1 : 0
             border.color: root.accent
             Accessible.name: modelData.name
             Accessible.description: root.historical ? "Last known" : signal.label
+            onHeightChanged: {
+              if (selected) Qt.callLater(root.ensureSelectionVisible)
+            }
 
             Item {
               id: nodeSummary
@@ -461,11 +477,12 @@ KeyboardPanel {
 
             NodeDetailCard {
               id: nodeDetail
-              visible: nodeRow.selected
+              visible: nodeRow.selected || height > 0
               anchors.left: parent.left
               anchors.right: parent.right
               anchors.top: nodeSummary.bottom
-              height: implicitHeight
+              height: nodeRow.selected ? implicitHeight : 0
+              opacity: nodeRow.selected ? 1 : 0
               node: nodeRow.modelData
               observedAt: nodeRow.row ? nodeRow.row.observedAt : ""
               historical: root.historical
@@ -473,6 +490,23 @@ KeyboardPanel {
               foreground: root.foreground
               dim: root.selectedDim
               fontFamily: root.fontFamily
+              Accessible.ignored: !nodeRow.selected
+
+              Behavior on height {
+                enabled: root.detailMotionEnabled
+                NumberAnimation {
+                  duration: root.detailExpandDuration
+                  easing.type: Easing.OutCubic
+                }
+              }
+
+              Behavior on opacity {
+                enabled: root.detailMotionEnabled
+                NumberAnimation {
+                  duration: root.detailFadeDuration
+                  easing.type: Easing.OutCubic
+                }
+              }
             }
           }
         }
@@ -512,14 +546,18 @@ KeyboardPanel {
             readonly property bool selected: !!row && root.selectedKey === row.key
             readonly property var signal: Logic.signalPresentation("registered_agent")
             width: contentColumn.width
-            height: agentSummary.height + (selected ? agentDetail.implicitHeight : 0)
+            height: agentSummary.height + agentDetail.height
             radius: Style.cornerRadius
+            clip: true
             opacity: root.historical && !selected ? 0.55 : 1
             color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
             border.width: selected ? 1 : 0
             border.color: root.accent
             Accessible.name: modelData.name
             Accessible.description: "Registered Agent"
+            onHeightChanged: {
+              if (selected) Qt.callLater(root.ensureSelectionVisible)
+            }
 
             Item {
               id: agentSummary
@@ -578,11 +616,12 @@ KeyboardPanel {
 
             AgentDetailCard {
               id: agentDetail
-              visible: agentRow.selected
+              visible: agentRow.selected || height > 0
               anchors.left: parent.left
               anchors.right: parent.right
               anchors.top: agentSummary.bottom
-              height: implicitHeight
+              height: agentRow.selected ? implicitHeight : 0
+              opacity: agentRow.selected ? 1 : 0
               agent: agentRow.modelData
               observedAt: agentRow.row ? agentRow.row.observedAt : ""
               historical: root.historical
@@ -591,6 +630,23 @@ KeyboardPanel {
               dim: root.selectedDim
               urgent: root.selectedSignalColor("critical")
               fontFamily: root.fontFamily
+              Accessible.ignored: !agentRow.selected
+
+              Behavior on height {
+                enabled: root.detailMotionEnabled
+                NumberAnimation {
+                  duration: root.detailExpandDuration
+                  easing.type: Easing.OutCubic
+                }
+              }
+
+              Behavior on opacity {
+                enabled: root.detailMotionEnabled
+                NumberAnimation {
+                  duration: root.detailFadeDuration
+                  easing.type: Easing.OutCubic
+                }
+              }
             }
           }
         }
@@ -612,12 +668,16 @@ KeyboardPanel {
           urgent: root.urgent
           fontFamily: root.fontFamily
           historical: root.historical
+          detailMotionEnabled: root.detailMotionEnabled
+          detailFadeDuration: root.detailFadeDuration
+          detailExpandDuration: root.detailExpandDuration
           signalColor: root.signalColor
           selectedSignalColor: root.selectedSignalColor
           showUnavailable: root.state === "degraded"
           onRowSelected: function(row) {
             root.selectRow(row)
           }
+          onSelectedGeometryChanged: Qt.callLater(root.ensureSelectionVisible)
         }
 
       }

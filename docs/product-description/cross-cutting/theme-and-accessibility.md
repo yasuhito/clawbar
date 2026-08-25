@@ -84,7 +84,7 @@ A theme generation change reloads green and yellow aliases; missing values use s
 - Healthy routine Node and Automation labels may be visually omitted while exceptional and historical labels stay explicit.
 - Narrow panel rows elide names, status, and detail lines while preserving full timestamps in accessible descriptions.
 - The developer demonstration prefix prevents fictional state from appearing current.
-- Reduced-motion behavior is inherited and not explicit in Clawbar source.
+- Omarchy Shell does not currently expose its reduced-motion preference to third-party QML. Clawbar therefore keeps detail motion short, places all timing and enablement in one source-level configuration point, and never makes information depend on animation.
 
 ## Open questions and verification
 

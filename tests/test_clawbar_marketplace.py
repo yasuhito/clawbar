@@ -128,6 +128,33 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("Behavior on opacity", panel)
         self.assertIn("width: panelFlick.width - Style.space(8)", panel)
 
+    def test_operational_details_share_short_reveal_motion(self) -> None:
+        panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
+        automations = (ROOT / "AutomationSection.qml").read_text(encoding="utf-8")
+
+        self.assertIn("DETAIL REVEAL STORYBOARD", panel)
+        self.assertIn("property bool detailMotionEnabled: true", panel)
+        self.assertIn("readonly property int detailFadeDuration: 120", panel)
+        self.assertIn("readonly property int detailExpandDuration: 180", panel)
+        self.assertEqual(panel.count("Behavior on height"), 2)
+        self.assertGreaterEqual(panel.count("Behavior on opacity"), 3)
+        self.assertEqual(automations.count("Behavior on height"), 1)
+        self.assertEqual(automations.count("Behavior on opacity"), 1)
+        self.assertIn("height: nodeSummary.height + nodeDetail.height", panel)
+        self.assertIn("height: agentSummary.height + agentDetail.height", panel)
+        self.assertIn(
+            "height: automationSummary.height + automationDetail.height",
+            automations,
+        )
+        self.assertIn("visible: nodeRow.selected || height > 0", panel)
+        self.assertIn("visible: agentRow.selected || height > 0", panel)
+        self.assertIn("visible: automationRow.selected || height > 0", automations)
+        self.assertIn("Accessible.ignored: !nodeRow.selected", panel)
+        self.assertIn("Accessible.ignored: !agentRow.selected", panel)
+        self.assertIn("Accessible.ignored: !automationRow.selected", automations)
+        self.assertIn("onSelectedGeometryChanged", panel)
+        self.assertIn("signal selectedGeometryChanged()", automations)
+
     def test_automation_selection_has_no_run_history_action(self) -> None:
         sources = "\n".join(
             (ROOT / path).read_text(encoding="utf-8")

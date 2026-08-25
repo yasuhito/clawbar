@@ -31,7 +31,7 @@ Down, Right, `j`, or `J` moves forward; Up, Left, `k`, or `K` moves backward. Po
 
 ### Waiting begins
 
-Selection movement settles immediately. Candidate activation enters the verification flow; operational detail never waits for OpenClaw.
+Selection state changes immediately. Candidate activation enters the verification flow; operational detail never waits for OpenClaw. For Node, Agent, and Automation rows, the selected surface and border update at once while the bounded detail uses a short reveal transition.
 
 ### While waiting
 
@@ -39,7 +39,7 @@ During candidate verification the user can still navigate by keyboard, but candi
 
 ### Settled
 
-The selected row is made visible by scrolling within the list viewport below the pinned Gateway header. When the list is taller than that viewport, a thin indicator at the right edge shows the visible proportion and scroll position. It becomes clearer during pointer or selection-follow scrolling, then settles to a quiet resting opacity. Node, Agent, and Automation rows expand their own detail beneath the row summary. Candidate rows do not expand a detail card; the selected candidate's action text changes to `Verifying…` during verification.
+The selected row is made visible by scrolling within the list viewport below the pinned Gateway header, including while its detail height settles. When the list is taller than that viewport, a thin indicator at the right edge shows the visible proportion and scroll position. It becomes clearer during pointer or selection-follow scrolling, then settles to a quiet resting opacity. Node, Agent, and Automation rows expand their own detail beneath the row summary with one shared height and opacity timing. Candidate rows do not expand a detail card; the selected candidate's action text changes to `Verifying…` during verification.
 
 ## Variants
 
@@ -85,6 +85,7 @@ The selected row is made visible by scrolling within the list viewport below the
 - Selection can cross section boundaries and wrap from Automation to the first row.
 - If the selected row disappears, the nearby index rule can select a different object without user input.
 - Long detail content increases row height and may require automatic scrolling.
+- A collapsing detail remains clipped to its row and leaves the accessibility tree as soon as the row loses Selection.
 - The pinned Gateway header never participates in list scrolling, including selection-follow scrolling.
 - The scroll indicator is absent when all rows fit and reserves enough horizontal space to avoid overlapping row content when present.
 

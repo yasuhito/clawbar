@@ -18,11 +18,15 @@ Column {
   required property color urgent
   required property string fontFamily
   required property bool historical
+  required property bool detailMotionEnabled
+  required property int detailFadeDuration
+  required property int detailExpandDuration
   required property bool showUnavailable
   required property var signalColor
   required property var selectedSignalColor
 
   signal rowSelected(var row)
+  signal selectedGeometryChanged()
 
   spacing: Style.space(4)
 
@@ -77,14 +81,18 @@ Column {
       readonly property var signal: Logic.signalPresentation(signalState)
       readonly property bool showStatus: Logic.showAutomationStatusLabel(modelData, root.historical)
       width: root.width
-      height: automationSummary.height + (selected ? automationDetail.implicitHeight : 0)
+      height: automationSummary.height + automationDetail.height
       radius: Style.cornerRadius
+      clip: true
       opacity: root.historical && !selected ? 0.55 : 1
       color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
       border.width: selected ? 1 : 0
       border.color: root.accent
       Accessible.name: modelData.name
       Accessible.description: root.historical ? "Last known" : Logic.automationStatusLabel(modelData)
+      onHeightChanged: {
+        if (selected) root.selectedGeometryChanged()
+      }
 
       Item {
         id: automationSummary
@@ -159,17 +167,35 @@ Column {
 
       AutomationDetailCard {
         id: automationDetail
-        visible: automationRow.selected
+        visible: automationRow.selected || height > 0
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: automationSummary.bottom
-        height: implicitHeight
+        height: automationRow.selected ? implicitHeight : 0
+        opacity: automationRow.selected ? 1 : 0
         automation: automationRow.modelData
         nowMs: root.nowMs
         historical: root.historical
         foreground: root.foreground
         dim: root.selectedDim
         fontFamily: root.fontFamily
+        Accessible.ignored: !automationRow.selected
+
+        Behavior on height {
+          enabled: root.detailMotionEnabled
+          NumberAnimation {
+            duration: root.detailExpandDuration
+            easing.type: Easing.OutCubic
+          }
+        }
+
+        Behavior on opacity {
+          enabled: root.detailMotionEnabled
+          NumberAnimation {
+            duration: root.detailFadeDuration
+            easing.type: Easing.OutCubic
+          }
+        }
       }
     }
   }
