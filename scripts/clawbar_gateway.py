@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import ctypes
 import ipaddress
 import json
+import os
+import signal
 import subprocess
 import time
 from dataclasses import dataclass
@@ -23,6 +26,7 @@ TAILSCALE_COMMAND = ("tailscale",)
 SETUP_GUIDANCE = "Choose a Tailscale device to verify as your OpenClaw Gateway."
 NO_TAILSCALE_GUIDANCE = "Connect Tailscale on this device, then refresh to find Gateway candidates."
 KEY_SECRET_ERROR = "Clawbar cannot derive private Gateway Candidate Keys. Repair its local key secret."
+PR_SET_PDEATHSIG = 1
 
 
 @dataclass(frozen=True)
@@ -43,16 +47,51 @@ def seconds_until_deadline(deadline_at: float) -> float:
 
 
 def run_command(command: Sequence[str], deadline_at: float) -> subprocess.CompletedProcess[str]:
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+        preexec_fn=terminate_with_parent,
+    )
     try:
-        return subprocess.run(
-            command,
-            capture_output=True,
-            check=False,
-            text=True,
+        stdout, stderr = process.communicate(
             timeout=seconds_until_deadline(deadline_at),
         )
     except subprocess.TimeoutExpired as error:
+        stop_process_group(process)
         raise CollectionDeadlineExceeded from error
+    except BaseException:
+        stop_process_group(process)
+        raise
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
+def terminate_with_parent() -> None:
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM, 0, 0, 0) != 0:
+        error_number = ctypes.get_errno()
+        raise OSError(error_number, os.strerror(error_number))
+    if os.getppid() == 1:
+        os.kill(os.getpid(), signal.SIGTERM)
+
+
+def stop_process_group(process: subprocess.Popen[str]) -> None:
+    if process.poll() is None:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            process.wait(timeout=0.25)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait()
+    process.communicate()
 
 
 def command_option(arguments: Sequence[str], option: str) -> str | None:

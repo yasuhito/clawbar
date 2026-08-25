@@ -33,6 +33,10 @@ class CollectorFixture:
                 import time
 
                 arguments = sys.argv[1:]
+                pid_path = os.environ.get("FAKE_PID_PATH")
+                if pid_path:
+                    with open(pid_path, "w", encoding="utf-8") as pid_file:
+                        pid_file.write(str(os.getpid()))
                 with open(os.environ["FAKE_CALL_LOG"], "a", encoding="utf-8") as log:
                     log.write(json.dumps(arguments) + "\\n")
 

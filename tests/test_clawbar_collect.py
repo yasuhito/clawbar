@@ -4,6 +4,7 @@ import contextlib
 import io
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -26,6 +27,69 @@ class MetadataTests(unittest.TestCase):
 
 
 class CollectorCommandTests(CollectorFixture, unittest.TestCase):
+    def test_executable_termination_stops_running_gateway_command(self) -> None:
+        self._assert_executable_termination_stops_running_gateway_command("terminate")
+
+    def test_executable_forced_termination_stops_running_gateway_command(self) -> None:
+        self._assert_executable_termination_stops_running_gateway_command("kill")
+
+    def _assert_executable_termination_stops_running_gateway_command(self, method: str) -> None:
+        pid_path = self.root / "gateway-command.pid"
+        child_pid: int | None = None
+        collector: subprocess.Popen[str] | None = None
+        with self.fake_environment(
+            FAKE_GATEWAY_DELAY="30",
+            FAKE_PID_PATH=str(pid_path),
+            XDG_STATE_HOME=str(self.root / "termination-state"),
+        ):
+            collector = subprocess.Popen(
+                [sys.executable, str(Path(clawbar_collect.__file__))],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                env=os.environ.copy(),
+            )
+            try:
+                started_deadline = time.monotonic() + 2
+                while not pid_path.exists() and time.monotonic() < started_deadline:
+                    self.assertIsNone(collector.poll())
+                    time.sleep(0.01)
+                self.assertTrue(pid_path.exists(), "Gateway command did not start")
+                child_pid = int(pid_path.read_text(encoding="utf-8"))
+
+                getattr(collector, method)()
+                collector.wait(timeout=2)
+
+                stopped_deadline = time.monotonic() + 1
+                while self._process_exists(child_pid) and time.monotonic() < stopped_deadline:
+                    time.sleep(0.01)
+                self.assertFalse(
+                    self._process_exists(child_pid),
+                    "Gateway command survived collector termination: "
+                    + self._process_state(child_pid),
+                )
+            finally:
+                if collector.poll() is None:
+                    collector.kill()
+                    collector.wait(timeout=2)
+                if child_pid is not None and self._process_exists(child_pid):
+                    os.kill(child_pid, signal.SIGKILL)
+
+    @staticmethod
+    def _process_exists(pid: int) -> bool:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        return True
+
+    @staticmethod
+    def _process_state(pid: int) -> str:
+        try:
+            status = Path(f"/proc/{pid}/status").read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return "gone"
+        return next((line for line in status.splitlines() if line.startswith("State:")), "unknown")
+
     def test_healthy_json_publishes_versioned_sanitized_snapshot(self) -> None:
         status = {
             "rpc": {
