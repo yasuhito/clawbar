@@ -45,6 +45,24 @@ KeyboardPanel {
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property var gatewaySignal: Logic.panelSignal(snapshot, state)
 
+  /* ───────────────────────────────────────────────────────
+   * SCROLL INDICATOR STORYBOARD
+   *
+   *    0ms   content moves → thumb becomes clear
+   *  850ms   movement settles → thumb starts fading
+   * 1010ms   thumb reaches its quiet resting opacity
+   * ─────────────────────────────────────────────────────── */
+  readonly property int scrollIndicatorSettleDelay: 850
+  readonly property int scrollIndicatorFadeDuration: 160
+  readonly property real scrollIndicatorActiveOpacity: 0.68
+  readonly property real scrollIndicatorIdleOpacity: 0.26
+  readonly property int scrollIndicatorWidth: Style.space(2)
+  readonly property int scrollIndicatorMinHeight: Style.space(28)
+  readonly property real scrollProgress: panelFlick.contentHeight > panelFlick.height
+    ? Math.max(0, Math.min(1,
+      panelFlick.contentY / (panelFlick.contentHeight - panelFlick.height)))
+    : 0
+
   focusTarget: keyCatcher
   contentWidth: fittedContentWidth(Style.space(360))
   contentHeight: fittedContentHeight(
@@ -113,6 +131,12 @@ KeyboardPanel {
   PanelKeyCatcher {
     id: keyCatcher
     anchors.fill: parent
+
+    Timer {
+      id: scrollIndicatorActivity
+      interval: root.scrollIndicatorSettleDelay
+      repeat: false
+    }
 
     onMoveRequested: function(dx, dy) {
       if (dy !== 0) root.moveSelection(dy)
@@ -227,10 +251,13 @@ KeyboardPanel {
       boundsBehavior: Flickable.StopAtBounds
       flickableDirection: Flickable.VerticalFlick
       interactive: contentHeight > height
+      onContentYChanged: {
+        if (interactive) scrollIndicatorActivity.restart()
+      }
 
       Column {
         id: contentColumn
-        width: panelFlick.width
+        width: panelFlick.width - Style.space(8)
         spacing: Style.space(4)
 
         Text {
@@ -593,6 +620,34 @@ KeyboardPanel {
           }
         }
 
+      }
+    }
+
+    Rectangle {
+      id: scrollIndicator
+      readonly property bool active: panelFlick.moving || panelFlick.dragging
+        || scrollIndicatorActivity.running
+      visible: panelFlick.contentHeight > panelFlick.height + 1
+      width: root.scrollIndicatorWidth
+      height: Math.max(
+        root.scrollIndicatorMinHeight,
+        panelFlick.height * Math.min(1, panelFlick.height / panelFlick.contentHeight)
+      )
+      x: panelFlick.x + panelFlick.width - width
+      y: panelFlick.y + root.scrollProgress * Math.max(0, panelFlick.height - height)
+      radius: width / 2
+      color: root.foreground
+      opacity: active
+        ? root.scrollIndicatorActiveOpacity
+        : root.scrollIndicatorIdleOpacity
+      z: 2
+      Accessible.ignored: true
+
+      Behavior on opacity {
+        NumberAnimation {
+          duration: root.scrollIndicatorFadeDuration
+          easing.type: Easing.OutCubic
+        }
       }
     }
   }

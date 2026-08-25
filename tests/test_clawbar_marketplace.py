@@ -106,6 +106,28 @@ class MarketplaceContractTest(unittest.TestCase):
             panel,
         )
 
+    def test_scroll_indicator_reflects_scrollability_position_and_activity(self) -> None:
+        panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
+
+        self.assertIn("id: scrollIndicator", panel)
+        self.assertIn(
+            "visible: panelFlick.contentHeight > panelFlick.height + 1",
+            panel,
+        )
+        self.assertIn("readonly property real scrollProgress", panel)
+        self.assertIn(
+            "panelFlick.contentY / (panelFlick.contentHeight - panelFlick.height)",
+            panel,
+        )
+        self.assertIn(
+            "panelFlick.height * Math.min(1, panelFlick.height / panelFlick.contentHeight)",
+            panel,
+        )
+        self.assertIn("id: scrollIndicatorActivity", panel)
+        self.assertIn("if (interactive) scrollIndicatorActivity.restart()", panel)
+        self.assertIn("Behavior on opacity", panel)
+        self.assertIn("width: panelFlick.width - Style.space(8)", panel)
+
     def test_automation_selection_has_no_run_history_action(self) -> None:
         sources = "\n".join(
             (ROOT / path).read_text(encoding="utf-8")
