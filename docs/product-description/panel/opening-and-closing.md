@@ -6,7 +6,7 @@ A normal press on the bar widget toggles one panel anchored to the claw mark. Op
 
 ## The simple case
 
-The user presses Clawbar. The panel opens at a fitted width up to the shell's available space and a fitted height capped at the themed equivalent of 560 spacing units. The panel key catcher receives focus.
+The user presses Clawbar. The panel opens at a fitted width up to the shell's available space and a fitted height capped at the themed equivalent of 560 spacing units. The Gateway header remains pinned at the top while only the operational rows scroll. The panel key catcher receives focus.
 
 The user reads or navigates, then presses Escape. The panel closes while the bar signal and collection schedule continue.
 
@@ -80,7 +80,7 @@ When open, keyboard actions route to the panel focus target. When closed, panel 
 
 - Middle-click on a closed widget refreshes without opening.
 - A snapshot can change while closed; the latest consumed state appears on next open.
-- A panel taller than the cap scrolls vertically rather than growing indefinitely.
+- A panel taller than the cap keeps the Gateway header visible and scrolls only its operational rows rather than growing indefinitely.
 - An empty panel still opens and shows Gateway summary and state guidance.
 - Repeated normal presses toggle rather than create multiple panels.
 

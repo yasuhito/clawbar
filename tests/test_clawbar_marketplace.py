@@ -90,6 +90,22 @@ class MarketplaceContractTest(unittest.TestCase):
 
         self.assertNotIn("id: fleetRail", panel)
 
+    def test_panel_pins_gateway_header_above_the_scrolling_rows(self) -> None:
+        panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
+        header_start = panel.index("id: panelHeader")
+        flick_start = panel.index("id: panelFlick")
+        content_start = panel.index("id: contentColumn")
+
+        self.assertLess(header_start, flick_start)
+        self.assertLess(flick_start, content_start)
+        self.assertIn('text: "OpenClaw"', panel[header_start:flick_start])
+        self.assertNotIn('text: "OpenClaw"', panel[content_start:])
+        self.assertIn("anchors.top: panelHeader.bottom", panel)
+        self.assertIn(
+            "panelHeader.height + Style.space(4) + contentColumn.implicitHeight",
+            panel,
+        )
+
     def test_automation_selection_has_no_run_history_action(self) -> None:
         sources = "\n".join(
             (ROOT / path).read_text(encoding="utf-8")

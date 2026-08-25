@@ -39,7 +39,7 @@ During candidate verification the user can still navigate by keyboard, but candi
 
 ### Settled
 
-The selected row is made visible by scrolling. Node, Agent, and Automation rows expand their own detail beneath the row summary. Candidate rows do not expand a detail card; the selected candidate's action text changes to `Verifying…` during verification.
+The selected row is made visible by scrolling within the list viewport below the pinned Gateway header. Node, Agent, and Automation rows expand their own detail beneath the row summary. Candidate rows do not expand a detail card; the selected candidate's action text changes to `Verifying…` during verification.
 
 ## Variants
 
@@ -85,6 +85,7 @@ The selected row is made visible by scrolling. Node, Agent, and Automation rows 
 - Selection can cross section boundaries and wrap from Automation to the first row.
 - If the selected row disappears, the nearby index rule can select a different object without user input.
 - Long detail content increases row height and may require automatic scrolling.
+- The pinned Gateway header never participates in list scrolling, including selection-follow scrolling.
 
 ## Open questions and verification
 

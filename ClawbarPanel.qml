@@ -47,7 +47,10 @@ KeyboardPanel {
 
   focusTarget: keyCatcher
   contentWidth: fittedContentWidth(Style.space(360))
-  contentHeight: fittedContentHeight(contentColumn.implicitHeight, Style.space(560))
+  contentHeight: fittedContentHeight(
+    panelHeader.height + Style.space(4) + contentColumn.implicitHeight,
+    Style.space(560)
+  )
 
   function reconcileRows() {
     var selection = Logic.reconcileSelection(rows, selectedKey, selectedIndexHint)
@@ -123,9 +126,101 @@ KeyboardPanel {
       else if (text === "r" || text === "R") root.refreshRequested()
     }
 
+    Item {
+      id: panelHeader
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      height: Style.space(60)
+
+      ClawMark {
+        id: panelClaw
+        anchors.left: parent.left
+        anchors.top: parent.top
+        width: Style.space(20)
+        height: width
+        color: root.foreground
+      }
+
+      Text {
+        anchors.left: panelClaw.right
+        anchors.leftMargin: Style.space(8)
+        anchors.top: parent.top
+        anchors.right: gatewayStatus.left
+        anchors.rightMargin: Style.space(8)
+        text: "OpenClaw"
+        elide: Text.ElideRight
+        color: root.foreground
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.title
+        font.bold: true
+      }
+
+      Row {
+        id: gatewayStatus
+        anchors.right: parent.right
+        anchors.top: parent.top
+        spacing: Style.space(5)
+
+        SignalPoint {
+          anchors.verticalCenter: parent.verticalCenter
+          kind: root.gatewaySignal.shape
+          color: root.signalColor(root.gatewaySignal.tone)
+        }
+
+        Text {
+          text: root.gatewaySignal.label
+          color: root.signalColor(root.gatewaySignal.tone)
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          font.bold: true
+        }
+      }
+
+      Text {
+        anchors.left: parent.left
+        anchors.right: observedTime.left
+        anchors.rightMargin: Style.space(8)
+        anchors.bottom: headerDivider.top
+        anchors.bottomMargin: Style.space(4)
+        text: root.summary
+        elide: Text.ElideRight
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+      }
+
+      Text {
+        id: observedTime
+        anchors.right: parent.right
+        anchors.bottom: headerDivider.top
+        anchors.bottomMargin: Style.space(4)
+        text: root.historical
+          ? "Last known " + Logic.relativeTime(root.observedAt, root.nowMs)
+          : root.snapshot ? Logic.relativeTime(root.snapshot.generatedAt, root.nowMs) : ""
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+      }
+
+      Rectangle {
+        id: headerDivider
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        height: 1
+        color: root.dim
+        opacity: 0.28
+      }
+    }
+
     Flickable {
       id: panelFlick
-      anchors.fill: parent
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: panelHeader.bottom
+      anchors.topMargin: Style.space(4)
+      anchors.bottom: parent.bottom
       contentWidth: width
       contentHeight: contentColumn.implicitHeight
       clip: true
@@ -137,79 +232,6 @@ KeyboardPanel {
         id: contentColumn
         width: panelFlick.width
         spacing: Style.space(4)
-
-        Item {
-          width: parent.width
-          height: Style.space(56)
-
-          ClawMark {
-            id: panelClaw
-            anchors.left: parent.left
-            anchors.top: parent.top
-            width: Style.space(20)
-            height: width
-            color: root.foreground
-          }
-
-          Text {
-            anchors.left: panelClaw.right
-            anchors.leftMargin: Style.space(8)
-            anchors.top: parent.top
-            anchors.right: gatewayStatus.left
-            anchors.rightMargin: Style.space(8)
-            text: "OpenClaw"
-            elide: Text.ElideRight
-            color: root.foreground
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.title
-            font.bold: true
-          }
-
-          Row {
-            id: gatewayStatus
-            anchors.right: parent.right
-            anchors.top: parent.top
-            spacing: Style.space(5)
-
-            SignalPoint {
-              anchors.verticalCenter: parent.verticalCenter
-              kind: root.gatewaySignal.shape
-              color: root.signalColor(root.gatewaySignal.tone)
-            }
-
-            Text {
-              text: root.gatewaySignal.label
-              color: root.signalColor(root.gatewaySignal.tone)
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-            }
-          }
-
-          Text {
-            anchors.left: parent.left
-            anchors.right: observedTime.left
-            anchors.rightMargin: Style.space(8)
-            anchors.bottom: parent.bottom
-            text: root.summary
-            elide: Text.ElideRight
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-          }
-
-          Text {
-            id: observedTime
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            text: root.historical
-              ? "Last known " + Logic.relativeTime(root.observedAt, root.nowMs)
-              : root.snapshot ? Logic.relativeTime(root.snapshot.generatedAt, root.nowMs) : ""
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-          }
-        }
 
         Text {
           visible: root.setupVisible
