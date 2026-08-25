@@ -75,6 +75,23 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("collectorService.collecting", widget)
         self.assertIn("readonly property bool collecting:", service)
 
+    def test_manual_refresh_feedback_is_distinct_from_scheduled_collection(self) -> None:
+        widget = (ROOT / "Clawbar.qml").read_text(encoding="utf-8")
+        service = (ROOT / "ClawbarService.qml").read_text(encoding="utf-8")
+
+        self.assertIn('property string refreshFeedback: "idle"', widget)
+        self.assertIn("interval: 6000", widget)
+        self.assertIn("collectorService.requestCollection(true)", widget)
+        self.assertIn('refreshFeedback = "failed"', widget)
+        self.assertIn("function onCollectionFinished(interactive, succeeded)", widget)
+        self.assertIn("property bool collectorInteractive: false", service)
+        self.assertIn("property bool refreshPendingInteractive: false", service)
+        self.assertIn("readonly property bool interactiveRefreshing:", service)
+        self.assertIn("signal collectionFinished(bool interactive, bool succeeded)", service)
+        self.assertIn("function requestCollection(interactive)", service)
+        self.assertIn("root.requestCollection(false)", service)
+        self.assertIn("root.startCollection(pendingInteractive)", service)
+
     def test_panel_omits_the_rejected_shortcut_footer(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
 

@@ -8,6 +8,9 @@ Item {
   visible: false
 
   property bool refreshPending: false
+  property bool refreshPendingInteractive: false
+  property bool collectorInteractive: false
+  property bool processSettling: false
   property string candidatePending: ""
   property string collectorPath: decodeURIComponent(
     String(Qt.resolvedUrl("scripts/clawbar_collect.py")).replace(/^file:\/\//, "")
@@ -15,22 +18,31 @@ Item {
   property int refreshIntervalSeconds: Logic.normalizeRefreshInterval(
     Quickshell.env("CLAWBAR_REFRESH_INTERVAL_SECONDS")
   )
-  readonly property bool collecting: collector.running || candidateVerifier.running
+  readonly property bool processRunning: collector.running || candidateVerifier.running
+  readonly property bool collecting: processRunning || processSettling
     || refreshPending || candidatePending !== ""
+  readonly property bool interactiveRefreshing: (collector.running && collectorInteractive)
+    || refreshPendingInteractive
   readonly property bool verifyingCandidate: candidateVerifier.running || candidatePending !== ""
 
-  signal collectionFinished()
+  signal collectionFinished(bool interactive, bool succeeded)
 
   function busy() {
-    return collecting
+    return processRunning || processSettling
   }
 
-  function requestCollection() {
+  function startCollection(interactive) {
+    collectorInteractive = !!interactive
+    collector.running = true
+  }
+
+  function requestCollection(interactive) {
     if (busy()) {
       refreshPending = true
+      refreshPendingInteractive = refreshPendingInteractive || !!interactive
       return
     }
-    collector.running = true
+    startCollection(interactive)
   }
 
   function verifyCandidate(candidateKey) {
@@ -50,19 +62,22 @@ Item {
     candidateVerifier.running = true
   }
 
-  function consumeCollection() {
-    if (busy()) {
-      Qt.callLater(root.consumeCollection)
+  function consumeCollection(interactive, succeeded) {
+    if (processRunning) {
+      Qt.callLater(function() { root.consumeCollection(interactive, succeeded) })
       return
     }
-    collectionFinished()
+    processSettling = false
+    collectionFinished(interactive, succeeded)
     if (candidatePending) {
       var candidateKey = candidatePending
       candidatePending = ""
       verifyCandidate(candidateKey)
     } else if (refreshPending) {
+      var pendingInteractive = refreshPendingInteractive
       refreshPending = false
-      collector.running = true
+      refreshPendingInteractive = false
+      root.startCollection(pendingInteractive)
     }
   }
 
@@ -74,15 +89,19 @@ Item {
       "--refresh-interval",
       String(root.refreshIntervalSeconds)
     ]
-    onExited: function(_) {
-      Qt.callLater(root.consumeCollection)
+    onExited: function(exitCode) {
+      var interactive = root.collectorInteractive
+      root.collectorInteractive = false
+      root.processSettling = true
+      Qt.callLater(function() { root.consumeCollection(interactive, exitCode === 0) })
     }
   }
 
   Process {
     id: candidateVerifier
-    onExited: function(_) {
-      Qt.callLater(root.consumeCollection)
+    onExited: function(exitCode) {
+      root.processSettling = true
+      Qt.callLater(function() { root.consumeCollection(false, exitCode === 0) })
     }
   }
 
@@ -91,6 +110,6 @@ Item {
     running: true
     repeat: true
     triggeredOnStart: true
-    onTriggered: root.requestCollection()
+    onTriggered: root.requestCollection(false)
   }
 }

@@ -1,15 +1,15 @@
 # Bug triage
 
-A consolidated list of code-supported defects and product inconsistencies raised by the feature documents. None has yet been confirmed in the running Omarchy panel, so no entry carries a **Status** line. Open questions about focus, layout, contrast, screen-reader behavior, timing, and user preference remain in their source documents until hand verification supplies evidence. This list lets the product team decide whether to fix, document as intended, or leave each behavior.
+A consolidated list of code-supported defects and product inconsistencies raised by the feature documents. Confirmed fixes carry a **Status** line and a Beads issue. Open questions about focus, layout, contrast, screen-reader behavior, timing, and user preference remain in their source documents until hand verification supplies evidence. This list lets the product team decide whether to fix, document as intended, or leave each behavior.
 
 ## Summary
 
-The documents raised six distinct code-supported concerns after verification-only questions were excluded and duplicate symptoms were merged. There are no high-severity entries. Five medium entries concern missing feedback or management, silent Incident transitions, and notification reliability; one medium lifecycle/privacy entry concerns retained state after removal. The largest cluster is silent behavior: refresh work or failure can be invisible, and notification transitions can be consumed without a visible event.
+The documents raised six distinct code-supported concerns after verification-only questions were excluded and duplicate symptoms were merged. There are no high-severity entries. B-01 and B-02 are fixed together: user-requested refresh now has bounded progress and failure feedback while scheduled collection remains quiet. Four medium concerns remain around fallback management, Incident transitions, notification reliability, and retained state after removal.
 
 | ID | Title | Severity | Area | Decision needed | Issue |
 | --- | --- | --- | --- | --- | --- |
-| B-01 | Manual refresh has no progress indication when a Snapshot is already loaded | medium | bar | product call | — |
-| B-02 | Scheduler-service failure is invisible when old data remains loaded | medium | bar | fix | — |
+| B-01 | Manual refresh has no progress indication when a Snapshot is already loaded | medium | bar | fixed | clawbar-8w3.20 |
+| B-02 | Scheduler-service failure is invisible when old data remains loaded | medium | bar | fixed | clawbar-8w3.20 |
 | B-03 | A verified fallback Gateway cannot be forgotten or replaced in Clawbar | medium | setup | product call | — |
 | B-04 | Removing or disabling a failing target silently ends Incident monitoring | medium | notifications | product call | — |
 | B-05 | Failed notification delivery permanently consumes the transition | medium | notifications | fix | — |
@@ -23,6 +23,8 @@ No high-severity code-supported defects were found during drafting.
 
 ### B-01: Manual refresh has no progress indication when a Snapshot is already loaded
 
+- **Status:** Fixed and verified in the running Omarchy panel by `clawbar-8w3.20`. User-requested refresh prefixes the summary with `Refreshing…`, animates the Claw, and preserves existing rows; scheduled collection remains quiet.
+
 - **Where the user meets it:** The user presses `r` or middle-clicks while current or old data is visible.
 - **What happens / what was expected:** Collection starts, but the bar and panel continue to look idle until a different result arrives. Two identical results make the action appear to do nothing. A common manual action should either show bounded progress or explicitly choose and document silent refresh.
 - **Reproduce:** 1. Load a Healthy Snapshot. 2. Delay the Gateway response for 8 seconds. 3. Open the panel and press `r`. 4. Observe the bar and panel before completion.
@@ -32,6 +34,8 @@ No high-severity code-supported defects were found during drafting.
 - **Raised by:** [Manual refresh](bar/manual-refresh.md#open-questions-and-verification), [Surface and actions](foundations/surface-and-actions.md#while-waiting), [Bar signal and tooltip](bar/signal-and-tooltip.md#waiting-begins).
 
 ### B-02: Scheduler-service failure is invisible when old data remains loaded
+
+- **Status:** Fixed and verified in the running Omarchy panel by `clawbar-8w3.20`. Failure preserves the existing Snapshot and shows `Refresh failed · showing last known` for six seconds.
 
 - **Where the user meets it:** The Clawbar widget is present but its scheduler service cannot be resolved, and the user manually refreshes while an old Snapshot is loaded.
 - **What happens / what was expected:** The request fails immediately, the old state remains unchanged, and only the shell console gets a warning. The user expects an in-panel indication that refresh could not start.

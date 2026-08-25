@@ -10,7 +10,7 @@ Manual refresh is available in every visible Gateway state, including Gateway Se
 
 The user opens the panel and presses `r`. Clawbar starts one collection in the background. The user can continue moving the selection or close the panel while it runs.
 
-If Clawbar has never loaded a usable snapshot, the bar and panel show Collecting until a result is consumed. If a snapshot is already visible, Clawbar keeps showing it during the request; there is no separate refreshing label or spinner.
+If Clawbar has never loaded a usable snapshot, the bar and panel show Collecting until a result is consumed. If a snapshot is already visible, Clawbar keeps showing it while the panel summary and bar tooltip begin with `Refreshing…`; the bar Claw also animates. Scheduled collection remains quiet and does not show this user-action feedback.
 
 When collection finishes, Clawbar reads the newly published snapshot. The panel updates to its new Gateway state, row contents, timestamps, Attention count, and severity. The selection is reconciled against the new rows rather than reset without reference to the prior selection.
 
@@ -42,13 +42,13 @@ A middle-click on the bar widget requests collection instead of toggling the pan
 
 If the collector and candidate verifier are idle, the collector starts. If either is busy, Clawbar records that one refresh remains pending. The request itself produces no success notification and no durable user-created record.
 
-When no collector service is available, the request cannot start. If Clawbar also has no snapshot, it changes to No data. If an existing snapshot is visible, it remains visible. This failure is written to the shell console rather than shown as an in-panel error.
+When no collector service is available, the request cannot start. If Clawbar also has no snapshot, it changes to No data. If an existing snapshot is visible, it remains visible and the summary becomes `Refresh failed · showing last known` for six seconds. The shell console still receives the private-safe service warning.
 
 ### Waiting begins
 
 On a first run with no usable snapshot, starting collection changes the visible state to Collecting. The bar summary becomes `Collecting OpenClaw Gateway status`; the Attention count is zero.
 
-With an existing snapshot, no distinct visible waiting state begins. The old snapshot remains the displayed current state until a later snapshot replaces it or its own age crosses the stale boundary. This means the user cannot tell from the bar or panel alone that a manual refresh is in flight.
+With an existing snapshot, the old rows and Gateway state remain displayed until a later snapshot replaces them or their own age crosses the stale boundary. The summary begins with `Refreshing…`, and the Claw animates, so the user can distinguish the in-flight Action without losing the last usable Operational Metadata.
 
 The collection shares the same bounded path as a scheduled collection. It resolves one Gateway, reads bounded metadata, reduces it to Operational Metadata, and atomically publishes a snapshot. See [Collection and freshness](../foundations/collection-and-freshness.md).
 
@@ -68,11 +68,11 @@ When the collector exits, Clawbar requests a snapshot read. A valid published sn
 
 If the new snapshot changes row order, selection follows the same stable key. If that row disappeared, selection moves to a surviving row near the old index. The prior inline detail collapses and the reconciled operational row expands its own detail. See [Selection model](../foundations/selection-model.md).
 
-If the refresh was queued, one new collection starts after the current work has fully stopped. Ten requests while busy therefore produce at most one additional collection, not ten.
+If the refresh was queued, one new collection starts after the current work has fully stopped. Ten requests while busy therefore produce at most one additional collection, not ten. User-action feedback remains active across the wait and settles only when that interactive collection finishes.
 
 A collection result may settle into Healthy, Degraded, Gateway Setup Required, Unstable, Offline, Configuration Error, No data, or another snapshot-derived state. “Settled” means the result was consumed; it does not mean the Gateway is healthy.
 
-If reading or parsing the snapshot fails and Clawbar has no prior snapshot, the state becomes No data after a collection attempt. If a prior snapshot is already in memory, the failed read does not discard it.
+If the interactive collector exits unsuccessfully, Clawbar preserves any prior snapshot and shows `Refresh failed · showing last known` for six seconds. If reading or parsing the snapshot fails and Clawbar has no prior snapshot, the state becomes No data after a collection attempt. A prior snapshot is never discarded by the failed read.
 
 ## Variants
 
@@ -80,7 +80,7 @@ If reading or parsing the snapshot fails and Clawbar has no prior snapshot, the 
 | --- | --- | --- |
 | Input method | Middle-click works from the bar with the panel open or closed. `r` and `R` work only through the focused panel. | Switching input method does not change the request. Pointer and keyboard navigation remain available while collection runs. |
 | Panel visibility | An open panel permits `r`; middle-click does not require it. Starting refresh does not open or close the panel. | Closing the panel leaves collection running. Reopening shows the current in-memory state and later receives the result. |
-| Snapshot freshness | With no snapshot, the Action shows Collecting. With a usable snapshot, it remains visible without a busy marker. | The old snapshot may cross its stale boundary before collection settles. The next valid snapshot replaces that stale presentation. |
+| Snapshot freshness | With no snapshot, the Action shows Collecting. With a usable snapshot, it remains visible beneath `Refreshing…`. | The old snapshot may cross its stale boundary before collection settles. The next valid snapshot replaces that stale presentation. |
 | Gateway state | Every Gateway state accepts a refresh. The current state determines what remains visible while the request runs. | Resolution or reachability changes are reflected only in the resulting snapshot; they do not mutate the current rows during collection. |
 
 The collector reads the environment and current target state when the process starts. Changes after that point are not documented as live changes to the already running request.
@@ -128,7 +128,7 @@ Manual refresh has no explicit cancel command. Closing the panel cancels only th
 - An invalid or unreadable snapshot does not erase an already loaded snapshot from memory.
 - Middle-click requests refresh without opening the panel. A normal click opens or closes the panel without refreshing.
 - The refresh shortcut is case-insensitive for `r` and `R`.
-- There is no visible busy marker when an existing snapshot remains loaded, so two identical successive snapshots can make the Action appear to have done nothing.
+- A scheduled refresh never shows `Refreshing…`; only `r` and middle-click produce user-action feedback.
 
 ## Open questions and verification
 
@@ -136,7 +136,7 @@ Manual refresh has no explicit cancel command. Closing the panel cancels only th
 - Confirm whether keyboard auto-repeat on `r` has any visible effect beyond the documented single pending refresh.
 - Confirm that closing and reopening the panel during collection preserves the expected focus and selection.
 - Confirm shell focus-loss behavior; the source establishes process serialization but not every compositor-level focus transition.
-- The lack of any visible refresh-in-progress indication when a prior snapshot exists may be worth treating as a product decision or usability bug.
-- The service-unavailable path writes only to the shell console when an old snapshot exists; confirm whether silent failure in the panel is intentional.
+- Confirm that `Refreshing…` remains visible across a manual request queued behind scheduled collection or candidate verification.
+- Confirm that the six-second failure message is long enough to notice without obscuring Last Known Metadata for too long.
 
 Verified against Clawbar commit `f08496e`.

@@ -32,7 +32,7 @@ A normal press toggles the panel; middle-click requests [manual refresh](manual-
 
 ### Waiting begins
 
-Panel toggling settles immediately. A refresh may wait, but an existing signal remains visible without a busy overlay. While collection runs, the same flex-and-snap motion gives activity feedback without adding another indicator.
+Panel toggling settles immediately. A refresh may wait, but an existing signal remains visible without a busy overlay. While any collection runs, the same flex-and-snap motion gives activity feedback; a user-requested refresh also prefixes the tooltip and panel summary with `Refreshing…` while scheduled collection stays quiet.
 
 ### While waiting
 

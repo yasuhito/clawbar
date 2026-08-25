@@ -41,7 +41,7 @@ Waiting does not lock the panel. The current snapshot and selection remain usabl
 
 ### While waiting
 
-The user may navigate, close, or reopen the panel. Collection and verification are serialized, while repeat refreshes coalesce. The panel does not show a generic global busy state. Candidate verification disables candidate pointer actions and labels the selected candidate `Verifying…`; ordinary refresh has no comparable marker when an old snapshot exists.
+The user may navigate, close, or reopen the panel. Collection and verification are serialized, while repeat refreshes coalesce. A user-requested refresh prefixes the panel summary with `Refreshing…`; scheduled collection stays quiet. Candidate verification disables candidate pointer actions and labels the selected candidate `Verifying…`.
 
 ### Settled
 

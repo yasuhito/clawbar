@@ -458,6 +458,12 @@ function panelSummary(state, resolutionSource, count, severity, panelSignalLabel
   return summary(state, resolutionSource, count, severity, !headerShowsIncidentCount)
 }
 
+function refreshSummary(baseSummary, feedback, hasSnapshot) {
+  if (feedback === "refreshing") return "Refreshing… · " + baseSummary
+  if (feedback === "failed" && hasSnapshot) return "Refresh failed · showing last known"
+  return baseSummary
+}
+
 function requestRefresh(running) {
   return {
     start: !running,
@@ -479,6 +485,7 @@ if (typeof module !== "undefined") {
     snapshotState: snapshotState,
     summary: summary,
     panelSummary: panelSummary,
+    refreshSummary: refreshSummary,
     requestRefresh: requestRefresh,
     consumeRefresh: consumeRefresh,
     historicalState: historicalState,

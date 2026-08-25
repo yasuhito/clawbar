@@ -15,6 +15,7 @@ BarWidget {
   property bool cacheReadPending: false
   property bool collectionAttempted: false
   property bool opened: false
+  property string refreshFeedback: "idle"
   property double nowMs: Date.now()
   readonly property color signalForeground: bar ? bar.foreground : Color.foreground
   property color healthyColor: signalForeground
@@ -33,12 +34,19 @@ BarWidget {
   readonly property int barCount: Logic.barCount(lastSnapshot, state)
   readonly property bool developerDemo: !!lastSnapshot && typeof lastSnapshot.demoScenario === "string"
   readonly property string baseSummary: Logic.summary(state, resolutionSource, barCount, barSeverity)
-  readonly property string summary: developerDemo ? "Developer demo · " + baseSummary : baseSummary
+  readonly property string refreshSummary: Logic.refreshSummary(
+    baseSummary, refreshFeedback, lastSnapshot !== null
+  )
+  readonly property string summary: developerDemo
+    ? "Developer demo · " + refreshSummary : refreshSummary
   readonly property string basePanelSummary: Logic.panelSummary(
     state, resolutionSource, barCount, barSeverity, Logic.panelSignal(lastSnapshot, state).label
   )
+  readonly property string refreshPanelSummary: Logic.refreshSummary(
+    basePanelSummary, refreshFeedback, lastSnapshot !== null
+  )
   readonly property string panelSummary: developerDemo
-    ? "Developer demo · " + basePanelSummary : basePanelSummary
+    ? "Developer demo · " + refreshPanelSummary : refreshPanelSummary
   readonly property var barSignal: Logic.signalPresentation(
     barSeverity === "critical" ? "failed" : barSeverity === "warning" ? "waiting" : "healthy"
   )
@@ -86,13 +94,20 @@ BarWidget {
   }
 
   function requestCollection() {
+    refreshFeedbackTimer.stop()
     if (!collectorService) {
       console.warn("Clawbar scheduler service unavailable")
-      if (lastSnapshot === null) state = "no_data"
+      if (lastSnapshot === null) {
+        state = "no_data"
+      } else {
+        refreshFeedback = "failed"
+        refreshFeedbackTimer.restart()
+      }
       return
     }
+    refreshFeedback = "refreshing"
     if (lastSnapshot === null) state = "collecting"
-    collectorService.requestCollection()
+    collectorService.requestCollection(true)
   }
 
   function consumeCollection() {
@@ -156,6 +171,12 @@ BarWidget {
     repeat: true
     onTriggered: root.refreshFreshness()
   }
+  Timer {
+    id: refreshFeedbackTimer
+    interval: 6000
+    repeat: false
+    onTriggered: root.refreshFeedback = "idle"
+  }
 
   BarIconButton {
     id: button
@@ -186,7 +207,11 @@ BarWidget {
 
   Connections {
     target: root.collectorService
-    function onCollectionFinished() {
+    function onCollectionFinished(interactive, succeeded) {
+      if (interactive) {
+        root.refreshFeedback = succeeded ? "idle" : "failed"
+        if (!succeeded) root.refreshFeedbackTimer.restart()
+      }
       root.consumeCollection()
     }
   }

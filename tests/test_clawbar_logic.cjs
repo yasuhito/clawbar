@@ -394,6 +394,25 @@ test("panel omits a duplicated Attention count only when its header shows an Inc
   )
 })
 
+test("manual refresh feedback preserves the current private-safe summary", () => {
+  assert.equal(
+    Logic.refreshSummary("Local OpenClaw Gateway healthy", "refreshing", true),
+    "Refreshing… · Local OpenClaw Gateway healthy"
+  )
+  assert.equal(
+    Logic.refreshSummary("Local OpenClaw Gateway healthy", "failed", true),
+    "Refresh failed · showing last known"
+  )
+  assert.equal(
+    Logic.refreshSummary("No OpenClaw Gateway data yet", "failed", false),
+    "No OpenClaw Gateway data yet"
+  )
+  assert.equal(
+    Logic.refreshSummary("Local OpenClaw Gateway healthy", "idle", true),
+    "Local OpenClaw Gateway healthy"
+  )
+})
+
 test("panel header rolls current Incidents above healthy Gateway state", () => {
   const snapshot = healthySnapshot(new Date(100000).toISOString())
   assert.deepEqual(Logic.panelSignal(snapshot, "healthy"), {
