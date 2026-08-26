@@ -10,16 +10,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Collection
 
+if __package__:
+    from .clawbar_bounds import MAX_COLLECTION_BYTES
+else:
+    from clawbar_bounds import MAX_COLLECTION_BYTES
 
-MAX_STATE_FILE_BYTES = 8 * 1024 * 1024
+
 READ_CHUNK_BYTES = 64 * 1024
+# 契約テストが参照する旧名。実体は clawbar_bounds.py に一元化済み。
+MAX_STATE_FILE_BYTES = MAX_COLLECTION_BYTES
 
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
-def read_bounded_regular_file(path: Path, max_bytes: int = MAX_STATE_FILE_BYTES) -> bytes:
+def read_bounded_regular_file(path: Path, max_bytes: int = MAX_COLLECTION_BYTES) -> bytes:
     """Read one owner-controlled regular file without following its final link."""
     flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(path, flags)

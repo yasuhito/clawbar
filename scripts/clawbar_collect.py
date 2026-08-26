@@ -16,6 +16,7 @@ from typing import Any, Sequence
 
 if __package__:
     from .clawbar_automation import collect_automation_surface
+    from .clawbar_bounds import MAX_METADATA_ITEMS
     from .clawbar_gateway import (
         CollectionDeadlineExceeded,
         CommandOutputExceeded,
@@ -50,6 +51,7 @@ if __package__:
     from .clawbar_target_state import GatewayTargetState
 else:
     from clawbar_automation import collect_automation_surface
+    from clawbar_bounds import MAX_METADATA_ITEMS
     from clawbar_gateway import (
         CollectionDeadlineExceeded,
         CommandOutputExceeded,
@@ -265,7 +267,7 @@ def decode_json(completed: subprocess.CompletedProcess[str]) -> object | None:
 METADATA_SURFACES = (
     ("nodes", "status", "--json"),
     ("gateway", "call", "agents.list", "--params", "{}", "--json"),
-    ("gateway", "call", "tasks.list", "--params", '{"limit":500}', "--json"),
+    ("gateway", "call", "tasks.list", "--params", f'{{"limit":{MAX_METADATA_ITEMS}}}', "--json"),
 )
 
 

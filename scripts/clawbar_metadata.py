@@ -11,13 +11,15 @@ from pathlib import Path
 from typing import Any
 
 if __package__:
+    from .clawbar_bounds import MAX_METADATA_ITEMS
     from .clawbar_snapshot import read_bounded_regular_file
 else:
+    from clawbar_bounds import MAX_METADATA_ITEMS
     from clawbar_snapshot import read_bounded_regular_file
 
 _SECRET_BYTES = 32
 MAX_NODE_REGISTRATIONS = 5_000
-MAX_AUTOMATIONS = 500
+MAX_AUTOMATIONS = MAX_METADATA_ITEMS
 AUTOMATION_KINDS = frozenset({"at", "every", "cron", "on-exit"})
 AUTOMATION_RESULTS = frozenset({"ok", "error", "skipped"})
 
@@ -203,7 +205,7 @@ def sanitize_agents(agent_payload: object, task_payload: object) -> list[dict[st
         return None
     if not isinstance(task_payload, dict) or not isinstance(task_payload.get("tasks"), list):
         return None
-    tasks = [task for task in task_payload["tasks"][:500] if isinstance(task, dict)]
+    tasks = [task for task in task_payload["tasks"][:MAX_METADATA_ITEMS] if isinstance(task, dict)]
     agents = []
     for raw in agent_payload["agents"][:100]:
         if not isinstance(raw, dict):

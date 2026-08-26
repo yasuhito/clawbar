@@ -16,9 +16,11 @@ from typing import Any, Sequence
 from urllib.parse import urlsplit
 
 if __package__:
+    from .clawbar_bounds import MAX_COLLECTION_BYTES
     from .clawbar_metadata import opaque_candidate_key
     from .clawbar_snapshot import atomic_write_snapshot, last_known_metadata, load_snapshot, utc_now
 else:
+    from clawbar_bounds import MAX_COLLECTION_BYTES
     from clawbar_metadata import opaque_candidate_key
     from clawbar_snapshot import atomic_write_snapshot, last_known_metadata, load_snapshot, utc_now
 
@@ -28,7 +30,7 @@ SETUP_GUIDANCE = "Choose a Tailscale device to verify as your OpenClaw Gateway."
 NO_TAILSCALE_GUIDANCE = "Connect Tailscale on this device, then refresh to find Gateway candidates."
 KEY_SECRET_ERROR = "Clawbar cannot derive private Gateway Candidate Keys. Repair its local key secret."
 PR_SET_PDEATHSIG = 1
-MAX_COMMAND_STREAM_BYTES = 8 * 1024 * 1024
+MAX_COMMAND_STREAM_BYTES = MAX_COLLECTION_BYTES
 COMMAND_READ_CHUNK_BYTES = 64 * 1024
 
 
