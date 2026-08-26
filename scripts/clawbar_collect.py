@@ -376,6 +376,57 @@ def resolve_target(
     return target, completed, automatic_setup_required
 
 
+def decode_status_or_fail(
+    snapshot_path: Path,
+    previous: dict[str, Any] | None,
+    refresh_interval: int,
+    candidate_key: str | None,
+    target: GatewayTarget | None,
+    completed: subprocess.CompletedProcess[str],
+) -> CollectionResult | tuple[dict[str, Any], str | None]:
+    """答え読み取り: Gateway応答を解読し source を判定する。
+
+    戻り値は CollectionResult ならここで確定（呼び出し側は即 return）。
+    (status, source) なら収集へ続行する。
+    """
+    try:
+        status = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        if candidate_key:
+            snapshot = configuration_error_snapshot(previous, refresh_interval, {}, None)
+            snapshot["failureKind"] = "malformed_json"
+            snapshot["setup"] = setup_section(
+                retained_setup_candidates(previous),
+                CANDIDATE_UNSUPPORTED_GUIDANCE,
+            )
+            return publish(snapshot_path, ExitCode.MALFORMED_JSON, snapshot)
+        return publish_failure(
+            snapshot_path,
+            previous,
+            refresh_interval,
+            ExitCode.MALFORMED_JSON,
+            "malformed_json",
+        )
+
+    if not isinstance(status, dict):
+        status = {}
+    source = resolution_source(status, target.source if target else None)
+    if source is None:
+        snapshot = configuration_error_snapshot(
+            previous,
+            refresh_interval,
+            status,
+            target.source if target else None,
+        )
+        if candidate_key:
+            snapshot["setup"] = setup_section(
+                retained_setup_candidates(previous),
+                CANDIDATE_UNSUPPORTED_GUIDANCE,
+            )
+        return publish(snapshot_path, ExitCode.UNSUPPORTED_JSON, snapshot)
+    return status, source
+
+
 def collect_gateway(
     snapshot_path: Path,
     refresh_interval: int,
@@ -482,41 +533,17 @@ def collect_gateway(
             "command_failed",
         )
 
-    try:
-        status = json.loads(completed.stdout)
-    except json.JSONDecodeError:
-        if candidate_key:
-            snapshot = configuration_error_snapshot(previous, refresh_interval, {}, None)
-            snapshot["failureKind"] = "malformed_json"
-            snapshot["setup"] = setup_section(
-                retained_setup_candidates(previous),
-                CANDIDATE_UNSUPPORTED_GUIDANCE,
-            )
-            return publish(snapshot_path, ExitCode.MALFORMED_JSON, snapshot)
-        return publish_failure(
-            snapshot_path,
-            previous,
-            refresh_interval,
-            ExitCode.MALFORMED_JSON,
-            "malformed_json",
-        )
-
-    if not isinstance(status, dict):
-        status = {}
-    source = resolution_source(status, target.source if target else None)
-    if source is None:
-        snapshot = configuration_error_snapshot(
-            previous,
-            refresh_interval,
-            status,
-            target.source if target else None,
-        )
-        if candidate_key:
-            snapshot["setup"] = setup_section(
-                retained_setup_candidates(previous),
-                CANDIDATE_UNSUPPORTED_GUIDANCE,
-            )
-        return publish(snapshot_path, ExitCode.UNSUPPORTED_JSON, snapshot)
+    decoded = decode_status_or_fail(
+        snapshot_path,
+        previous,
+        refresh_interval,
+        candidate_key,
+        target,
+        completed,
+    )
+    if isinstance(decoded, CollectionResult):
+        return decoded
+    status, source = decoded
 
     fleet_payload, agent_payload, task_payload, automation_payload, metadata_failures = (
         collect_metadata(
