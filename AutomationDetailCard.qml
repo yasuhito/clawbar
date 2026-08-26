@@ -5,12 +5,13 @@ import "ClawbarLogic.js" as Logic
 Item {
   id: root
 
-  required property var automation
+  // Uniform Operational Row detail interface: injected by RowSection's loader.
+  required property var vm
+  required property var palette
   required property double nowMs
   required property bool historical
-  required property color foreground
-  required property color dim
-  required property string fontFamily
+
+  readonly property var automation: vm.item
 
   implicitHeight: detailColumn.implicitHeight + Style.space(16)
 
@@ -27,8 +28,8 @@ Item {
       visible: root.historical
       width: parent.width
       text: "Last known · " + Logic.relativeTime(root.automation.lastRunAt, root.nowMs)
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.palette.selectedDim
+      font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
       wrapMode: Text.NoWrap
       elide: Text.ElideRight
@@ -39,8 +40,8 @@ Item {
       width: parent.width
       text: Logic.automationKindLabel(root.automation.kind)
         + " · " + Logic.automationStatusLabel(root.automation)
-      color: root.foreground
-      font.family: root.fontFamily
+      color: root.palette.foreground
+      font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
       wrapMode: Text.NoWrap
       elide: Text.ElideRight
@@ -56,8 +57,8 @@ Item {
         var full = Logic.absoluteLocalTime(root.automation.nextRunAt)
         return full ? "Full local time " + full : ""
       }
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.palette.selectedDim
+      font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
       wrapMode: Text.NoWrap
       elide: Text.ElideRight
@@ -73,8 +74,8 @@ Item {
         var full = Logic.absoluteLocalTime(root.automation.lastRunAt)
         return full ? "Full local time " + full : ""
       }
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.palette.selectedDim
+      font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
       wrapMode: Text.NoWrap
       elide: Text.ElideRight
@@ -87,8 +88,8 @@ Item {
         && root.automation.lastResult === "none"
       width: parent.width
       text: "No run timestamps"
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.palette.selectedDim
+      font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
       wrapMode: Text.NoWrap
       elide: Text.ElideRight

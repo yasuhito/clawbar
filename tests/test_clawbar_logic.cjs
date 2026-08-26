@@ -541,3 +541,170 @@ test("metadataUnavailableText returns null without the size-limit reason", () =>
   )
   assert.equal(Logic.metadataUnavailableText(null), null)
 })
+
+// ─── Operational Row view-models ───
+
+test("makePalette derives contrast-safe colors once for every row", () => {
+  const palette = Logic.makePalette({
+    foreground: "#ffffff",
+    accent: "#89b4fa",
+    urgent: "#f38ba8",
+    muted: "#a6adc8",
+    healthy: "#a6e3a1",
+    warning: "",
+    panelSurface: "#11111b",
+    selectedSurface: "#313244",
+    fontFamily: "Sans"
+  })
+
+  assert.equal(palette.foreground, "#ffffff")
+  assert.equal(palette.fontFamily, "Sans")
+  assert.equal(typeof palette.signalColor, "function")
+  assert.equal(typeof palette.selectedSignalColor, "function")
+  assert.equal(
+    palette.signalColor("critical"),
+    Logic.readableColor("#f38ba8", "#ffffff", "#11111b", 4.5)
+  )
+  assert.equal(
+    palette.signalColor("healthy"),
+    Logic.readableColor("#a6e3a1", "#ffffff", "#11111b", 4.5)
+  )
+  assert.equal(
+    palette.signalColor("warning"),
+    Logic.readableColor("#89b4fa", "#ffffff", "#11111b", 4.5)
+  )
+  assert.equal(
+    palette.selectedSignalColor("critical"),
+    Logic.readableColor(palette.signalColor("critical"), "#ffffff", "#313244", 4.5)
+  )
+  assert.equal(palette.dim, Logic.readableColor("#a6adc8", "#ffffff", "#11111b", 4.5))
+  assert.equal(
+    palette.selectedDim,
+    Logic.readableColor(palette.dim, "#ffffff", "#313244", 4.5)
+  )
+})
+
+function operationalSnapshot() {
+  const snapshot = healthySnapshot(new Date(100000).toISOString())
+  snapshot.fleet = {
+    available: true,
+    nodes: [
+      { key: "node:a", name: "alpha", state: "healthy" },
+      { key: "node:b", name: "beta", state: "offline" }
+    ]
+  }
+  snapshot.agents = {
+    available: true,
+    items: [
+      { key: "agent:a", name: "planner", taskResult: { state: "failed", completedAt: new Date(50000).toISOString() } },
+      { name: "observer" }
+    ]
+  }
+  snapshot.automations = {
+    available: true,
+    items: [
+      { id: "cron-1", name: "Morning review", enabled: true, lastResult: "error", consecutiveFailures: 2 },
+      { id: "off-1", name: "Retired job", enabled: false, lastRunAt: new Date(60000).toISOString(), lastResult: "none" }
+    ]
+  }
+  return snapshot
+}
+
+test("panelSections orders candidate, node, agent and automation rows", () => {
+  const sections = Logic.panelSections(operationalSnapshot(), "healthy")
+
+  assert.deepEqual(sections.map(section => section.kind), ["candidate", "node", "agent", "automation"])
+  const [candidates, nodes, agents, automations] = sections
+  assert.deepEqual(candidates.rows.map(row => row.key), [])
+  assert.deepEqual(nodes.rows.map(row => row.key), ["node:a", "node:b"])
+
+  const alpha = nodes.rows[0]
+  assert.equal(alpha.showStatusLabel, false)
+  assert.equal(alpha.titleMuted, false)
+  assert.equal(alpha.titleBold, true)
+
+  const beta = nodes.rows[1]
+  assert.equal(beta.dot.tone, "muted")
+  assert.equal(beta.dot.shape, "circle")
+  assert.equal(beta.titleMuted, true)
+  assert.equal(beta.titleBold, false)
+  assert.equal(beta.showStatusLabel, true)
+  assert.equal(beta.statusLabel, "Offline")
+  assert.equal(beta.accessibleDescription, "Offline")
+
+  const planner = agents.rows[0]
+  assert.equal(planner.key, "agent:a")
+  assert.equal(planner.dot.tone, "registered")
+  assert.equal(planner.subCritical, true)
+  assert.match(planner.subText(new Date(140000).getTime()), /^Task: Failed/)
+
+  const observer = agents.rows[1]
+  assert.equal(observer.key, "agent:observer")
+  assert.equal(observer.subCritical, false)
+
+  const failing = automations.rows[0]
+  assert.equal(failing.dot.tone, "critical")
+  assert.equal(failing.showStatusLabel, true)
+  assert.equal(failing.statusLabel, "Failed · 2×")
+  assert.equal(failing.accessibleDescription, "Automation Failure · 2 consecutive failures")
+  assert.equal(typeof failing.subText(new Date(140000).getTime()), "string")
+
+  const retired = automations.rows[1]
+  assert.equal(retired.titleMuted, true)
+  assert.equal(retired.dot.tone, "disabled")
+  assert.equal(retired.dot.shape, "dotted")
+  assert.equal(retired.statusLabel, "Disabled")
+})
+
+test("setup candidate rows expose verify actions without dots", () => {
+  const snapshot = operationalSnapshot()
+  snapshot.gateway.state = "configuration_error"
+  snapshot.setup = { candidates: [{ key: "cand-1", name: "mac-studio" }] }
+
+  const state = Logic.snapshotState(snapshot, 100000)
+  assert.equal(state, "configuration_error")
+
+  const [candidates] = Logic.panelSections(snapshot, state)
+  assert.deepEqual(candidates.rows.map(row => row.key), ["cand-1"])
+  const row = candidates.rows[0]
+  assert.equal(row.dot, null)
+  assert.equal(row.name, "mac-studio")
+  assert.equal(row.showStatusLabel, true)
+  assert.equal(row.statusLabel, "Verify")
+  assert.equal(row.historical, false)
+})
+
+test("stale snapshots mark every operational row as Last known", () => {
+  const observedAt = new Date(100000).toISOString()
+  const snapshot = healthySnapshot(observedAt)
+  snapshot.lastKnown = {
+    observedAt,
+    fleet: { available: true, nodes: [{ key: "node:a", name: "alpha", state: "offline" }] },
+    agents: { available: true, items: [] },
+    automations: { available: true, items: [] }
+  }
+
+  const nodes = Logic.panelSections(snapshot, "stale").find(s => s.kind === "node")
+  const row = nodes.rows[0]
+  assert.equal(row.historical, true)
+  assert.equal(row.observedAt, observedAt)
+  assert.equal(row.statusLabel, "Last known")
+  assert.equal(row.accessibleDescription, "Last known")
+  assert.equal(row.dot.tone, "muted")
+})
+
+test("sectionKeys flattens selection order across kinds", () => {
+  const sections = [
+    { kind: "candidate", rows: [{ key: "c1" }] },
+    { kind: "node", rows: [{ key: "n1" }, { key: "n2" }] },
+    { kind: "agent", rows: [] },
+    { kind: "automation", rows: [{ key: "a1" }] }
+  ]
+
+  assert.deepEqual(Logic.sectionKeys(sections), ["c1", "n1", "n2", "a1"])
+})
+
+test("selection reconciliation accepts plain key arrays", () => {
+  assert.deepEqual(Logic.reconcileSelection(["n1", "n2"], "", 1), { key: "n2", index: 1 })
+  assert.deepEqual(Logic.reconcileSelection(["n1"], "missing", 5), { key: "n1", index: 0 })
+})

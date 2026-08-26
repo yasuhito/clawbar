@@ -28,7 +28,7 @@ KeyboardPanel {
   readonly property bool setupVisible: candidates.length > 0 || state === "setup_required"
     || (state === "configuration_error" && snapshot && snapshot.setup)
   readonly property bool configurationErrorVisible: state === "configuration_error"
-  readonly property int selectedIndex: Logic.indexForKey(rows, selectedKey)
+  readonly property int selectedIndex: Logic.indexForKey(selectionKeys, selectedKey)
   readonly property var selectedRow: selectedIndex >= 0 ? rows[selectedIndex] : null
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color panelSurface: Color.popups.background
@@ -44,6 +44,22 @@ KeyboardPanel {
   required property color warning
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property var gatewaySignal: Logic.panelSignal(snapshot, state)
+
+  // One palette object carries every color the Operational Rows need; the
+  // panel derives it once so sections never re-thread theme colors.
+  readonly property var palette: Logic.makePalette({
+    foreground: String(foreground),
+    accent: String(accent),
+    urgent: String(urgent),
+    muted: String(rawDim),
+    healthy: String(healthy),
+    warning: String(warning),
+    panelSurface: String(panelSurface),
+    selectedSurface: String(selectedSurface),
+    fontFamily: fontFamily
+  })
+  readonly property var sections: Logic.panelSections(snapshot, state)
+  readonly property var selectionKeys: Logic.sectionKeys(sections)
 
   /* ───────────────────────────────────────────────────────
    * DETAIL REVEAL STORYBOARD
@@ -83,7 +99,7 @@ KeyboardPanel {
   )
 
   function reconcileRows() {
-    var selection = Logic.reconcileSelection(rows, selectedKey, selectedIndexHint)
+    var selection = Logic.reconcileSelection(selectionKeys, selectedKey, selectedIndexHint)
     selectedKey = selection.key
     selectedIndexHint = selection.index < 0 ? 0 : selection.index
   }
@@ -91,12 +107,12 @@ KeyboardPanel {
   function selectRow(row) {
     if (!row) return
     selectedKey = row.key
-    selectedIndexHint = Logic.indexForKey(rows, row.key)
+    selectedIndexHint = Logic.indexForKey(selectionKeys, row.key)
     Qt.callLater(root.ensureSelectionVisible)
   }
 
   function moveSelection(delta) {
-    var next = Logic.moveFocus(selectedIndex, rows.length, delta)
+    var next = Logic.moveFocus(selectedIndex, selectionKeys.length, delta)
     if (next < 0) return
     selectedKey = rows[next].key
     selectedIndexHint = next
@@ -108,11 +124,19 @@ KeyboardPanel {
     if (row.kind === "candidate") return candidateRepeater.itemAt(row.sectionIndex)
     if (row.kind === "node") return nodeRepeater.itemAt(row.sectionIndex)
     if (row.kind === "agent") return agentRepeater.itemAt(row.sectionIndex)
-    return automationSection.itemAt(row.sectionIndex)
+    return null
+  }
+
+  // Automations already live in a key-addressable RowSection; the remaining
+  // kinds migrate step by step and keep the legacy offset lookup until then.
+  function delegateForSelection() {
+    if (selectedRow && selectedRow.kind === "automation")
+      return automationRows.itemForKey(selectedKey)
+    return rowDelegate(selectedRow)
   }
 
   function ensureSelectionVisible() {
-    var delegate = rowDelegate(selectedRow)
+    var delegate = delegateForSelection()
     if (!delegate) return
     var top = delegate.mapToItem(contentColumn, 0, 0).y
     var bottom = top + delegate.height
@@ -672,33 +696,69 @@ KeyboardPanel {
           }
         }
 
-        AutomationSection {
-          id: automationSection
+        Text {
+          textFormat: Text.PlainText
+          visible: !root.setupVisible && !root.configurationErrorVisible
+          width: parent.width
+          topPadding: Style.space(8)
+          text: "AUTOMATIONS"
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          font.bold: true
+        }
+
+        Text {
+          textFormat: Text.PlainText
+          visible: !root.setupVisible && !root.configurationErrorVisible
+            && root.state === "degraded" && root.snapshot
+            && root.snapshot.automations && !root.snapshot.automations.available
+          width: parent.width
+          text: root.snapshot && root.snapshot.automations
+            && root.snapshot.automations.reason === "more_than_500"
+              ? "Unavailable — more than 500 Automations"
+              : "Unavailable"
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+        }
+
+        Text {
+          textFormat: Text.PlainText
+          visible: !root.setupVisible && !root.configurationErrorVisible
+            && !!root.metadata && root.metadata.automations
+            && root.metadata.automations.available && root.automations.length === 0
+          width: parent.width
+          text: "No Automations"
+          color: root.dim
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.body
+        }
+
+        Component {
+          id: automationDetailDelegate
+          AutomationDetailCard {}
+        }
+
+        RowSection {
+          id: automationRows
           width: parent.width
           visible: !root.setupVisible && !root.configurationErrorVisible
-          section: root.metadata ? root.metadata.automations : null
-          automations: root.automations
-          rows: root.rows
-          rowOffset: root.candidates.length + root.nodes.length + root.agents.length
+          rows: Logic.sectionRows(root.sections, "automation")
+          palette: root.palette
           selectedKey: root.selectedKey
           nowMs: root.nowMs
-          foreground: root.foreground
-          dim: root.dim
-          selectedDim: root.selectedDim
-          accent: root.accent
-          urgent: root.urgent
-          fontFamily: root.fontFamily
           historical: root.historical
-          detailMotionEnabled: root.detailMotionEnabled
-          detailFadeDuration: root.detailFadeDuration
-          detailExpandDuration: root.detailExpandDuration
-          signalColor: root.signalColor
-          selectedSignalColor: root.selectedSignalColor
-          showUnavailable: root.state === "degraded"
-          onRowSelected: function(row) {
-            root.selectRow(row)
+          motionEnabled: root.detailMotionEnabled
+          fadeDuration: root.detailFadeDuration
+          expandDuration: root.detailExpandDuration
+          detailComponent: automationDetailDelegate
+          dotInsetUnits: 8
+          onRowActivated: function(vm) {
+            if (!vm.key) return
+            root.selectRow(vm)
           }
-          onSelectedGeometryChanged: Qt.callLater(root.ensureSelectionVisible)
+          onSelectionGeometryChanged: Qt.callLater(root.ensureSelectionVisible)
         }
 
       }

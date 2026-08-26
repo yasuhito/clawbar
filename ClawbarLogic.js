@@ -153,10 +153,168 @@ function panelRows(snapshot, state) {
   }))
 }
 
+// Operational Row view-models: presentation facts computed once, tested here,
+// consumed uniformly by RowSection.qml regardless of kind.
+
+function candidateViewModel(item, index) {
+  return {
+    kind: "candidate",
+    key: String(item.key || ""),
+    item: item,
+    name: String(item.name || ""),
+    dot: null,
+    titleBold: true,
+    titleMuted: false,
+    statusLabel: "Verify",
+    showStatusLabel: true,
+    statusCapRatio: null,
+    hasSub: false,
+    subText: function() { return "" },
+    subCritical: false,
+    accessibleDescription: "Gateway candidate",
+    historical: false,
+    observedAt: ""
+  }
+}
+
+function nodeViewModel(item, index, historical, observedAt) {
+  var signal = nodeSignalPresentation(item.state)
+  var offline = item.state === "offline"
+  var label = historical ? "Last known" : signal.label
+  return {
+    kind: "node",
+    key: String(item.key || ""),
+    item: item,
+    name: String(item.name || ""),
+    dot: { shape: signal.shape, tone: signal.tone },
+    titleBold: !offline,
+    titleMuted: offline,
+    statusLabel: label,
+    showStatusLabel: showNodeStatusLabel(item.state, historical),
+    statusCapRatio: null,
+    hasSub: false,
+    subText: function() { return "" },
+    subCritical: false,
+    accessibleDescription: label,
+    historical: historical,
+    observedAt: observedAt
+  }
+}
+
+function agentViewModel(item, index, historical, observedAt) {
+  var result = item.taskResult || {}
+  var failed = result.state === "failed"
+  return {
+    kind: "agent",
+    key: String(item.key || "agent:" + item.name),
+    item: item,
+    name: String(item.name || ""),
+    dot: SIGNAL_PRESENTATIONS.registered_agent,
+    titleBold: true,
+    titleMuted: false,
+    statusLabel: "",
+    showStatusLabel: false,
+    statusCapRatio: null,
+    hasSub: true,
+    subText: function(nowMilliseconds) {
+      return taskResultLabel(result, nowMilliseconds)
+    },
+    subCritical: failed,
+    accessibleDescription: "Registered Agent",
+    historical: historical,
+    observedAt: observedAt
+  }
+}
+
+function automationViewModel(item, index, historical, observedAt) {
+  var failed = !!item.enabled && item.lastResult === "error"
+  var disabled = !item.enabled
+  var signalState = failed ? "failed" : disabled ? "disabled" : item.lastResult === "ok" ? "succeeded" : "healthy"
+  var signal = signalPresentation(signalState)
+  return {
+    kind: "automation",
+    key: item.id ? "automation:" + item.id : "",
+    item: item,
+    name: String(item.name || ""),
+    dot: { shape: signal.shape, tone: signal.tone },
+    titleBold: !!item.enabled,
+    titleMuted: disabled,
+    statusLabel: historical ? "Last known" : automationCompactStatusLabel(item),
+    showStatusLabel: showAutomationStatusLabel(item, historical),
+    statusCapRatio: 0.42,
+    hasSub: true,
+    subText: function(nowMilliseconds) {
+      if (!historical)
+        return automationTimingLabel(item, nowMilliseconds)
+      var last = relativeTime(item.lastRunAt, nowMilliseconds)
+      return last ? "Last " + last : "No runs yet"
+    },
+    subCritical: false,
+    accessibleDescription: historical ? "Last known" : automationStatusLabel(item),
+    historical: historical,
+    observedAt: observedAt
+  }
+}
+
+function panelSections(snapshot, state) {
+  var historical = historicalState(state)
+  var observedAt = observationTime(snapshot, state)
+  return [
+    {
+      kind: "candidate",
+      rows: setupCandidates(snapshot, state).map(function(item, index) {
+        return candidateViewModel(item, index)
+      })
+    },
+    {
+      kind: "node",
+      rows: fleetNodes(snapshot, state).map(function(item, index) {
+        return nodeViewModel(item, index, historical, observedAt)
+      })
+    },
+    {
+      kind: "agent",
+      rows: agents(snapshot, state).map(function(item, index) {
+        return agentViewModel(item, index, historical, observedAt)
+      })
+    },
+    {
+      kind: "automation",
+      rows: automations(snapshot, state).map(function(item, index) {
+        return automationViewModel(item, index, historical, observedAt)
+      })
+    }
+  ]
+}
+
+function sectionRows(sections, kind) {
+  for (var i = 0; i < sections.length; i++)
+    if (sections[i].kind === kind) return sections[i].rows
+  return []
+}
+
+function sectionKeys(sections) {
+  var keys = []
+  sections.forEach(function(section) {
+    section.rows.forEach(function(row) { keys.push(row.key) })
+  })
+  return keys
+}
+
+function keyKind(sections, key) {
+  if (!key) return ""
+  for (var i = 0; i < sections.length; i++)
+    if (sections[i].rows.some(function(row) { return row.key === key }))
+      return sections[i].kind
+  return ""
+}
+
 function indexForKey(rows, key) {
   if (!key) return -1
-  for (var i = 0; i < rows.length; i++)
-    if (rows[i].key === key) return i
+  for (var i = 0; i < rows.length; i++) {
+    var entryKey = rows[i] && typeof rows[i] === "object" ? rows[i].key : rows[i]
+    if (entryKey === key) return i
+  }
   return -1
 }
 
@@ -164,7 +322,8 @@ function reconcileSelection(rows, selectedKey, indexHint) {
   if (rows.length === 0) return { key: "", index: -1 }
   var retained = indexForKey(rows, selectedKey)
   var index = retained >= 0 ? retained : Math.max(0, Math.min(indexHint, rows.length - 1))
-  return { key: rows[index].key, index: index }
+  var entry = rows[index]
+  return { key: entry && typeof entry === "object" ? entry.key : entry, index: index }
 }
 
 function moveFocus(index, count, delta) {
@@ -188,6 +347,39 @@ function relativeTime(value, nowMilliseconds) {
 function absoluteLocalTime(value) {
   var timestamp = Date.parse(String(value || ""))
   return isNaN(timestamp) ? "" : new Date(timestamp).toLocaleString()
+}
+
+// One palette object replaces per-call color threading across QML files.
+// Derived colors are contrast-adjusted once against their target surface.
+function makePalette(input) {
+  var foreground = String(input.foreground)
+  var accent = String(input.accent)
+  var urgent = String(input.urgent)
+  var healthy = input.healthy ? String(input.healthy) : ""
+  var warning = input.warning ? String(input.warning) : ""
+  var panelSurface = String(input.panelSurface)
+  var selectedSurface = String(input.selectedSurface)
+  var dim = readableColor(String(input.muted), foreground, panelSurface, 4.5)
+  var selectedDim = readableColor(dim, foreground, selectedSurface, 4.5)
+
+  function preferredTone(tone) {
+    return signalColor(tone, foreground, accent, urgent, dim, healthy, warning)
+  }
+
+  return {
+    fontFamily: String(input.fontFamily || ""),
+    foreground: foreground,
+    accent: accent,
+    urgent: urgent,
+    dim: dim,
+    selectedDim: selectedDim,
+    signalColor: function(tone) {
+      return readableColor(preferredTone(tone), foreground, panelSurface, 4.5)
+    },
+    selectedSignalColor: function(tone) {
+      return readableColor(preferredTone(tone), foreground, selectedSurface, 4.5)
+    }
+  }
 }
 
 var COMPACT_MONTHS = [
@@ -528,6 +720,11 @@ if (typeof module !== "undefined") {
     nodeMetadataLabel: nodeMetadataLabel,
     showNodeStatusLabel: showNodeStatusLabel,
     nodeSignalPresentation: nodeSignalPresentation,
-    metadataUnavailableText: metadataUnavailableText
+    metadataUnavailableText: metadataUnavailableText,
+    makePalette: makePalette,
+    panelSections: panelSections,
+    sectionRows: sectionRows,
+    sectionKeys: sectionKeys,
+    keyKind: keyKind
   }
 }
