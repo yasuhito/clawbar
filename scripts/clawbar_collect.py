@@ -18,6 +18,7 @@ if __package__:
     from .clawbar_automation import collect_automation_surface
     from .clawbar_gateway import (
         CollectionDeadlineExceeded,
+        CommandOutputExceeded,
         GatewayTarget,
         automatic_resolution_missing,
         discover_node_host,
@@ -32,7 +33,12 @@ if __package__:
         setup_section,
     )
     from .clawbar_incidents import process_incident_transitions
-    from .clawbar_metadata import build_current_snapshot, load_local_key_secret, sanitize_metadata
+    from .clawbar_metadata import (
+        OUTPUT_EXCEEDED_LIMIT,
+        build_current_snapshot,
+        load_local_key_secret,
+        sanitize_metadata,
+    )
     from .clawbar_snapshot import (
         atomic_write_snapshot,
         build_failure_snapshot,
@@ -46,6 +52,7 @@ else:
     from clawbar_automation import collect_automation_surface
     from clawbar_gateway import (
         CollectionDeadlineExceeded,
+        CommandOutputExceeded,
         GatewayTarget,
         automatic_resolution_missing,
         discover_node_host,
@@ -60,7 +67,12 @@ else:
         setup_section,
     )
     from clawbar_incidents import process_incident_transitions
-    from clawbar_metadata import build_current_snapshot, load_local_key_secret, sanitize_metadata
+    from clawbar_metadata import (
+        OUTPUT_EXCEEDED_LIMIT,
+        build_current_snapshot,
+        load_local_key_secret,
+        sanitize_metadata,
+    )
     from clawbar_snapshot import (
         atomic_write_snapshot,
         build_failure_snapshot,
@@ -248,27 +260,41 @@ def read_metadata_surface(
     arguments: Sequence[str],
     deadline_at: float,
     target: GatewayTarget | None,
-) -> object | None:
+) -> tuple[object | None, str | None]:
     try:
-        return decode_json(metadata_command(openclaw_command, arguments, deadline_at, target))
+        return (
+            decode_json(metadata_command(openclaw_command, arguments, deadline_at, target)),
+            None,
+        )
+    except CommandOutputExceeded:
+        return None, OUTPUT_EXCEEDED_LIMIT
     except (CollectionDeadlineExceeded, OSError):
-        return None
+        return None, None
 
 
+
+
+METADATA_SURFACE_NAMES = ("fleet", "agents", "tasks")
 
 
 def collect_metadata(
     openclaw_command: Sequence[str],
     deadline_at: float,
     target: GatewayTarget | None,
-) -> tuple[object | None, object | None, object | None, object | None]:
-    core = tuple(
-        read_metadata_surface(openclaw_command, arguments, deadline_at, target)
-        for arguments in METADATA_SURFACES
-    )
+) -> tuple[object | None, object | None, object | None, object | None, dict[str, str | None]]:
+    payloads: list[object | None] = []
+    failures: dict[str, str | None] = {}
+    for name, arguments in zip(METADATA_SURFACE_NAMES, METADATA_SURFACES):
+        payload, failure = read_metadata_surface(openclaw_command, arguments, deadline_at, target)
+        payloads.append(payload)
+        failures[name] = failure
+
     def read_automation(arguments: Sequence[str]) -> object | None:
-        return read_metadata_surface(openclaw_command, arguments, deadline_at, target)
-    return (*core, collect_automation_surface(read_automation))
+        payload, _ = read_metadata_surface(openclaw_command, arguments, deadline_at, target)
+        return payload
+
+    automation_payload = collect_automation_surface(read_automation)
+    return (*payloads, automation_payload, failures)
 
 
 
@@ -452,10 +478,12 @@ def collect_gateway(
             )
         return publish(snapshot_path, ExitCode.UNSUPPORTED_JSON, snapshot)
 
-    fleet_payload, agent_payload, task_payload, automation_payload = collect_metadata(
-        openclaw_command,
-        command_deadline_at,
-        target,
+    fleet_payload, agent_payload, task_payload, automation_payload, metadata_failures = (
+        collect_metadata(
+            openclaw_command,
+            command_deadline_at,
+            target,
+        )
     )
     fleet, agents, automations, automation_failure = sanitize_metadata(
         fleet_payload,
@@ -473,6 +501,7 @@ def collect_gateway(
         agents,
         automations,
         automation_failure,
+        metadata_failures=metadata_failures,
     )
     if fleet is None:
         retained = last_known_metadata(previous)

@@ -1119,6 +1119,76 @@ class ExternalCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(snapshot["fleet"], {"available": True, "nodes": []})
         self.assertEqual(snapshot["agents"], {"available": False, "items": []})
 
+    def test_oversize_agents_surface_marks_section_reason(self) -> None:
+        result = self.run_external(
+            "local",
+            environment_overrides={
+                "FAKE_AGENTS_OUTPUT_BYTES": str(
+                    clawbar_gateway.MAX_COMMAND_STREAM_BYTES + 1
+                ),
+            },
+        )
+
+        self.assertEqual(result.returncode, clawbar_collect.ExitCode.OK, result.stderr)
+        snapshot = json.loads(result.stdout)
+        self.assertEqual(snapshot["gateway"], {"state": "degraded"})
+        self.assertEqual(snapshot["fleet"], {"available": True, "nodes": []})
+        self.assertTrue(snapshot["automations"]["available"])
+        self.assertEqual(
+            snapshot["agents"],
+            {
+                "available": False,
+                "items": [],
+                "reason": "output_exceeded_limit",
+            },
+        )
+
+    def test_oversize_task_surface_marks_agents_section_reason(self) -> None:
+        result = self.run_external(
+            "local",
+            environment_overrides={
+                "FAKE_TASKS_OUTPUT_BYTES": str(
+                    clawbar_gateway.MAX_COMMAND_STREAM_BYTES + 1
+                ),
+            },
+        )
+
+        self.assertEqual(result.returncode, clawbar_collect.ExitCode.OK, result.stderr)
+        snapshot = json.loads(result.stdout)
+        self.assertEqual(snapshot["gateway"], {"state": "degraded"})
+        self.assertEqual(snapshot["fleet"], {"available": True, "nodes": []})
+        self.assertEqual(
+            snapshot["agents"],
+            {
+                "available": False,
+                "items": [],
+                "reason": "output_exceeded_limit",
+            },
+        )
+
+    def test_oversize_nodes_surface_marks_fleet_section_reason(self) -> None:
+        result = self.run_external(
+            "local",
+            environment_overrides={
+                "FAKE_NODES_OUTPUT_BYTES": str(
+                    clawbar_gateway.MAX_COMMAND_STREAM_BYTES + 1
+                ),
+            },
+        )
+
+        self.assertEqual(result.returncode, clawbar_collect.ExitCode.OK, result.stderr)
+        snapshot = json.loads(result.stdout)
+        self.assertEqual(snapshot["gateway"], {"state": "degraded"})
+        self.assertTrue(snapshot["automations"]["available"])
+        self.assertEqual(
+            snapshot["fleet"],
+            {
+                "available": False,
+                "nodes": [],
+                "reason": "output_exceeded_limit",
+            },
+        )
+
     def test_executable_ignores_misleading_success_stderr_and_nonzero_streams(self) -> None:
         healthy = self.run_external(
             "local",

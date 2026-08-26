@@ -522,3 +522,22 @@ test("signal semantics follow the prototype dot and color legend", () => {
   assert.equal(Logic.themeColorFromTheme('color3 = "#DF8E1D"', "yellow", "fg"), "#DF8E1D")
   assert.equal(Logic.themeColorFromTheme("foreground = \"#100F0F\"", "green", "fg"), "fg")
 })
+
+test("metadataUnavailableText maps the size-limit reason to a specific message", () => {
+  assert.equal(
+    Logic.metadataUnavailableText({
+      available: false,
+      reason: "output_exceeded_limit",
+    }),
+    "Unavailable — metadata response exceeded the collection limit"
+  )
+})
+
+test("metadataUnavailableText returns null without the size-limit reason", () => {
+  assert.equal(Logic.metadataUnavailableText({ available: false }), null)
+  assert.equal(
+    Logic.metadataUnavailableText({ available: false, reason: "more_than_500" }),
+    null
+  )
+  assert.equal(Logic.metadataUnavailableText(null), null)
+})

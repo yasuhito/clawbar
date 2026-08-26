@@ -458,6 +458,12 @@ function panelSummary(state, resolutionSource, count, severity, panelSignalLabel
   return summary(state, resolutionSource, count, severity, !headerShowsIncidentCount)
 }
 
+function metadataUnavailableText(section) {
+  return !!section && !section.available && section.reason === "output_exceeded_limit"
+    ? "Unavailable — metadata response exceeded the collection limit"
+    : null
+}
+
 function refreshSummary(baseSummary, feedback, hasSnapshot) {
   if (feedback === "refreshing") return "Refreshing… · " + baseSummary
   if (feedback === "failed" && hasSnapshot) return "Refresh failed · showing last known"
@@ -521,6 +527,7 @@ if (typeof module !== "undefined") {
     reconcileSelection: reconcileSelection,
     nodeMetadataLabel: nodeMetadataLabel,
     showNodeStatusLabel: showNodeStatusLabel,
-    nodeSignalPresentation: nodeSignalPresentation
+    nodeSignalPresentation: nodeSignalPresentation,
+    metadataUnavailableText: metadataUnavailableText
   }
 }

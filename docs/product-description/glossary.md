@@ -62,7 +62,7 @@ The vocabulary used across these documents. When a document uses one of these te
 
 **Healthy Gateway.** A Gateway whose core status and requested metadata are current and available. A healthy Gateway may still coexist with Automation Failures, so the panel header and bar can show critical Incident severity while Gateway reachability remains healthy.
 
-**Degraded Gateway.** A reachable Gateway whose core status is current but whose Fleet, Agent/Task, or Automation metadata could not all be collected. Unavailable sections show no carried-forward values.
+**Degraded Gateway.** A reachable Gateway whose core status is current but whose Fleet, Agent/Task, or Automation metadata could not all be collected — including when collection output was discarded for exceeding the bounded-size limit. Unavailable sections show no carried-forward values.
 
 **Unstable Gateway.** A previously reachable Gateway after one consecutive failed collection. Last Known Metadata remains visible, but the previous snapshot no longer establishes current health.
 

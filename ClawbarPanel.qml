@@ -396,7 +396,8 @@ KeyboardPanel {
           visible: root.state === "degraded" && root.snapshot
             && root.snapshot.fleet && !root.snapshot.fleet.available
           width: parent.width
-          text: "Node metadata unavailable"
+          text: Logic.metadataUnavailableText(root.snapshot && root.snapshot.fleet)
+            || "Node metadata unavailable"
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
@@ -545,7 +546,8 @@ KeyboardPanel {
           visible: root.state === "degraded" && root.snapshot
             && root.snapshot.agents && !root.snapshot.agents.available
           width: parent.width
-          text: "Agent and Task metadata unavailable"
+          text: Logic.metadataUnavailableText(root.snapshot && root.snapshot.agents)
+            || "Agent and Task metadata unavailable"
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.body

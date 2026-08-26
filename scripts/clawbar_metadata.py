@@ -324,6 +324,9 @@ def sanitize_metadata(
     )
 
 
+OUTPUT_EXCEEDED_LIMIT = "output_exceeded_limit"
+
+
 def build_current_snapshot(
     schema_version: int,
     generated_at: str,
@@ -333,6 +336,7 @@ def build_current_snapshot(
     agents: list[dict[str, Any]] | None,
     automations: list[dict[str, Any]] | None,
     automation_failure: str | None,
+    metadata_failures: dict[str, str | None] | None = None,
 ) -> dict[str, Any]:
     degraded = fleet is None or agents is None or automations is None
     gateway_state = "degraded" if degraded else "healthy"
@@ -354,14 +358,28 @@ def build_current_snapshot(
     }
     if automation_failure is not None:
         automation_section["reason"] = automation_failure
+    failures = metadata_failures or {}
+    fleet_section: dict[str, Any] = {
+        "available": fleet is not None,
+        "nodes": fleet or [],
+    }
+    if fleet is None and failures.get("fleet"):
+        fleet_section["reason"] = failures["fleet"]
+    agents_section: dict[str, Any] = {
+        "available": agents is not None,
+        "items": agents or [],
+    }
+    agents_failure = failures.get("agents") or failures.get("tasks")
+    if agents is None and agents_failure:
+        agents_section["reason"] = agents_failure
     return {
         "schemaVersion": schema_version,
         "generatedAt": generated_at,
         "refreshIntervalSeconds": refresh_interval,
         "resolutionSource": source,
         "gateway": {"state": gateway_state},
-        "fleet": {"available": fleet is not None, "nodes": fleet or []},
-        "agents": {"available": agents is not None, "items": agents or []},
+        "fleet": fleet_section,
+        "agents": agents_section,
         "automations": automation_section,
         "bar": bar,
         "lastSuccessAt": generated_at,

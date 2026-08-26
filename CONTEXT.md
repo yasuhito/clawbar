@@ -25,7 +25,7 @@ The latest attempt to collect from a previously reachable Gateway failed, withou
 _Avoid_: Offline Gateway, Offline Node
 
 **Degraded Gateway**:
-A reachable Gateway whose core status is current but whose Task or Automation metadata could not be collected. Unavailable sections show no carried-forward values.
+A reachable Gateway whose core status is current but whose Fleet, Agent/Task, or Automation metadata could not all be collected — including when collection output was discarded for exceeding the bounded-size limit. Unavailable sections show no carried-forward values.
 _Avoid_: Offline Gateway, Stale Snapshot
 
 **Offline Gateway**:

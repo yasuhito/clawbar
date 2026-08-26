@@ -33,6 +33,17 @@ class CollectorFixture:
                 import time
 
                 arguments = sys.argv[1:]
+
+                def maybe_write_oversize_output(environment_name):
+                    if environment_name not in os.environ:
+                        return
+                    remaining = int(os.environ[environment_name])
+                    while remaining:
+                        written = min(65536, remaining)
+                        os.write(sys.stdout.fileno(), b"x" * written)
+                        remaining -= written
+                    raise SystemExit(0)
+
                 pid_path = os.environ.get("FAKE_PID_PATH")
                 if pid_path:
                     with open(pid_path, "w", encoding="utf-8") as pid_file:
@@ -63,6 +74,18 @@ class CollectorFixture:
                             }
                         }))
                     raise SystemExit(0)
+
+                if arguments[:2] == ["gateway", "status"] and "FAKE_GATEWAY_OUTPUT_BYTES" in os.environ:
+                    maybe_write_oversize_output("FAKE_GATEWAY_OUTPUT_BYTES")
+
+                if arguments[:3] == ["nodes", "status", "--json"]:
+                    maybe_write_oversize_output("FAKE_NODES_OUTPUT_BYTES")
+
+                if arguments[:3] == ["gateway", "call", "agents.list"]:
+                    maybe_write_oversize_output("FAKE_AGENTS_OUTPUT_BYTES")
+
+                if arguments[:3] == ["gateway", "call", "tasks.list"]:
+                    maybe_write_oversize_output("FAKE_TASKS_OUTPUT_BYTES")
 
                 if arguments[:3] == ["nodes", "status", "--json"]:
                     time.sleep(float(os.environ.get("FAKE_NODES_DELAY", "0")))
@@ -101,15 +124,6 @@ class CollectorFixture:
 
                 if arguments[:2] == ["gateway", "status"]:
                     time.sleep(float(os.environ.get("FAKE_GATEWAY_DELAY", "0")))
-                    output_bytes = os.environ.get("FAKE_GATEWAY_OUTPUT_BYTES")
-                    if output_bytes is not None:
-                        remaining = int(output_bytes)
-                        chunk = b"x" * min(65536, remaining)
-                        while remaining:
-                            written = min(len(chunk), remaining)
-                            os.write(sys.stdout.fileno(), chunk[:written])
-                            remaining -= written
-                        raise SystemExit(0)
                     scenario = os.environ.get("FAKE_SCENARIO", "local")
                     candidate_mode = os.environ.get("FAKE_CANDIDATE_MODE", "healthy")
                     if "--url" in arguments and scenario == "unresolved":

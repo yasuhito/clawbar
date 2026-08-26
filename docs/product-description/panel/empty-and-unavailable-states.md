@@ -40,7 +40,7 @@ Selection and scrolling remain available. Existing data can become Last Known Me
 
 ### Settled
 
-No initial success settles as `No data yet`. Setup Required shows setup guidance. A current empty section says Empty Fleet or No Automations; empty Agents disappear. A failed current section says metadata unavailable. More than 500 Automations has its own explicit unavailable reason.
+No initial success settles as `No data yet`. Setup Required shows setup guidance. A current empty section says Empty Fleet or No Automations; empty Agents disappear. A failed current section says metadata unavailable. More than 500 Automations has its own explicit unavailable reason, as does a Fleet or Agent/Task section whose collection output exceeded the bounded-size limit (`Unavailable — metadata response exceeded the collection limit`).
 
 ## Variants
 
