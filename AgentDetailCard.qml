@@ -5,14 +5,15 @@ import "ClawbarLogic.js" as Logic
 Item {
   id: root
 
-  required property var agent
-  required property string observedAt
-  required property bool historical
+  // Uniform Operational Row detail interface: injected by RowSection's loader.
+  required property var vm
+  required property var palette
   required property double nowMs
-  required property color foreground
-  required property color dim
-  required property color urgent
-  required property string fontFamily
+  required property bool historical
+
+  readonly property var agent: vm.item
+  readonly property string observedAt: vm.observedAt
+  readonly property color urgent: palette.selectedSignalColor("critical")
 
   readonly property var taskResult: agent.taskResult || ({})
   readonly property bool taskFailed: taskResult.state === "failed"
@@ -32,8 +33,8 @@ Item {
       visible: root.historical
       width: parent.width
       text: "Last known · " + Logic.relativeTime(root.observedAt, root.nowMs)
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.palette.selectedDim
+      font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
       wrapMode: Text.NoWrap
       elide: Text.ElideRight
@@ -46,9 +47,9 @@ Item {
         if (!root.taskResult || root.taskResult.state === "none") return "Task result None"
         return "Task result " + (root.taskResult.state === "succeeded" ? "Succeeded" : "Failed")
       }
-      color: root.taskFailed ? root.urgent : root.foreground
+      color: root.taskFailed ? root.urgent : root.palette.foreground
       font.bold: root.taskFailed
-      font.family: root.fontFamily
+      font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
       wrapMode: Text.NoWrap
       elide: Text.ElideRight
@@ -66,8 +67,8 @@ Item {
         var full = Logic.absoluteLocalTime(root.taskResult.completedAt)
         return full ? "Full local time " + full : ""
       }
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.palette.selectedDim
+      font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
       wrapMode: Text.NoWrap
       elide: Text.ElideRight
@@ -85,8 +86,8 @@ Item {
         var full = Logic.absoluteLocalTime(root.observedAt)
         return full ? "Full local time " + full : ""
       }
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.palette.selectedDim
+      font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
       wrapMode: Text.NoWrap
       elide: Text.ElideRight

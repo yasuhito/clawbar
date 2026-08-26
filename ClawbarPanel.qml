@@ -122,7 +122,6 @@ KeyboardPanel {
   function rowDelegate(row) {
     if (!row) return null
     if (row.kind === "candidate") return candidateRepeater.itemAt(row.sectionIndex)
-    if (row.kind === "agent") return agentRepeater.itemAt(row.sectionIndex)
     return null
   }
 
@@ -131,6 +130,7 @@ KeyboardPanel {
   function sectionForKind(kind) {
     if (kind === "automation") return automationRows
     if (kind === "node") return nodeRows
+    if (kind === "agent") return agentRows
     return null
   }
 
@@ -494,123 +494,28 @@ KeyboardPanel {
           font.pixelSize: Style.font.body
         }
 
-        Repeater {
-          id: agentRepeater
-          model: root.agents
+        Component {
+          id: agentDetailDelegate
+          AgentDetailCard {}
+        }
 
-          delegate: Rectangle {
-            id: agentRow
-            required property var modelData
-            required property int index
-            readonly property var row: root.rows[root.candidates.length + root.nodes.length + index]
-            readonly property bool selected: !!row && root.selectedKey === row.key
-            readonly property var signal: Logic.signalPresentation("registered_agent")
-            width: contentColumn.width
-            height: agentSummary.height + agentDetail.height
-            radius: Style.cornerRadius
-            clip: true
-            opacity: root.historical && !selected ? 0.55 : 1
-            color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
-            border.width: selected ? 1 : 0
-            border.color: root.accent
-            Accessible.name: modelData.name
-            Accessible.description: "Registered Agent"
-            onHeightChanged: {
-              if (selected) Qt.callLater(root.ensureSelectionVisible)
-            }
-
-            Item {
-              id: agentSummary
-              width: parent.width
-              height: Style.space(48)
-
-              MouseArea {
-                anchors.fill: parent
-                onClicked: root.selectRow(agentRow.row)
-              }
-
-              SignalPoint {
-                anchors.left: parent.left
-                anchors.leftMargin: Style.space(9)
-                anchors.verticalCenter: agentName.verticalCenter
-                kind: agentRow.signal.shape
-                color: agentRow.selected ? root.selectedSignalColor(agentRow.signal.tone)
-                  : root.signalColor(agentRow.signal.tone)
-              }
-
-              Text {
-                textFormat: Text.PlainText
-                id: agentName
-                anchors.left: parent.left
-                anchors.leftMargin: Style.space(26)
-                anchors.right: parent.right
-                anchors.rightMargin: Style.space(8)
-                anchors.top: parent.top
-                anchors.topMargin: Style.space(6)
-                text: agentRow.modelData.name
-                elide: Text.ElideRight
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.body
-                font.bold: true
-              }
-
-              Text {
-                textFormat: Text.PlainText
-                anchors.left: agentName.left
-                anchors.right: parent.right
-                anchors.rightMargin: Style.space(8)
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: Style.space(6)
-                text: Logic.taskResultLabel(agentRow.modelData.taskResult, root.nowMs)
-                elide: Text.ElideRight
-                color: agentRow.modelData.taskResult
-                  && agentRow.modelData.taskResult.state === "failed"
-                    ? (agentRow.selected ? root.selectedSignalColor("critical")
-                      : root.signalColor("critical"))
-                    : (agentRow.selected ? root.selectedDim : root.dim)
-                font.bold: !!agentRow.modelData.taskResult
-                  && agentRow.modelData.taskResult.state === "failed"
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-              }
-            }
-
-            AgentDetailCard {
-              id: agentDetail
-              visible: agentRow.selected || height > 0
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.top: agentSummary.bottom
-              height: agentRow.selected ? implicitHeight : 0
-              opacity: agentRow.selected ? 1 : 0
-              agent: agentRow.modelData
-              observedAt: agentRow.row ? agentRow.row.observedAt : ""
-              historical: root.historical
-              nowMs: root.nowMs
-              foreground: root.foreground
-              dim: root.selectedDim
-              urgent: root.selectedSignalColor("critical")
-              fontFamily: root.fontFamily
-              Accessible.ignored: !agentRow.selected
-
-              Behavior on height {
-                enabled: root.detailMotionEnabled
-                NumberAnimation {
-                  duration: root.detailExpandDuration
-                  easing.type: Easing.OutCubic
-                }
-              }
-
-              Behavior on opacity {
-                enabled: root.detailMotionEnabled
-                NumberAnimation {
-                  duration: root.detailFadeDuration
-                  easing.type: Easing.OutCubic
-                }
-              }
-            }
+        RowSection {
+          id: agentRows
+          width: parent.width
+          rows: Logic.sectionRows(root.sections, "agent")
+          palette: root.palette
+          selectedKey: root.selectedKey
+          nowMs: root.nowMs
+          historical: root.historical
+          motionEnabled: root.detailMotionEnabled
+          fadeDuration: root.detailFadeDuration
+          expandDuration: root.detailExpandDuration
+          detailComponent: agentDetailDelegate
+          onRowActivated: function(vm) {
+            if (!vm.key) return
+            root.selectRow(vm)
           }
+          onSelectionGeometryChanged: Qt.callLater(root.ensureSelectionVisible)
         }
 
         Text {
