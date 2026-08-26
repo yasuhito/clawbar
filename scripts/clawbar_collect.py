@@ -107,6 +107,20 @@ class CollectionResult:
     snapshot: dict[str, Any]
 
 
+CANDIDATE_NOT_FOUND_GUIDANCE = (
+    "That Gateway candidate is no longer available. Refresh and choose a listed device."
+)
+CANDIDATE_TIMEOUT_GUIDANCE = (
+    "Gateway verification timed out. Check Tailscale and try again."
+)
+CANDIDATE_UNREACHABLE_GUIDANCE = (
+    "The selected device could not be verified. Check Tailscale or choose another device."
+)
+CANDIDATE_UNSUPPORTED_GUIDANCE = (
+    "The selected device does not provide a supported OpenClaw Gateway."
+)
+
+
 
 
 
@@ -311,6 +325,28 @@ def publish_current(
     return publish(snapshot_path, ExitCode.OK, snapshot)
 
 
+def candidate_retry(
+    snapshot_path: Path,
+    previous: dict[str, Any] | None,
+    refresh_interval: int,
+    failure_kind: str,
+    guidance: str,
+    exit_code: ExitCode = ExitCode.OK,
+) -> CollectionResult:
+    """候補確かめ: 検証に失敗した候補モードの分岐。再選択を促して終了する。"""
+    return publish(
+        snapshot_path,
+        exit_code,
+        setup_retry_snapshot(
+            previous,
+            refresh_interval,
+            SCHEMA_VERSION,
+            failure_kind,
+            guidance,
+        ),
+    )
+
+
 def resolve_target(
     snapshot_path: Path,
     openclaw_command: Sequence[str],
@@ -359,16 +395,12 @@ def collect_gateway(
     target = selected_candidate(snapshot_path, candidate_key, SCHEMA_VERSION) if candidate_key else None
 
     if candidate_key and target is None:
-        return publish(
+        return candidate_retry(
             snapshot_path,
-            ExitCode.OK,
-            setup_retry_snapshot(
-                previous,
-                refresh_interval,
-                SCHEMA_VERSION,
-                "candidate_not_found",
-                "That Gateway candidate is no longer available. Refresh and choose a listed device.",
-            ),
+            previous,
+            refresh_interval,
+            "candidate_not_found",
+            CANDIDATE_NOT_FOUND_GUIDANCE,
         )
 
     try:
@@ -380,16 +412,13 @@ def collect_gateway(
         )
     except CollectionDeadlineExceeded:
         if candidate_key:
-            return publish(
+            return candidate_retry(
                 snapshot_path,
-                ExitCode.COMMAND_TIMEOUT,
-                setup_retry_snapshot(
-                    previous,
-                    refresh_interval,
-                    SCHEMA_VERSION,
-                    "timeout",
-                    "Gateway verification timed out. Check Tailscale and try again.",
-                ),
+                previous,
+                refresh_interval,
+                "timeout",
+                CANDIDATE_TIMEOUT_GUIDANCE,
+                exit_code=ExitCode.COMMAND_TIMEOUT,
             )
         return publish_failure(
             snapshot_path,
@@ -400,16 +429,12 @@ def collect_gateway(
         )
     except OSError:
         if candidate_key:
-            return publish(
+            return candidate_retry(
                 snapshot_path,
-                ExitCode.COMMAND_FAILED,
-                setup_retry_snapshot(
-                    previous,
-                    refresh_interval,
-                    SCHEMA_VERSION,
-                    "candidate_unreachable",
-                    "The selected device could not be verified. Check Tailscale or choose another device.",
-                ),
+                previous,
+                refresh_interval,
+                "candidate_unreachable",
+                CANDIDATE_UNREACHABLE_GUIDANCE,
             )
         return publish_failure(
             snapshot_path,
@@ -429,16 +454,12 @@ def collect_gateway(
                 "command_failed",
             )
         if candidate_key:
-            return publish(
+            return candidate_retry(
                 snapshot_path,
-                ExitCode.OK,
-                setup_retry_snapshot(
-                    previous,
-                    refresh_interval,
-                    SCHEMA_VERSION,
-                    "candidate_unreachable",
-                    "The selected device could not be verified. Check Tailscale or choose another device.",
-                ),
+                previous,
+                refresh_interval,
+                "candidate_unreachable",
+                CANDIDATE_UNREACHABLE_GUIDANCE,
             )
         if automatic_setup_required and not (previous and isinstance(previous.get("lastSuccessAt"), str)):
             return publish(
@@ -469,7 +490,7 @@ def collect_gateway(
             snapshot["failureKind"] = "malformed_json"
             snapshot["setup"] = setup_section(
                 retained_setup_candidates(previous),
-                "The selected device does not provide a supported OpenClaw Gateway.",
+                CANDIDATE_UNSUPPORTED_GUIDANCE,
             )
             return publish(snapshot_path, ExitCode.MALFORMED_JSON, snapshot)
         return publish_failure(
@@ -493,7 +514,7 @@ def collect_gateway(
         if candidate_key:
             snapshot["setup"] = setup_section(
                 retained_setup_candidates(previous),
-                "The selected device does not provide a supported OpenClaw Gateway.",
+                CANDIDATE_UNSUPPORTED_GUIDANCE,
             )
         return publish(snapshot_path, ExitCode.UNSUPPORTED_JSON, snapshot)
 
