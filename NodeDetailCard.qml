@@ -78,8 +78,8 @@ Item {
         var full = Logic.absoluteLocalTime(root.observedAt)
         return full ? "Full local time " + full : ""
       }
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.palette.selectedDim
+      font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
       wrapMode: Text.NoWrap
       elide: Text.ElideRight
