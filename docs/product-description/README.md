@@ -183,8 +183,8 @@ The source of truth is the Clawbar implementation in this repository, outside `d
 - `README.md` and `manifest.json`: installation, requirements, defaults, entry points, and supported surface.
 - `CONTEXT.md`: canonical domain vocabulary and distinctions.
 - `Clawbar.qml`: bar action, snapshot reading, freshness timer, tooltip, and panel ownership.
-- `ClawbarPanel.qml`: visible panel states, keyboard navigation, row order, scrolling, candidate actions, and inline Node and Agent detail.
-- `AutomationSection.qml` and the detail-card components: healthy-label visibility and bounded inline row detail.
+- `ClawbarPanel.qml`: visible panel states, keyboard navigation, section headers, scrolling, and candidate actions.
+- `RowSection.qml` and the detail-card components: the shared Operational Row list (selection by key, expandable bounded inline row detail) and healthy-label visibility.
 - `ClawbarService.qml`: immediate and scheduled collection, coalescing, and candidate-verification serialization.
 - `ClawbarLogic.js`: visible states, labels, counts, colors, relative times, and selection reconciliation.
 - `scripts/clawbar_collect.py` and the other `scripts/clawbar_*.py` modules: Gateway resolution, bounded metadata collection, privacy reduction, snapshot publication, and Incident transitions.
