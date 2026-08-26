@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -134,13 +135,14 @@ class MarketplaceContractTest(unittest.TestCase):
 
     def test_panel_pins_gateway_header_above_the_scrolling_rows(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
+        header = (ROOT / "PanelHeader.qml").read_text(encoding="utf-8")
         header_start = panel.index("id: panelHeader")
         flick_start = panel.index("id: panelFlick")
         content_start = panel.index("id: contentColumn")
 
         self.assertLess(header_start, flick_start)
         self.assertLess(flick_start, content_start)
-        self.assertIn('text: "OpenClaw"', panel[header_start:flick_start])
+        self.assertIn('text: "OpenClaw"', header)
         self.assertNotIn('text: "OpenClaw"', panel[content_start:])
         self.assertIn("anchors.top: panelHeader.bottom", panel)
         self.assertIn(
@@ -172,30 +174,25 @@ class MarketplaceContractTest(unittest.TestCase):
 
     def test_operational_details_share_short_reveal_motion(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
-        automations = (ROOT / "AutomationSection.qml").read_text(encoding="utf-8")
+        reveal = (ROOT / "DetailReveal.qml").read_text(encoding="utf-8")
+        section = (ROOT / "RowSection.qml").read_text(encoding="utf-8")
 
         self.assertIn("DETAIL REVEAL STORYBOARD", panel)
         self.assertIn("property bool detailMotionEnabled: true", panel)
         self.assertIn("readonly property int detailFadeDuration: 120", panel)
         self.assertIn("readonly property int detailExpandDuration: 180", panel)
-        self.assertEqual(panel.count("Behavior on height"), 2)
-        self.assertGreaterEqual(panel.count("Behavior on opacity"), 3)
-        self.assertEqual(automations.count("Behavior on height"), 1)
-        self.assertEqual(automations.count("Behavior on opacity"), 1)
-        self.assertIn("height: nodeSummary.height + nodeDetail.height", panel)
-        self.assertIn("height: agentSummary.height + agentDetail.height", panel)
-        self.assertIn(
-            "height: automationSummary.height + automationDetail.height",
-            automations,
-        )
-        self.assertIn("visible: nodeRow.selected || height > 0", panel)
-        self.assertIn("visible: agentRow.selected || height > 0", panel)
-        self.assertIn("visible: automationRow.selected || height > 0", automations)
-        self.assertIn("Accessible.ignored: !nodeRow.selected", panel)
-        self.assertIn("Accessible.ignored: !agentRow.selected", panel)
-        self.assertIn("Accessible.ignored: !automationRow.selected", automations)
-        self.assertIn("onSelectedGeometryChanged", panel)
-        self.assertIn("signal selectedGeometryChanged()", automations)
+        # One shared reveal implementation replaces the per-kind copies.
+        self.assertEqual(reveal.count("Behavior on height"), 1)
+        self.assertEqual(reveal.count("Behavior on opacity"), 1)
+        self.assertNotIn("Behavior on height", section)
+        self.assertNotIn("Behavior on height", panel)
+        self.assertIn("height: summaryArea.height + detailReveal.height", section)
+        self.assertIn("expanded: rowRoot.selected", section)
+        self.assertIn("Accessible.ignored: !expanded", reveal)
+        for kind in ("node", "agent", "automation"):
+            self.assertIn(f'{kind}DetailDelegate', panel)
+        self.assertIn("signal selectionGeometryChanged()", section)
+        self.assertIn("onSelectionGeometryChanged", panel)
 
     def test_automation_selection_has_no_run_history_action(self) -> None:
         sources = "\n".join(
@@ -203,7 +200,7 @@ class MarketplaceContractTest(unittest.TestCase):
             for path in (
                 "Clawbar.qml",
                 "ClawbarPanel.qml",
-                "AutomationSection.qml",
+                "RowSection.qml",
                 "AutomationDetailCard.qml",
             )
         )
@@ -218,46 +215,52 @@ class MarketplaceContractTest(unittest.TestCase):
 
     def test_registered_agents_use_a_static_green_dot_without_activity_claims(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
+        logic = (ROOT / "ClawbarLogic.js").read_text(encoding="utf-8")
         detail = (ROOT / "AgentDetailCard.qml").read_text(encoding="utf-8")
 
-        self.assertIn('Logic.signalPresentation("registered_agent")', panel)
-        self.assertIn('Accessible.description: "Registered Agent"', panel)
+        # The static registered-agent dot is a view-model fact, rendered generically.
+        self.assertIn("dot: SIGNAL_PRESENTATIONS.registered_agent", logic)
+        self.assertIn('accessibleDescription: "Registered Agent"', logic)
+        self.assertIn("Accessible.description: modelData.accessibleDescription", (ROOT / "RowSection.qml").read_text(encoding="utf-8"))
         self.assertNotIn("modelData.activity", panel)
         self.assertNotIn('text: "Activity "', detail)
 
     def test_selected_rows_use_theme_aware_readable_secondary_colors(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
-        section = (ROOT / "AutomationSection.qml").read_text(encoding="utf-8")
+        logic = (ROOT / "ClawbarLogic.js").read_text(encoding="utf-8")
+        section = (ROOT / "RowSection.qml").read_text(encoding="utf-8")
 
         self.assertIn("Logic.readableColor(rawDim, foreground, panelSurface, 4.5)", panel)
         self.assertIn("readonly property color selectedDim", panel)
-        self.assertIn("nodeRow.selected ? root.selectedSignalColor", panel)
-        self.assertIn(': root.signalColor("critical")', panel)
-        self.assertIn("root.selectedDim", panel)
-        self.assertIn("required property color selectedDim", section)
-        self.assertIn("root.selectedDim", section)
+        # Selected-row secondaries resolve through the palette against each surface.
+        self.assertIn("selectedSignalColor: function(tone)", logic)
+        self.assertIn("root.palette.selectedSignalColor(rowRoot.dot.tone)", section)
+        self.assertIn("root.palette.selectedDim", section)
+        self.assertIn("root.palette.dim", section)
 
     def test_healthy_row_labels_are_visually_quiet_but_accessible(self) -> None:
-        panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
-        section = (ROOT / "AutomationSection.qml").read_text(encoding="utf-8")
+        logic = (ROOT / "ClawbarLogic.js").read_text(encoding="utf-8")
+        section = (ROOT / "RowSection.qml").read_text(encoding="utf-8")
 
-        self.assertIn("Logic.showNodeStatusLabel", panel)
-        self.assertIn("Logic.showAutomationStatusLabel", section)
-        self.assertIn("Accessible.description", panel)
+        # Label quietness is decided once per Operational Row view-model.
+        self.assertIn("showNodeStatusLabel(item.state, historical)", logic)
+        self.assertIn("showAutomationStatusLabel(item, historical)", logic)
         self.assertIn("Accessible.description", section)
+        self.assertIn("Accessible.name: modelData.name", section)
 
     def test_selected_operational_rows_expand_details_inside_their_delegates(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
-        section = (ROOT / "AutomationSection.qml").read_text(encoding="utf-8")
+        section = (ROOT / "RowSection.qml").read_text(encoding="utf-8")
 
-        self.assertIn("NodeDetailCard {", panel)
-        self.assertIn("visible: nodeRow.selected", panel)
-        self.assertIn("AgentDetailCard {", panel)
-        self.assertIn("visible: agentRow.selected", panel)
-        self.assertIn("AutomationDetailCard {", section)
-        self.assertIn("visible: automationRow.selected", section)
+        # Detail cards instantiate inside their row delegate through the shared loader.
+        # Detail cards appear only as inline delegate components, never hoisted.
+        detail_refs = sorted(re.findall(r"\w+DetailCard \{\}", panel))
+        self.assertEqual(detail_refs, [
+            "AgentDetailCard {}",
+            "AutomationDetailCard {}",
+            "NodeDetailCard {}",
+        ])
         self.assertNotIn("id: selectedCard", panel)
-        self.assertNotIn("DetailCard", panel[panel.index("id: candidateRepeater"):panel.index('text: "FLEET"')])
 
     def test_operational_details_use_compact_single_line_timestamps(self) -> None:
         details = "\n".join(
