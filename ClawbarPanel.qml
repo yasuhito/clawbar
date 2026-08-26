@@ -1,7 +1,8 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
-import "ClawbarLogic.js" as Logic
+import "ClawbarSnapshot.js" as Snapshot
+import "ClawbarPresentation.js" as Presentation
 import "ClawbarColor.js" as Color
 
 KeyboardPanel {
@@ -18,18 +19,18 @@ KeyboardPanel {
   signal refreshRequested()
   signal candidateVerificationRequested(string candidateKey)
 
-  readonly property var metadata: Logic.metadataSnapshot(snapshot, state)
-  readonly property bool historical: Logic.historicalState(state)
-  readonly property string observedAt: Logic.observationTime(snapshot, state)
-  readonly property var nodes: Logic.fleetNodes(snapshot, state)
-  readonly property var agents: Logic.agents(snapshot, state)
-  readonly property var automations: Logic.automations(snapshot, state)
-  readonly property var candidates: Logic.setupCandidates(snapshot, state)
+  readonly property var metadata: Snapshot.metadataSnapshot(snapshot, state)
+  readonly property bool historical: Snapshot.historicalState(state)
+  readonly property string observedAt: Snapshot.observationTime(snapshot, state)
+  readonly property var nodes: Snapshot.fleetNodes(snapshot, state)
+  readonly property var agents: Snapshot.agents(snapshot, state)
+  readonly property var automations: Snapshot.automations(snapshot, state)
+  readonly property var candidates: Snapshot.setupCandidates(snapshot, state)
   readonly property bool setupVisible: candidates.length > 0 || state === "setup_required"
     || (state === "configuration_error" && snapshot && snapshot.setup)
   readonly property bool configurationErrorVisible: state === "configuration_error"
-  readonly property int selectedIndex: Logic.indexForKey(selectionKeys, selectedKey)
-  readonly property string selectedKind: Logic.keyKind(sections, selectedKey)
+  readonly property int selectedIndex: Presentation.indexForKey(selectionKeys, selectedKey)
+  readonly property string selectedKind: Presentation.keyKind(sections, selectedKey)
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color panelSurface: Color.popups.background
   readonly property color rawDim: Color.muted
@@ -43,7 +44,7 @@ KeyboardPanel {
   required property color healthy
   required property color warning
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
-  readonly property var gatewaySignal: Logic.panelSignal(snapshot, state)
+  readonly property var gatewaySignal: Presentation.panelSignal(snapshot, state)
 
   // One palette object carries every color the Operational Rows need; the
   // panel derives it once so sections never re-thread theme colors.
@@ -58,8 +59,9 @@ KeyboardPanel {
     selectedSurface: String(selectedSurface),
     fontFamily: fontFamily
   })
-  readonly property var sections: Logic.panelSections(snapshot, state)
-  readonly property var selectionKeys: Logic.sectionKeys(sections)
+  readonly property var sections: Presentation.panelSections(
+    Snapshot.sectionData(snapshot, state))
+  readonly property var selectionKeys: Presentation.sectionKeys(sections)
 
   /* ───────────────────────────────────────────────────────
    * DETAIL REVEAL STORYBOARD
@@ -99,7 +101,7 @@ KeyboardPanel {
   )
 
   function reconcileRows() {
-    var selection = Logic.reconcileSelection(selectionKeys, selectedKey, selectedIndexHint)
+    var selection = Presentation.reconcileSelection(selectionKeys, selectedKey, selectedIndexHint)
     selectedKey = selection.key
     selectedIndexHint = selection.index < 0 ? 0 : selection.index
   }
@@ -107,12 +109,12 @@ KeyboardPanel {
   function selectRow(row) {
     if (!row) return
     selectedKey = row.key
-    selectedIndexHint = Logic.indexForKey(selectionKeys, row.key)
+    selectedIndexHint = Presentation.indexForKey(selectionKeys, row.key)
     Qt.callLater(root.ensureSelectionVisible)
   }
 
   function moveSelection(delta) {
-    var next = Logic.moveFocus(selectedIndex, selectionKeys.length, delta)
+    var next = Presentation.moveFocus(selectedIndex, selectionKeys.length, delta)
     if (next < 0) return
     selectedKey = selectionKeys[next]
     selectedIndexHint = next
@@ -175,8 +177,8 @@ KeyboardPanel {
       gatewaySignal: root.gatewaySignal
       summary: root.summary
       timeCaption: root.historical
-        ? "Last known " + Logic.relativeTime(root.observedAt, root.nowMs)
-        : root.snapshot ? Logic.relativeTime(root.snapshot.generatedAt, root.nowMs) : ""
+        ? "Last known " + Presentation.relativeTime(root.observedAt, root.nowMs)
+        : root.snapshot ? Presentation.relativeTime(root.snapshot.generatedAt, root.nowMs) : ""
     }
 
     Flickable {
@@ -242,7 +244,7 @@ KeyboardPanel {
           textFormat: Text.PlainText
           visible: root.configurationErrorVisible && !root.setupVisible
           width: parent.width
-          text: Logic.configurationGuidance(root.state)
+          text: Presentation.configurationGuidance(root.state)
           color: root.foreground
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
@@ -252,7 +254,7 @@ KeyboardPanel {
         RowSection {
           id: candidateRows
           width: parent.width
-          rows: Logic.sectionRows(root.sections, "candidate")
+          rows: Presentation.sectionRows(root.sections, "candidate")
           palette: root.palette
           selectedKey: root.selectedKey
           nowMs: root.nowMs
@@ -289,7 +291,7 @@ KeyboardPanel {
           visible: root.state === "degraded" && root.snapshot
             && root.snapshot.fleet && !root.snapshot.fleet.available
           width: parent.width
-          text: Logic.metadataUnavailableText(root.snapshot && root.snapshot.fleet)
+          text: Presentation.metadataUnavailableText(root.snapshot && root.snapshot.fleet)
             || "Node metadata unavailable"
           color: root.dim
           font.family: root.fontFamily
@@ -315,7 +317,7 @@ KeyboardPanel {
         RowSection {
           id: nodeRows
           width: parent.width
-          rows: Logic.sectionRows(root.sections, "node")
+          rows: Presentation.sectionRows(root.sections, "node")
           palette: root.palette
           selectedKey: root.selectedKey
           nowMs: root.nowMs
@@ -350,7 +352,7 @@ KeyboardPanel {
           visible: root.state === "degraded" && root.snapshot
             && root.snapshot.agents && !root.snapshot.agents.available
           width: parent.width
-          text: Logic.metadataUnavailableText(root.snapshot && root.snapshot.agents)
+          text: Presentation.metadataUnavailableText(root.snapshot && root.snapshot.agents)
             || "Agent and Task metadata unavailable"
           color: root.dim
           font.family: root.fontFamily
@@ -365,7 +367,7 @@ KeyboardPanel {
         RowSection {
           id: agentRows
           width: parent.width
-          rows: Logic.sectionRows(root.sections, "agent")
+          rows: Presentation.sectionRows(root.sections, "agent")
           palette: root.palette
           selectedKey: root.selectedKey
           nowMs: root.nowMs
@@ -429,7 +431,7 @@ KeyboardPanel {
           id: automationRows
           width: parent.width
           visible: !root.setupVisible && !root.configurationErrorVisible
-          rows: Logic.sectionRows(root.sections, "automation")
+          rows: Presentation.sectionRows(root.sections, "automation")
           palette: root.palette
           selectedKey: root.selectedKey
           nowMs: root.nowMs

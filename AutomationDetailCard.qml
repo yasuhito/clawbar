@@ -1,6 +1,6 @@
 import QtQuick
 import qs.Commons
-import "ClawbarLogic.js" as Logic
+import "ClawbarPresentation.js" as Presentation
 
 Item {
   id: root
@@ -27,7 +27,7 @@ Item {
       textFormat: Text.PlainText
       visible: root.historical
       width: parent.width
-      text: "Last known · " + Logic.relativeTime(root.automation.lastRunAt, root.nowMs)
+      text: "Last known · " + Presentation.relativeTime(root.automation.lastRunAt, root.nowMs)
       color: root.palette.selectedDim
       font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
@@ -38,8 +38,8 @@ Item {
     Text {
       textFormat: Text.PlainText
       width: parent.width
-      text: Logic.automationKindLabel(root.automation.kind)
-        + " · " + Logic.automationStatusLabel(root.automation)
+      text: Presentation.automationKindLabel(root.automation.kind)
+        + " · " + Presentation.automationStatusLabel(root.automation)
       color: root.palette.foreground
       font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
@@ -49,12 +49,12 @@ Item {
 
     Text {
       textFormat: Text.PlainText
-      visible: !!Logic.compactAbsoluteLocalTime(root.automation.nextRunAt, root.nowMs)
+      visible: !!Presentation.compactAbsoluteLocalTime(root.automation.nextRunAt, root.nowMs)
       width: parent.width
-      text: "Next run " + Logic.compactAbsoluteLocalTime(root.automation.nextRunAt, root.nowMs)
+      text: "Next run " + Presentation.compactAbsoluteLocalTime(root.automation.nextRunAt, root.nowMs)
       Accessible.name: text
       Accessible.description: {
-        var full = Logic.absoluteLocalTime(root.automation.nextRunAt)
+        var full = Presentation.absoluteLocalTime(root.automation.nextRunAt)
         return full ? "Full local time " + full : ""
       }
       color: root.palette.selectedDim
@@ -66,12 +66,12 @@ Item {
 
     Text {
       textFormat: Text.PlainText
-      visible: !!Logic.compactAbsoluteLocalTime(root.automation.lastRunAt, root.nowMs)
+      visible: !!Presentation.compactAbsoluteLocalTime(root.automation.lastRunAt, root.nowMs)
       width: parent.width
-      text: "Last run " + Logic.compactAbsoluteLocalTime(root.automation.lastRunAt, root.nowMs)
+      text: "Last run " + Presentation.compactAbsoluteLocalTime(root.automation.lastRunAt, root.nowMs)
       Accessible.name: text
       Accessible.description: {
-        var full = Logic.absoluteLocalTime(root.automation.lastRunAt)
+        var full = Presentation.absoluteLocalTime(root.automation.lastRunAt)
         return full ? "Full local time " + full : ""
       }
       color: root.palette.selectedDim
@@ -83,8 +83,8 @@ Item {
 
     Text {
       textFormat: Text.PlainText
-      visible: !Logic.compactAbsoluteLocalTime(root.automation.nextRunAt, root.nowMs)
-        && !Logic.compactAbsoluteLocalTime(root.automation.lastRunAt, root.nowMs)
+      visible: !Presentation.compactAbsoluteLocalTime(root.automation.nextRunAt, root.nowMs)
+        && !Presentation.compactAbsoluteLocalTime(root.automation.lastRunAt, root.nowMs)
         && root.automation.lastResult === "none"
       width: parent.width
       text: "No run timestamps"

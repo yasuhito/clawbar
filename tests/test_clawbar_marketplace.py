@@ -215,12 +215,12 @@ class MarketplaceContractTest(unittest.TestCase):
 
     def test_registered_agents_use_a_static_green_dot_without_activity_claims(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
-        logic = (ROOT / "ClawbarLogic.js").read_text(encoding="utf-8")
+        presentation = (ROOT / "ClawbarPresentation.js").read_text(encoding="utf-8")
         detail = (ROOT / "AgentDetailCard.qml").read_text(encoding="utf-8")
 
         # The static registered-agent dot is a view-model fact, rendered generically.
-        self.assertIn("dot: SIGNAL_PRESENTATIONS.registered_agent", logic)
-        self.assertIn('accessibleDescription: "Registered Agent"', logic)
+        self.assertIn("dot: SIGNAL_PRESENTATIONS.registered_agent", presentation)
+        self.assertIn('accessibleDescription: "Registered Agent"', presentation)
         self.assertIn("Accessible.description: modelData.accessibleDescription", (ROOT / "RowSection.qml").read_text(encoding="utf-8"))
         self.assertNotIn("modelData.activity", panel)
         self.assertNotIn('text: "Activity "', detail)
@@ -239,12 +239,12 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("root.palette.dim", section)
 
     def test_healthy_row_labels_are_visually_quiet_but_accessible(self) -> None:
-        logic = (ROOT / "ClawbarLogic.js").read_text(encoding="utf-8")
+        presentation = (ROOT / "ClawbarPresentation.js").read_text(encoding="utf-8")
         section = (ROOT / "RowSection.qml").read_text(encoding="utf-8")
 
         # Label quietness is decided once per Operational Row view-model.
-        self.assertIn("showNodeStatusLabel(item.state, historical)", logic)
-        self.assertIn("showAutomationStatusLabel(item, historical)", logic)
+        self.assertIn("showNodeStatusLabel(item.state, historical)", presentation)
+        self.assertIn("showAutomationStatusLabel(item, historical)", presentation)
         self.assertIn("Accessible.description", section)
         self.assertIn("Accessible.name: modelData.name", section)
 
@@ -272,7 +272,7 @@ class MarketplaceContractTest(unittest.TestCase):
             )
         )
 
-        self.assertIn("Logic.compactAbsoluteLocalTime", details)
+        self.assertIn("Presentation.compactAbsoluteLocalTime", details)
         self.assertNotIn("wrapMode: Text.Wrap", details)
         self.assertIn("wrapMode: Text.NoWrap", details)
         self.assertIn("elide: Text.ElideRight", details)

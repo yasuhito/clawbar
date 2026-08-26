@@ -3,7 +3,8 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
-import "ClawbarLogic.js" as Logic
+import "ClawbarSnapshot.js" as Snapshot
+import "ClawbarPresentation.js" as Presentation
 import "ClawbarColor.js" as Color
 
 BarWidget {
@@ -32,24 +33,24 @@ BarWidget {
     if (!bar || !bar.shell || typeof bar.shell.serviceFor !== "function") return null
     return bar.shell.serviceFor(root.moduleName)
   }
-  readonly property string barSeverity: Logic.barSeverity(lastSnapshot, state)
-  readonly property int barCount: Logic.barCount(lastSnapshot, state)
+  readonly property string barSeverity: Snapshot.barSeverity(lastSnapshot, state)
+  readonly property int barCount: Snapshot.barCount(lastSnapshot, state)
   readonly property bool developerDemo: !!lastSnapshot && typeof lastSnapshot.demoScenario === "string"
-  readonly property string baseSummary: Logic.summary(state, resolutionSource, barCount, barSeverity)
-  readonly property string refreshSummary: Logic.refreshSummary(
+  readonly property string baseSummary: Presentation.summary(state, resolutionSource, barCount, barSeverity)
+  readonly property string refreshSummary: Presentation.refreshSummary(
     baseSummary, refreshFeedback, lastSnapshot !== null
   )
   readonly property string summary: developerDemo
     ? "Developer demo · " + refreshSummary : refreshSummary
-  readonly property string basePanelSummary: Logic.panelSummary(
-    state, resolutionSource, barCount, barSeverity, Logic.panelSignal(lastSnapshot, state).label
+  readonly property string basePanelSummary: Presentation.panelSummary(
+    state, resolutionSource, barCount, barSeverity, Presentation.panelSignal(lastSnapshot, state).label
   )
-  readonly property string refreshPanelSummary: Logic.refreshSummary(
+  readonly property string refreshPanelSummary: Presentation.refreshSummary(
     basePanelSummary, refreshFeedback, lastSnapshot !== null
   )
   readonly property string panelSummary: developerDemo
     ? "Developer demo · " + refreshPanelSummary : refreshPanelSummary
-  readonly property var barSignal: Logic.signalPresentation(
+  readonly property var barSignal: Presentation.signalPresentation(
     barSeverity === "critical" ? "failed" : barSeverity === "warning" ? "waiting" : "healthy"
   )
   readonly property color barSignalColor: Color.signalColor(
@@ -89,13 +90,13 @@ BarWidget {
   onThemeGenerationChanged: readThemeColors()
 
   function readSnapshot() {
-    var action = Logic.requestRefresh(cacheReader.running)
+    var action = Snapshot.requestRefresh(cacheReader.running)
     cacheReadPending = action.pending
     if (action.start) cacheReader.running = true
   }
 
   function consumeCacheRead(exitCode) {
-    var action = Logic.consumeRefresh(cacheReader.running, cacheReadPending)
+    var action = Snapshot.consumeRefresh(cacheReader.running, cacheReadPending)
     cacheReadPending = action.pending
     if (action.wait) {
       Qt.callLater(function() { root.consumeCacheRead(exitCode) })
@@ -133,14 +134,14 @@ BarWidget {
   }
 
   function applySnapshot(snapshot) {
-    state = Logic.snapshotState(snapshot, Date.now())
+    state = Snapshot.snapshotState(snapshot, Date.now())
     resolutionSource = String(snapshot.resolutionSource || "unresolved")
     lastSnapshot = snapshot
   }
 
   function refreshFreshness() {
     nowMs = Date.now()
-    if (lastSnapshot) state = Logic.snapshotState(lastSnapshot, nowMs)
+    if (lastSnapshot) state = Snapshot.snapshotState(lastSnapshot, nowMs)
   }
 
   function open() {

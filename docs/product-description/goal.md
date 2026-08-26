@@ -10,7 +10,7 @@ Read in this order before drafting:
 
 1. `CONTEXT.md` for canonical vocabulary and distinctions.
 2. `Clawbar.qml`, `ClawbarPanel.qml`, and the relevant row or detail QML component for the visible action and state.
-3. `ClawbarLogic.js` for selection, visible state, labels, severity, counts, time display, and freshness.
+3. `ClawbarSnapshot.js` and `ClawbarPresentation.js` for selection, visible state, labels, severity, counts, time display, and freshness.
 4. `ClawbarService.qml` and the relevant module under `scripts/` for scheduling, resolution, reduction, publication, or notification behavior.
 5. The matching tests. Start with `tests/test_clawbar_logic.cjs`, then use `tests/test_clawbar_collect.py`, `tests/test_clawbar_freshness.py`, `tests/test_clawbar_incidents.py`, or `tests/test_clawbar_automation.py` as the feature requires.
 6. `README.md`, `manifest.json`, and `scripts/clawbar_demo.py` for documented defaults and the running-product verification route.

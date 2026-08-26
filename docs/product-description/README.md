@@ -58,7 +58,7 @@ The cancel and interrupt rows matter most. They remain identical and in the same
 For each document:
 
 1. Read the QML surface in `Clawbar.qml`, `ClawbarPanel.qml`, and the relevant row or detail component.
-2. Read `ClawbarLogic.js` for presentation state, selection, labels, freshness, and count behavior.
+2. Read `ClawbarSnapshot.js` (freshness, section extraction, counts) and `ClawbarPresentation.js` (selection, labels, view-models) for behavior.
 3. Read the relevant collector module in `scripts/`, then the matching tests. The tests define many boundaries and failure cases more precisely than the interface code alone.
 4. Draft the experience from the user's point of view.
 5. Exercise ambiguous behavior in the actual Omarchy panel, using the developer demonstration only to provide fictional input states.
@@ -186,7 +186,9 @@ The source of truth is the Clawbar implementation in this repository, outside `d
 - `ClawbarPanel.qml`: visible panel states, keyboard navigation, section headers, scrolling, and candidate actions.
 - `RowSection.qml` and the detail-card components: the shared Operational Row list (selection by key, expandable bounded inline row detail) and healthy-label visibility.
 - `ClawbarService.qml`: immediate and scheduled collection, coalescing, and candidate-verification serialization.
-- `ClawbarLogic.js`: visible states, labels, counts, colors, relative times, and selection reconciliation.
+- `ClawbarSnapshot.js`: snapshot freshness rules, section extraction, and bar aggregation.
+- `ClawbarPresentation.js`: Operational Row view-models, labels, signals, relative times, and selection reconciliation.
+- `ClawbarColor.js`: contrast-adjusted color math and the palette object.
 - `scripts/clawbar_collect.py` and the other `scripts/clawbar_*.py` modules: Gateway resolution, bounded metadata collection, privacy reduction, snapshot publication, and Incident transitions.
 - `tests/test_clawbar_logic.cjs`: executable specification for the QML-facing presentation model.
 - `tests/test_clawbar_collect.py`, `tests/test_clawbar_freshness.py`, `tests/test_clawbar_incidents.py`, and `tests/test_clawbar_automation.py`: executable specifications for collection, freshness, privacy, state transitions, notifications, and Automation behavior.

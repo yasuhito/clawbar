@@ -1,6 +1,6 @@
 import QtQuick
 import qs.Commons
-import "ClawbarLogic.js" as Logic
+import "ClawbarPresentation.js" as Presentation
 
 Item {
   id: root
@@ -28,7 +28,7 @@ Item {
       textFormat: Text.PlainText
       visible: root.historical
       width: parent.width
-      text: "Last known · " + Logic.relativeTime(root.observedAt, root.nowMs)
+      text: "Last known · " + Presentation.relativeTime(root.observedAt, root.nowMs)
       color: root.palette.selectedDim
       font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
@@ -39,7 +39,7 @@ Item {
     Text {
       textFormat: Text.PlainText
       width: parent.width
-      text: Logic.nodeMetadataLabel(root.node)
+      text: Presentation.nodeMetadataLabel(root.node)
       color: root.palette.foreground
       font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
@@ -51,12 +51,12 @@ Item {
       textFormat: Text.PlainText
       width: parent.width
       text: {
-        var lastSeen = Logic.compactAbsoluteLocalTime(root.node.lastSeenAt, root.nowMs)
+        var lastSeen = Presentation.compactAbsoluteLocalTime(root.node.lastSeenAt, root.nowMs)
         return lastSeen ? "Last seen " + lastSeen : "No observation timestamp"
       }
       Accessible.name: text
       Accessible.description: {
-        var full = Logic.absoluteLocalTime(root.node.lastSeenAt)
+        var full = Presentation.absoluteLocalTime(root.node.lastSeenAt)
         return full ? "Full local time " + full : ""
       }
       color: root.palette.selectedDim
@@ -70,12 +70,12 @@ Item {
       textFormat: Text.PlainText
       width: parent.width
       text: {
-        var observed = Logic.compactAbsoluteLocalTime(root.observedAt, root.nowMs)
+        var observed = Presentation.compactAbsoluteLocalTime(root.observedAt, root.nowMs)
         return observed ? "Observed " + observed : ""
       }
       Accessible.name: text
       Accessible.description: {
-        var full = Logic.absoluteLocalTime(root.observedAt)
+        var full = Presentation.absoluteLocalTime(root.observedAt)
         return full ? "Full local time " + full : ""
       }
       color: root.palette.selectedDim

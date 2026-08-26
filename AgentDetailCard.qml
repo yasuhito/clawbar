@@ -1,6 +1,6 @@
 import QtQuick
 import qs.Commons
-import "ClawbarLogic.js" as Logic
+import "ClawbarPresentation.js" as Presentation
 
 Item {
   id: root
@@ -32,7 +32,7 @@ Item {
       textFormat: Text.PlainText
       visible: root.historical
       width: parent.width
-      text: "Last known · " + Logic.relativeTime(root.observedAt, root.nowMs)
+      text: "Last known · " + Presentation.relativeTime(root.observedAt, root.nowMs)
       color: root.palette.selectedDim
       font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
@@ -59,12 +59,12 @@ Item {
       textFormat: Text.PlainText
       width: parent.width
       text: {
-        var completed = Logic.compactAbsoluteLocalTime(root.taskResult.completedAt, root.nowMs)
+        var completed = Presentation.compactAbsoluteLocalTime(root.taskResult.completedAt, root.nowMs)
         return completed ? "Completed " + completed : "No completion timestamp"
       }
       Accessible.name: text
       Accessible.description: {
-        var full = Logic.absoluteLocalTime(root.taskResult.completedAt)
+        var full = Presentation.absoluteLocalTime(root.taskResult.completedAt)
         return full ? "Full local time " + full : ""
       }
       color: root.palette.selectedDim
@@ -78,12 +78,12 @@ Item {
       textFormat: Text.PlainText
       width: parent.width
       text: {
-        var observed = Logic.compactAbsoluteLocalTime(root.observedAt, root.nowMs)
+        var observed = Presentation.compactAbsoluteLocalTime(root.observedAt, root.nowMs)
         return observed ? "Observed " + observed : ""
       }
       Accessible.name: text
       Accessible.description: {
-        var full = Logic.absoluteLocalTime(root.observedAt)
+        var full = Presentation.absoluteLocalTime(root.observedAt)
         return full ? "Full local time " + full : ""
       }
       color: root.palette.selectedDim

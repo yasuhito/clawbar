@@ -1,6 +1,8 @@
 const test = require("node:test")
 const assert = require("node:assert/strict")
-const Logic = require("../ClawbarLogic.js")
+const Snapshot = require("../ClawbarSnapshot.js")
+const Presentation = require("../ClawbarPresentation.js")
+const Logic = Object.assign({}, Snapshot, Presentation)
 
 function healthySnapshot(generatedAt, refreshIntervalSeconds = 30) {
   return {
@@ -69,7 +71,7 @@ test("stale and failed collections render retained rows as historical", () => {
   assert.equal(Logic.barSeverity(stale, "stale"), "warning")
   assert.equal(Logic.barCount(stale, "stale"), 1)
   assert.deepEqual(
-    Logic.panelSections(stale, "stale").flatMap(s => s.rows).map(row => [row.kind, row.historical, row.observedAt]),
+    Presentation.panelSections(Snapshot.sectionData(stale, "stale")).flatMap(s => s.rows).map(row => [row.kind, row.historical, row.observedAt]),
     [
       ["node", true, observedAt],
       ["agent", true, observedAt],
@@ -87,7 +89,7 @@ test("stale and failed collections render retained rows as historical", () => {
     lastKnown: { observedAt, gateway: { state: "healthy" }, fleet, agents, automations }
   }
   assert.deepEqual(Logic.fleetNodes(failed, "unstable"), fleet.nodes)
-  assert.equal(Logic.panelSections(failed, "unstable").flatMap(s => s.rows)[0].historical, true)
+  assert.equal(Presentation.panelSections(Snapshot.sectionData(failed, "unstable")).flatMap(s => s.rows)[0].historical, true)
   assert.equal(Logic.barCount(failed, "unstable"), 1)
   assert.equal(Logic.snapshotState(failed, 220001), "stale")
   assert.deepEqual(Logic.fleetNodes(failed, "stale"), fleet.nodes)
@@ -156,7 +158,7 @@ test("panel rows preserve Gateway order and keyboard focus wraps", () => {
     items: [{ key: "agent:planner", name: "planner" }, { key: "agent:builder", name: "builder" }]
   }
 
-  const sections = Logic.panelSections(snapshot, "healthy")
+  const sections = Presentation.panelSections(Snapshot.sectionData(snapshot, "healthy"))
   const keys = Logic.sectionKeys(sections)
 
   const kinds = sections.flatMap(s => s.rows).map(row => `${row.kind}:${row.item.name}`)
@@ -179,7 +181,7 @@ test("keyless Nodes never receive positional identity", () => {
     nodes: [{ name: "Local" }, { name: "studio-ops" }]
   }
 
-  const nodeKeys = Logic.sectionRows(Logic.panelSections(snapshot, "healthy"), "node")
+  const nodeKeys = Logic.sectionRows(Presentation.panelSections(Snapshot.sectionData(snapshot, "healthy")), "node")
     .map(row => row.key)
 
   assert.deepEqual(nodeKeys, ["", ""])
@@ -212,7 +214,7 @@ test("registered Agents expose Task Result without claiming current Activity", (
     "Task: Failed · 9m"
   )
   assert.equal(Logic.taskResultLabel(snapshot.agents.items[2].taskResult, 100000), "Task: None")
-  const observerRow = Logic.panelSections(snapshot, "healthy")
+  const observerRow = Presentation.panelSections(Snapshot.sectionData(snapshot, "healthy"))
     .flatMap(s => s.rows)
     .find(row => row.item.name === "observer")
   assert.equal(observerRow.key, "agent:observer")
@@ -220,7 +222,7 @@ test("registered Agents expose Task Result without claiming current Activity", (
 })
 
 test("Node selection follows stable keys without expansion state", () => {
-  const firstKeys = Logic.sectionKeys(Logic.panelSections({
+  const firstKeys = Logic.sectionKeys(Presentation.panelSections(Snapshot.sectionData({
     fleet: {
       available: true,
       nodes: [
@@ -229,7 +231,7 @@ test("Node selection follows stable keys without expansion state", () => {
       ]
     },
     agents: { available: true, items: [] }
-  }, "healthy")).filter(key => key.startsWith("node:"))
+  }, "healthy"))).filter(key => key.startsWith("node:"))
   const reordered = [firstKeys[1], firstKeys[0]]
 
   const retained = Logic.reconcileSelection(reordered, "node:b", 1)
@@ -265,7 +267,7 @@ test("Automations follow Agents and retain selection by stable hidden id", () =>
     ]
   }
 
-  const keys = Logic.sectionKeys(Logic.panelSections(snapshot, "healthy"))
+  const keys = Logic.sectionKeys(Presentation.panelSections(Snapshot.sectionData(snapshot, "healthy")))
 
   assert.deepEqual(keys, [
     "node:a",
@@ -540,7 +542,7 @@ function operationalSnapshot() {
 }
 
 test("panelSections orders candidate, node, agent and automation rows", () => {
-  const sections = Logic.panelSections(operationalSnapshot(), "healthy")
+  const sections = Presentation.panelSections(Snapshot.sectionData(operationalSnapshot(), "healthy"))
 
   assert.deepEqual(sections.map(section => section.kind), ["candidate", "node", "agent", "automation"])
   const [candidates, nodes, agents, automations] = sections
@@ -593,7 +595,7 @@ test("setup candidate rows expose verify actions without dots", () => {
   const state = Logic.snapshotState(snapshot, 100000)
   assert.equal(state, "configuration_error")
 
-  const [candidates] = Logic.panelSections(snapshot, state)
+  const [candidates] = Presentation.panelSections(Snapshot.sectionData(snapshot, state))
   assert.deepEqual(candidates.rows.map(row => row.key), ["cand-1"])
   const row = candidates.rows[0]
   assert.equal(row.dot, null)
@@ -613,7 +615,7 @@ test("stale snapshots mark every operational row as Last known", () => {
     automations: { available: true, items: [] }
   }
 
-  const nodes = Logic.panelSections(snapshot, "stale").find(s => s.kind === "node")
+  const nodes = Presentation.panelSections(Snapshot.sectionData(snapshot, "stale")).find(s => s.kind === "node")
   const row = nodes.rows[0]
   assert.equal(row.historical, true)
   assert.equal(row.observedAt, observedAt)

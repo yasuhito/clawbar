@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import "ClawbarLogic.js" as Logic
+import "ClawbarSnapshot.js" as Snapshot
 
 Item {
   id: root
@@ -15,7 +15,7 @@ Item {
   property string collectorPath: decodeURIComponent(
     String(Qt.resolvedUrl("scripts/clawbar_collect.py")).replace(/^file:\/\//, "")
   )
-  property int refreshIntervalSeconds: Logic.normalizeRefreshInterval(
+  property int refreshIntervalSeconds: Snapshot.normalizeRefreshInterval(
     Quickshell.env("CLAWBAR_REFRESH_INTERVAL_SECONDS")
   )
   readonly property bool processRunning: collector.running || candidateVerifier.running
