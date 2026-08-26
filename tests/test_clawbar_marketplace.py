@@ -230,7 +230,7 @@ class MarketplaceContractTest(unittest.TestCase):
         color = (ROOT / "ClawbarColor.js").read_text(encoding="utf-8")
         section = (ROOT / "RowSection.qml").read_text(encoding="utf-8")
 
-        self.assertIn("Color.readableColor(rawDim, foreground, panelSurface, 4.5)", panel)
+        self.assertIn("ColorKit.readableColor(rawDim, foreground, panelSurface, 4.5)", panel)
         self.assertIn("readonly property color selectedDim", panel)
         # Selected-row secondaries resolve through the palette against each surface.
         self.assertIn("selectedSignalColor: function(tone)", color)
