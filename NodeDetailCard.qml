@@ -5,13 +5,14 @@ import "ClawbarLogic.js" as Logic
 Item {
   id: root
 
-  required property var node
-  required property string observedAt
-  required property bool historical
+  // Uniform Operational Row detail interface: injected by RowSection's loader.
+  required property var vm
+  required property var palette
   required property double nowMs
-  required property color foreground
-  required property color dim
-  required property string fontFamily
+  required property bool historical
+
+  readonly property var node: vm.item
+  readonly property string observedAt: vm.observedAt
 
   implicitHeight: detailColumn.implicitHeight + Style.space(16)
 
@@ -28,8 +29,8 @@ Item {
       visible: root.historical
       width: parent.width
       text: "Last known · " + Logic.relativeTime(root.observedAt, root.nowMs)
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.palette.selectedDim
+      font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
       wrapMode: Text.NoWrap
       elide: Text.ElideRight
@@ -39,8 +40,8 @@ Item {
       textFormat: Text.PlainText
       width: parent.width
       text: Logic.nodeMetadataLabel(root.node)
-      color: root.foreground
-      font.family: root.fontFamily
+      color: root.palette.foreground
+      font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
       wrapMode: Text.NoWrap
       elide: Text.ElideRight
@@ -58,8 +59,8 @@ Item {
         var full = Logic.absoluteLocalTime(root.node.lastSeenAt)
         return full ? "Full local time " + full : ""
       }
-      color: root.dim
-      font.family: root.fontFamily
+      color: root.palette.selectedDim
+      font.family: root.palette.fontFamily
       font.pixelSize: Style.font.caption
       wrapMode: Text.NoWrap
       elide: Text.ElideRight

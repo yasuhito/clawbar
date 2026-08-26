@@ -122,16 +122,22 @@ KeyboardPanel {
   function rowDelegate(row) {
     if (!row) return null
     if (row.kind === "candidate") return candidateRepeater.itemAt(row.sectionIndex)
-    if (row.kind === "node") return nodeRepeater.itemAt(row.sectionIndex)
     if (row.kind === "agent") return agentRepeater.itemAt(row.sectionIndex)
     return null
   }
 
-  // Automations already live in a key-addressable RowSection; the remaining
-  // kinds migrate step by step and keep the legacy offset lookup until then.
+  // Migrated kinds live in key-addressable RowSections; the rest keep the
+  // legacy offset lookup until their migration step.
+  function sectionForKind(kind) {
+    if (kind === "automation") return automationRows
+    if (kind === "node") return nodeRows
+    return null
+  }
+
   function delegateForSelection() {
-    if (selectedRow && selectedRow.kind === "automation")
-      return automationRows.itemForKey(selectedKey)
+    var kind = selectedRow ? selectedRow.kind : ""
+    var section = sectionForKind(kind)
+    if (section) return section.itemForKey(selectedKey)
     return rowDelegate(selectedRow)
   }
 
@@ -438,117 +444,28 @@ KeyboardPanel {
           font.pixelSize: Style.font.body
         }
 
-        Repeater {
-          id: nodeRepeater
-          model: root.nodes
+        Component {
+          id: nodeDetailDelegate
+          NodeDetailCard {}
+        }
 
-          delegate: Rectangle {
-            id: nodeRow
-            required property var modelData
-            required property int index
-            readonly property var row: root.rows[root.candidates.length + index]
-            readonly property bool selected: !!row && root.selectedKey === row.key
-            readonly property bool offline: modelData.state === "offline"
-            readonly property var signal: Logic.nodeSignalPresentation(modelData.state)
-            readonly property bool showStatus: Logic.showNodeStatusLabel(modelData.state, root.historical)
-            width: contentColumn.width
-            height: nodeSummary.height + nodeDetail.height
-            radius: Style.cornerRadius
-            clip: true
-            opacity: root.historical && !selected ? 0.55 : 1
-            color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
-            border.width: selected ? 1 : 0
-            border.color: root.accent
-            Accessible.name: modelData.name
-            Accessible.description: root.historical ? "Last known" : signal.label
-            onHeightChanged: {
-              if (selected) Qt.callLater(root.ensureSelectionVisible)
-            }
-
-            Item {
-              id: nodeSummary
-              width: parent.width
-              height: Style.space(40)
-
-              MouseArea {
-                anchors.fill: parent
-                onClicked: root.selectRow(nodeRow.row)
-              }
-
-              SignalPoint {
-                anchors.left: parent.left
-                anchors.leftMargin: Style.space(9)
-                anchors.verticalCenter: nodeTitle.verticalCenter
-                kind: nodeRow.signal.shape
-                color: nodeRow.selected ? root.selectedSignalColor(nodeRow.signal.tone)
-                  : root.signalColor(nodeRow.signal.tone)
-              }
-
-              Text {
-                textFormat: Text.PlainText
-                id: nodeTitle
-                anchors.left: parent.left
-                anchors.leftMargin: Style.space(26)
-                anchors.right: nodeRow.showStatus ? nodeState.left : parent.right
-                anchors.rightMargin: Style.space(8)
-                anchors.verticalCenter: parent.verticalCenter
-                text: nodeRow.modelData.name
-                elide: Text.ElideRight
-                color: nodeRow.offline ? (nodeRow.selected ? root.selectedDim : root.dim) : root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.body
-                font.bold: !nodeRow.offline
-              }
-
-              Text {
-                textFormat: Text.PlainText
-                id: nodeState
-                visible: nodeRow.showStatus
-                anchors.right: parent.right
-                anchors.rightMargin: Style.space(8)
-                anchors.verticalCenter: nodeTitle.verticalCenter
-                text: root.historical ? "Last known" : nodeRow.signal.label
-                color: nodeRow.selected ? root.selectedSignalColor(nodeRow.signal.tone)
-                  : root.historical ? root.dim : root.signalColor(nodeRow.signal.tone)
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-              }
-            }
-
-            NodeDetailCard {
-              id: nodeDetail
-              visible: nodeRow.selected || height > 0
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.top: nodeSummary.bottom
-              height: nodeRow.selected ? implicitHeight : 0
-              opacity: nodeRow.selected ? 1 : 0
-              node: nodeRow.modelData
-              observedAt: nodeRow.row ? nodeRow.row.observedAt : ""
-              historical: root.historical
-              nowMs: root.nowMs
-              foreground: root.foreground
-              dim: root.selectedDim
-              fontFamily: root.fontFamily
-              Accessible.ignored: !nodeRow.selected
-
-              Behavior on height {
-                enabled: root.detailMotionEnabled
-                NumberAnimation {
-                  duration: root.detailExpandDuration
-                  easing.type: Easing.OutCubic
-                }
-              }
-
-              Behavior on opacity {
-                enabled: root.detailMotionEnabled
-                NumberAnimation {
-                  duration: root.detailFadeDuration
-                  easing.type: Easing.OutCubic
-                }
-              }
-            }
+        RowSection {
+          id: nodeRows
+          width: parent.width
+          rows: Logic.sectionRows(root.sections, "node")
+          palette: root.palette
+          selectedKey: root.selectedKey
+          nowMs: root.nowMs
+          historical: root.historical
+          motionEnabled: root.detailMotionEnabled
+          fadeDuration: root.detailFadeDuration
+          expandDuration: root.detailExpandDuration
+          detailComponent: nodeDetailDelegate
+          onRowActivated: function(vm) {
+            if (!vm.key) return
+            root.selectRow(vm)
           }
+          onSelectionGeometryChanged: Qt.callLater(root.ensureSelectionVisible)
         }
 
         Text {
