@@ -69,36 +69,6 @@ function setupCandidates(snapshot, state) {
   return setup && Array.isArray(setup.candidates) ? setup.candidates : []
 }
 
-
-function candidateRow(item, index) {
-  return {
-    kind: "candidate",
-    key: String(item.key || ""),
-    sectionIndex: index,
-    item: item,
-    typeLabel: "Gateway candidate",
-    timestamp: "",
-    missingTimestampLabel: "",
-    historical: false,
-    observedAt: ""
-  }
-}
-
-
-function nodeRow(item, index, historical, observedAt) {
-  return {
-    kind: "node",
-    key: String(item.key || ""),
-    sectionIndex: index,
-    item: item,
-    typeLabel: "Node",
-    timestamp: item.lastSeenAt || "",
-    missingTimestampLabel: "No observation timestamp",
-    historical: historical,
-    observedAt: observedAt
-  }
-}
-
 function nodeMetadataLabel(item) {
   var parts = [item && item.platform, item && item.model, item && item.version]
     .filter(function(value) { return !!value })
@@ -107,50 +77,6 @@ function nodeMetadataLabel(item) {
 
 function showNodeStatusLabel(state, historical) {
   return historical || state !== "healthy"
-}
-
-function agentRow(item, index, historical, observedAt) {
-  var result = item.taskResult || {}
-  return {
-    kind: "agent",
-    key: String(item.key || "agent:" + item.name),
-    sectionIndex: index,
-    item: item,
-    typeLabel: "Agent",
-    timestamp: result.completedAt || "",
-    missingTimestampLabel: "No completion timestamp",
-    historical: historical,
-    observedAt: observedAt
-  }
-}
-
-function automationRow(item, index, historical, observedAt) {
-  return {
-    kind: "automation",
-    key: item.id ? "automation:" + item.id : "",
-    sectionIndex: index,
-    item: item,
-    typeLabel: "Automation",
-    timestamp: item.lastRunAt || "",
-    missingTimestampLabel: "No runs yet",
-    historical: historical,
-    observedAt: observedAt
-  }
-}
-
-
-function panelRows(snapshot, state) {
-  var historical = historicalState(state)
-  var observedAt = observationTime(snapshot, state)
-  return setupCandidates(snapshot, state).map(function(item, index) {
-    return candidateRow(item, index)
-  }).concat(fleetNodes(snapshot, state).map(function(item, index) {
-    return nodeRow(item, index, historical, observedAt)
-  })).concat(agents(snapshot, state).map(function(item, index) {
-    return agentRow(item, index, historical, observedAt)
-  })).concat(automations(snapshot, state).map(function(item, index) {
-    return automationRow(item, index, historical, observedAt)
-  }))
 }
 
 // Operational Row view-models: presentation facts computed once, tested here,
@@ -693,8 +619,7 @@ if (typeof module !== "undefined") {
     agents: agents,
     automations: automations,
     setupCandidates: setupCandidates,
-    panelRows: panelRows,
-    moveFocus: moveFocus,
+    panelSections: panelSections,    moveFocus: moveFocus,
     relativeTime: relativeTime,
     timeUntil: timeUntil,
     absoluteLocalTime: absoluteLocalTime,

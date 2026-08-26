@@ -20,7 +20,6 @@ KeyboardPanel {
   readonly property var metadata: Logic.metadataSnapshot(snapshot, state)
   readonly property bool historical: Logic.historicalState(state)
   readonly property string observedAt: Logic.observationTime(snapshot, state)
-  readonly property var rows: Logic.panelRows(snapshot, state)
   readonly property var nodes: Logic.fleetNodes(snapshot, state)
   readonly property var agents: Logic.agents(snapshot, state)
   readonly property var automations: Logic.automations(snapshot, state)
@@ -29,7 +28,7 @@ KeyboardPanel {
     || (state === "configuration_error" && snapshot && snapshot.setup)
   readonly property bool configurationErrorVisible: state === "configuration_error"
   readonly property int selectedIndex: Logic.indexForKey(selectionKeys, selectedKey)
-  readonly property var selectedRow: selectedIndex >= 0 ? rows[selectedIndex] : null
+  readonly property string selectedKind: Logic.keyKind(sections, selectedKey)
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color panelSurface: Color.popups.background
   readonly property color rawDim: Color.muted
@@ -114,35 +113,23 @@ KeyboardPanel {
   function moveSelection(delta) {
     var next = Logic.moveFocus(selectedIndex, selectionKeys.length, delta)
     if (next < 0) return
-    selectedKey = rows[next].key
+    selectedKey = selectionKeys[next]
     selectedIndexHint = next
     Qt.callLater(root.ensureSelectionVisible)
   }
 
-  function rowDelegate(row) {
-    if (!row) return null
-    if (row.kind === "candidate") return candidateRepeater.itemAt(row.sectionIndex)
-    return null
-  }
-
-  // Migrated kinds live in key-addressable RowSections; the rest keep the
-  // legacy offset lookup until their migration step.
+  // Every kind lives in a key-addressable RowSection.
   function sectionForKind(kind) {
     if (kind === "automation") return automationRows
     if (kind === "node") return nodeRows
     if (kind === "agent") return agentRows
+    if (kind === "candidate") return candidateRows
     return null
   }
 
-  function delegateForSelection() {
-    var kind = selectedRow ? selectedRow.kind : ""
-    var section = sectionForKind(kind)
-    if (section) return section.itemForKey(selectedKey)
-    return rowDelegate(selectedRow)
-  }
-
   function ensureSelectionVisible() {
-    var delegate = delegateForSelection()
+    var section = sectionForKind(selectedKind)
+    var delegate = section ? section.itemForKey(selectedKey) : null
     if (!delegate) return
     var top = delegate.mapToItem(contentColumn, 0, 0).y
     var bottom = top + delegate.height
@@ -152,22 +139,11 @@ KeyboardPanel {
   }
 
   function activateSelection() {
-    if (selectedRow && selectedRow.kind === "candidate" && !verifyingCandidate)
-      candidateVerificationRequested(selectedRow.key)
+    if (selectedKind === "candidate" && !verifyingCandidate)
+      candidateVerificationRequested(selectedKey)
   }
 
-
-  function signalColor(tone) {
-    var preferred = Logic.signalColor(tone, foreground, accent, urgent, dim, healthy, warning)
-    return Logic.readableColor(preferred, foreground, panelSurface, 4.5)
-  }
-
-  function selectedSignalColor(tone) {
-    var preferred = Logic.signalColor(tone, foreground, accent, urgent, dim, healthy, warning)
-    return Logic.readableColor(preferred, foreground, selectedSurface, 4.5)
-  }
-
-  onRowsChanged: reconcileRows()
+  onSectionsChanged: reconcileRows()
   Component.onCompleted: reconcileRows()
 
   PanelKeyCatcher {
@@ -192,96 +168,14 @@ KeyboardPanel {
       else if (text === "r" || text === "R") root.refreshRequested()
     }
 
-    Item {
+    PanelHeader {
       id: panelHeader
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.top: parent.top
-      height: Style.space(60)
-
-      ClawMark {
-        id: panelClaw
-        anchors.left: parent.left
-        anchors.top: parent.top
-        width: Style.space(20)
-        height: width
-        color: root.foreground
-      }
-
-      Text {
-        textFormat: Text.PlainText
-        anchors.left: panelClaw.right
-        anchors.leftMargin: Style.space(8)
-        anchors.top: parent.top
-        anchors.right: gatewayStatus.left
-        anchors.rightMargin: Style.space(8)
-        text: "OpenClaw"
-        elide: Text.ElideRight
-        color: root.foreground
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.title
-        font.bold: true
-      }
-
-      Row {
-        id: gatewayStatus
-        anchors.right: parent.right
-        anchors.top: parent.top
-        spacing: Style.space(5)
-
-        SignalPoint {
-          anchors.verticalCenter: parent.verticalCenter
-          kind: root.gatewaySignal.shape
-          color: root.signalColor(root.gatewaySignal.tone)
-        }
-
-        Text {
-          textFormat: Text.PlainText
-          text: root.gatewaySignal.label
-          color: root.signalColor(root.gatewaySignal.tone)
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
-          font.bold: true
-        }
-      }
-
-      Text {
-        textFormat: Text.PlainText
-        anchors.left: parent.left
-        anchors.right: observedTime.left
-        anchors.rightMargin: Style.space(8)
-        anchors.bottom: headerDivider.top
-        anchors.bottomMargin: Style.space(4)
-        text: root.summary
-        elide: Text.ElideRight
-        color: root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-      }
-
-      Text {
-        textFormat: Text.PlainText
-        id: observedTime
-        anchors.right: parent.right
-        anchors.bottom: headerDivider.top
-        anchors.bottomMargin: Style.space(4)
-        text: root.historical
-          ? "Last known " + Logic.relativeTime(root.observedAt, root.nowMs)
-          : root.snapshot ? Logic.relativeTime(root.snapshot.generatedAt, root.nowMs) : ""
-        color: root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-      }
-
-      Rectangle {
-        id: headerDivider
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        height: 1
-        color: root.dim
-        opacity: 0.28
-      }
+      palette: root.palette
+      gatewaySignal: root.gatewaySignal
+      summary: root.summary
+      timeCaption: root.historical
+        ? "Last known " + Logic.relativeTime(root.observedAt, root.nowMs)
+        : root.snapshot ? Logic.relativeTime(root.snapshot.generatedAt, root.nowMs) : ""
     }
 
     Flickable {
@@ -354,60 +248,28 @@ KeyboardPanel {
           wrapMode: Text.Wrap
         }
 
-        Repeater {
-          id: candidateRepeater
-          model: root.candidates
-
-          delegate: Rectangle {
-            id: candidateRow
-            required property var modelData
-            required property int index
-            readonly property var row: root.rows[index]
-            readonly property bool selected: !!row && root.selectedKey === row.key
-            width: contentColumn.width
-            height: Style.space(40)
-            radius: Style.cornerRadius
-            color: selected ? Style.selectedFillFor(root.foreground, root.accent) : "transparent"
-            border.width: selected ? 1 : 0
-            border.color: root.accent
-
-            MouseArea {
-              anchors.fill: parent
-              enabled: !root.verifyingCandidate
-              onClicked: {
-                root.selectRow(candidateRow.row)
-                root.activateSelection()
-              }
-            }
-
-            Text {
-              textFormat: Text.PlainText
-              anchors.left: parent.left
-              anchors.leftMargin: Style.space(9)
-              anchors.right: candidateAction.left
-              anchors.rightMargin: Style.space(8)
-              anchors.verticalCenter: parent.verticalCenter
-              text: candidateRow.modelData.name
-              elide: Text.ElideRight
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              font.bold: true
-            }
-
-            Text {
-              textFormat: Text.PlainText
-              id: candidateAction
-              anchors.right: parent.right
-              anchors.rightMargin: Style.space(9)
-              anchors.verticalCenter: parent.verticalCenter
-              text: root.verifyingCandidate && candidateRow.selected ? "Verifying…" : "Verify"
-              color: root.accent
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-            }
+        RowSection {
+          id: candidateRows
+          width: parent.width
+          rows: Logic.sectionRows(root.sections, "candidate")
+          palette: root.palette
+          selectedKey: root.selectedKey
+          nowMs: root.nowMs
+          historical: root.historical
+          motionEnabled: root.detailMotionEnabled
+          fadeDuration: root.detailFadeDuration
+          expandDuration: root.detailExpandDuration
+          detailComponent: null
+          interactive: !root.verifyingCandidate
+          activeActionLabel: root.verifyingCandidate ? "Verifying…" : ""
+          edgeInsetUnits: 9
+          onRowActivated: function(vm) {
+            if (!vm.key) return
+            root.selectRow(vm)
+            if (!root.verifyingCandidate)
+              root.candidateVerificationRequested(vm.key)
           }
+          onSelectionGeometryChanged: Qt.callLater(root.ensureSelectionVisible)
         }
 
         Text {

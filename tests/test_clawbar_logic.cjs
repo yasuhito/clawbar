@@ -69,7 +69,7 @@ test("stale and failed collections render retained rows as historical", () => {
   assert.equal(Logic.barSeverity(stale, "stale"), "warning")
   assert.equal(Logic.barCount(stale, "stale"), 1)
   assert.deepEqual(
-    Logic.panelRows(stale, "stale").map(row => [row.kind, row.historical, row.observedAt]),
+    Logic.panelSections(stale, "stale").flatMap(s => s.rows).map(row => [row.kind, row.historical, row.observedAt]),
     [
       ["node", true, observedAt],
       ["agent", true, observedAt],
@@ -87,7 +87,7 @@ test("stale and failed collections render retained rows as historical", () => {
     lastKnown: { observedAt, gateway: { state: "healthy" }, fleet, agents, automations }
   }
   assert.deepEqual(Logic.fleetNodes(failed, "unstable"), fleet.nodes)
-  assert.equal(Logic.panelRows(failed, "unstable")[0].historical, true)
+  assert.equal(Logic.panelSections(failed, "unstable").flatMap(s => s.rows)[0].historical, true)
   assert.equal(Logic.barCount(failed, "unstable"), 1)
   assert.equal(Logic.snapshotState(failed, 220001), "stale")
   assert.deepEqual(Logic.fleetNodes(failed, "stale"), fleet.nodes)
@@ -156,17 +156,19 @@ test("panel rows preserve Gateway order and keyboard focus wraps", () => {
     items: [{ key: "agent:planner", name: "planner" }, { key: "agent:builder", name: "builder" }]
   }
 
-  const rows = Logic.panelRows(snapshot)
+  const sections = Logic.panelSections(snapshot, "healthy")
+  const keys = Logic.sectionKeys(sections)
 
-  assert.deepEqual(rows.map(row => `${row.kind}:${row.item.name}`), [
+  const kinds = sections.flatMap(s => s.rows).map(row => `${row.kind}:${row.item.name}`)
+  assert.deepEqual(kinds, [
     "node:Local",
     "node:studio-ops",
     "agent:planner",
     "agent:builder"
   ])
-  assert.equal(Logic.moveFocus(-1, rows.length, 1), 1)
-  assert.equal(Logic.moveFocus(3, rows.length, 1), 0)
-  assert.equal(Logic.moveFocus(0, rows.length, -1), 3)
+  assert.equal(Logic.moveFocus(-1, keys.length, 1), 1)
+  assert.equal(Logic.moveFocus(3, keys.length, 1), 0)
+  assert.equal(Logic.moveFocus(0, keys.length, -1), 3)
   assert.equal(Logic.moveFocus(0, 0, 1), -1)
 })
 
@@ -177,10 +179,11 @@ test("keyless Nodes never receive positional identity", () => {
     nodes: [{ name: "Local" }, { name: "studio-ops" }]
   }
 
-  const rows = Logic.panelRows(snapshot)
+  const nodeKeys = Logic.sectionRows(Logic.panelSections(snapshot, "healthy"), "node")
+    .map(row => row.key)
 
-  assert.deepEqual(rows.map(row => row.key), ["", ""])
-  assert.equal(Logic.indexForKey(rows, ""), -1)
+  assert.deepEqual(nodeKeys, ["", ""])
+  assert.equal(Logic.indexForKey(["", ""], ""), -1)
 })
 
 test("registered Agents expose Task Result without claiming current Activity", () => {
@@ -209,13 +212,15 @@ test("registered Agents expose Task Result without claiming current Activity", (
     "Task: Failed · 9m"
   )
   assert.equal(Logic.taskResultLabel(snapshot.agents.items[2].taskResult, 100000), "Task: None")
-  const observerRow = Logic.panelRows(snapshot).find(row => row.item.name === "observer")
-  assert.equal(observerRow.timestamp, completedAt)
-  assert.equal(observerRow.missingTimestampLabel, "No completion timestamp")
+  const observerRow = Logic.panelSections(snapshot, "healthy")
+    .flatMap(s => s.rows)
+    .find(row => row.item.name === "observer")
+  assert.equal(observerRow.key, "agent:observer")
+  assert.match(observerRow.subText(100000 + 9 * 60000), /^Task: Succeeded · 9m$/)
 })
 
 test("Node selection follows stable keys without expansion state", () => {
-  const firstRows = Logic.panelRows({
+  const firstKeys = Logic.sectionKeys(Logic.panelSections({
     fleet: {
       available: true,
       nodes: [
@@ -224,16 +229,15 @@ test("Node selection follows stable keys without expansion state", () => {
       ]
     },
     agents: { available: true, items: [] }
-  })
-  const reorderedRows = [firstRows[1], firstRows[0]]
+  }, "healthy")).filter(key => key.startsWith("node:"))
+  const reordered = [firstKeys[1], firstKeys[0]]
 
-  const retained = Logic.reconcileSelection(reorderedRows, "node:b", 1)
-  const removed = Logic.reconcileSelection([firstRows[0]], retained.key, retained.index)
+  const retained = Logic.reconcileSelection(reordered, "node:b", 1)
+  const removed = Logic.reconcileSelection([firstKeys[0]], retained.key, retained.index)
 
   assert.deepEqual(retained, { key: "node:b", index: 0 })
   assert.deepEqual(removed, { key: "node:a", index: 0 })
-  assert.equal(firstRows[0].missingTimestampLabel, "No observation timestamp")
-  assert.notEqual(firstRows[0].key, firstRows[1].key)
+  assert.notEqual(firstKeys[0], firstKeys[1])
 })
 
 test("Node metadata label keeps available Operational Metadata", () => {
@@ -261,16 +265,16 @@ test("Automations follow Agents and retain selection by stable hidden id", () =>
     ]
   }
 
-  const rows = Logic.panelRows(snapshot)
+  const keys = Logic.sectionKeys(Logic.panelSections(snapshot, "healthy"))
 
-  assert.deepEqual(rows.map(row => `${row.kind}:${row.item.name}`), [
-    "node:Local",
+  assert.deepEqual(keys, [
+    "node:a",
     "agent:planner",
-    "automation:Failed",
-    "automation:Successful"
+    "automation:failure-id",
+    "automation:success-id"
   ])
-  assert.equal(rows[2].key, "automation:failure-id")
-  const reordered = rows.slice(0, 2).concat([rows[3], rows[2]])
+  assert.equal(keys[2], "automation:failure-id")
+  const reordered = [keys[0], keys[1], keys[3], keys[2]]
   assert.deepEqual(
     Logic.reconcileSelection(reordered, "automation:failure-id", 2),
     { key: "automation:failure-id", index: 3 }
