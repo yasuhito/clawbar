@@ -5,7 +5,7 @@ import qs.Commons
 import qs.Ui
 import "ClawbarSnapshot.js" as Snapshot
 import "ClawbarPresentation.js" as Presentation
-import "ClawbarColor.js" as Color
+import "ClawbarColor.js" as ColorKit
 
 BarWidget {
   id: root
@@ -53,7 +53,7 @@ BarWidget {
   readonly property var barSignal: Presentation.signalPresentation(
     barSeverity === "critical" ? "failed" : barSeverity === "warning" ? "waiting" : "healthy"
   )
-  readonly property color barSignalColor: Color.signalColor(
+  readonly property color barSignalColor: ColorKit.signalColor(
     barSignal.tone,
     signalForeground,
     Color.accent,
@@ -64,8 +64,8 @@ BarWidget {
   )
 
   function loadThemeColors(raw) {
-    healthyColor = Color.themeColorFromTheme(raw, "green", signalForeground)
-    warningColor = Color.themeColorFromTheme(raw, "yellow", Color.accent)
+    healthyColor = ColorKit.themeColorFromTheme(raw, "green", signalForeground)
+    warningColor = ColorKit.themeColorFromTheme(raw, "yellow", Color.accent)
   }
 
   function readThemeColors() {

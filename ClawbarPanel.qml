@@ -3,7 +3,7 @@ import qs.Commons
 import qs.Ui
 import "ClawbarSnapshot.js" as Snapshot
 import "ClawbarPresentation.js" as Presentation
-import "ClawbarColor.js" as Color
+import "ClawbarColor.js" as ColorKit
 
 KeyboardPanel {
   id: root
@@ -20,12 +20,13 @@ KeyboardPanel {
   signal candidateVerificationRequested(string candidateKey)
 
   readonly property var metadata: Snapshot.metadataSnapshot(snapshot, state)
-  readonly property bool historical: Snapshot.historicalState(state)
-  readonly property string observedAt: Snapshot.observationTime(snapshot, state)
-  readonly property var nodes: Snapshot.fleetNodes(snapshot, state)
-  readonly property var agents: Snapshot.agents(snapshot, state)
-  readonly property var automations: Snapshot.automations(snapshot, state)
-  readonly property var candidates: Snapshot.setupCandidates(snapshot, state)
+  readonly property var sectionData: Snapshot.sectionData(snapshot, state)
+  readonly property bool historical: sectionData.historical
+  readonly property string observedAt: sectionData.observedAt
+  readonly property var nodes: sectionData.nodes
+  readonly property var agents: sectionData.agents
+  readonly property var automations: sectionData.automations
+  readonly property var candidates: sectionData.candidates
   readonly property bool setupVisible: candidates.length > 0 || state === "setup_required"
     || (state === "configuration_error" && snapshot && snapshot.setup)
   readonly property bool configurationErrorVisible: state === "configuration_error"
@@ -34,11 +35,11 @@ KeyboardPanel {
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color panelSurface: Color.popups.background
   readonly property color rawDim: Color.muted
-  readonly property color dim: Color.readableColor(rawDim, foreground, panelSurface, 4.5)
-  readonly property color selectedSurface: Color.blendColor(
+  readonly property color dim: ColorKit.readableColor(rawDim, foreground, panelSurface, 4.5)
+  readonly property color selectedSurface: ColorKit.blendColor(
     Style.selectedStateColor(foreground, accent), panelSurface, Style.selectedFillAlpha
   )
-  readonly property color selectedDim: Color.readableColor(dim, foreground, selectedSurface, 4.5)
+  readonly property color selectedDim: ColorKit.readableColor(dim, foreground, selectedSurface, 4.5)
   readonly property color accent: Color.accent
   readonly property color urgent: bar ? bar.urgent : Color.urgent
   required property color healthy
@@ -48,7 +49,7 @@ KeyboardPanel {
 
   // One palette object carries every color the Operational Rows need; the
   // panel derives it once so sections never re-thread theme colors.
-  readonly property var palette: Color.makePalette({
+  readonly property var palette: ColorKit.makePalette({
     foreground: String(foreground),
     accent: String(accent),
     urgent: String(urgent),
@@ -59,8 +60,7 @@ KeyboardPanel {
     selectedSurface: String(selectedSurface),
     fontFamily: fontFamily
   })
-  readonly property var sections: Presentation.panelSections(
-    Snapshot.sectionData(snapshot, state))
+  readonly property var sections: Presentation.panelSections(sectionData)
   readonly property var selectionKeys: Presentation.sectionKeys(sections)
 
   /* ───────────────────────────────────────────────────────

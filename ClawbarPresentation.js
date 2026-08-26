@@ -176,7 +176,7 @@ function showNodeStatusLabel(state, historical) {
 // Operational Row view-models: presentation facts computed once, tested here,
 // consumed uniformly by RowSection.qml regardless of kind.
 
-function candidateViewModel(item, index) {
+function candidateViewModel(item) {
   return {
     kind: "candidate",
     key: String(item.key || ""),
@@ -197,7 +197,7 @@ function candidateViewModel(item, index) {
   }
 }
 
-function nodeViewModel(item, index, historical, observedAt) {
+function nodeViewModel(item, historical, observedAt) {
   var signal = nodeSignalPresentation(item.state)
   var offline = item.state === "offline"
   var label = historical ? "Last known" : signal.label
@@ -221,7 +221,7 @@ function nodeViewModel(item, index, historical, observedAt) {
   }
 }
 
-function agentViewModel(item, index, historical, observedAt) {
+function agentViewModel(item, historical, observedAt) {
   var result = item.taskResult || {}
   var failed = result.state === "failed"
   return {
@@ -246,7 +246,7 @@ function agentViewModel(item, index, historical, observedAt) {
   }
 }
 
-function automationViewModel(item, index, historical, observedAt) {
+function automationViewModel(item, historical, observedAt) {
   var failed = !!item.enabled && item.lastResult === "error"
   var disabled = !item.enabled
   var signalState = failed ? "failed" : disabled ? "disabled" : item.lastResult === "ok" ? "succeeded" : "healthy"
@@ -282,25 +282,25 @@ function panelSections(data) {
     {
       kind: "candidate",
       rows: data.candidates.map(function(item, index) {
-        return candidateViewModel(item, index)
+        return candidateViewModel(item)
       })
     },
     {
       kind: "node",
       rows: data.nodes.map(function(item, index) {
-        return nodeViewModel(item, index, data.historical, data.observedAt)
+        return nodeViewModel(item, data.historical, data.observedAt)
       })
     },
     {
       kind: "agent",
       rows: data.agents.map(function(item, index) {
-        return agentViewModel(item, index, data.historical, data.observedAt)
+        return agentViewModel(item, data.historical, data.observedAt)
       })
     },
     {
       kind: "automation",
       rows: data.automations.map(function(item, index) {
-        return automationViewModel(item, index, data.historical, data.observedAt)
+        return automationViewModel(item, data.historical, data.observedAt)
       })
     }
   ]
