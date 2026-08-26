@@ -311,6 +311,35 @@ def publish_current(
     return publish(snapshot_path, ExitCode.OK, snapshot)
 
 
+def resolve_target(
+    snapshot_path: Path,
+    openclaw_command: Sequence[str],
+    command_deadline_at: float,
+    target: GatewayTarget | None,
+) -> tuple[GatewayTarget | None, subprocess.CompletedProcess[str], bool]:
+    """行き先決め: 選ばれた候補または自動解決でGateway応答を取得する。
+
+    CollectionDeadlineExceeded と OSError は呼び出し側へそのまま伝わる。
+    """
+    automatic_setup_required = False
+    if target is not None:
+        completed = gateway_status_command(openclaw_command, command_deadline_at, target)
+        return target, completed, automatic_setup_required
+    completed = gateway_status_command(openclaw_command, command_deadline_at)
+    if completed.returncode != 0:
+        automatic_setup_required = automatic_resolution_missing(completed)
+        target = discover_node_host(openclaw_command, command_deadline_at)
+        if target is None:
+            verified_url = GatewayTargetState(
+                snapshot_path,
+                SCHEMA_VERSION,
+            ).load_verified_fallback()
+            target = GatewayTarget(verified_url, "tailscale") if verified_url else None
+        if target is not None:
+            completed = gateway_status_command(openclaw_command, command_deadline_at, target)
+    return target, completed, automatic_setup_required
+
+
 def collect_gateway(
     snapshot_path: Path,
     refresh_interval: int,
@@ -328,7 +357,6 @@ def collect_gateway(
     except OSError:
         secret = None
     target = selected_candidate(snapshot_path, candidate_key, SCHEMA_VERSION) if candidate_key else None
-    automatic_setup_required = False
 
     if candidate_key and target is None:
         return publish(
@@ -344,21 +372,12 @@ def collect_gateway(
         )
 
     try:
-        if target is not None:
-            completed = gateway_status_command(openclaw_command, command_deadline_at, target)
-        else:
-            completed = gateway_status_command(openclaw_command, command_deadline_at)
-            if completed.returncode != 0:
-                automatic_setup_required = automatic_resolution_missing(completed)
-                target = discover_node_host(openclaw_command, command_deadline_at)
-                if target is None:
-                    verified_url = GatewayTargetState(
-                        snapshot_path,
-                        SCHEMA_VERSION,
-                    ).load_verified_fallback()
-                    target = GatewayTarget(verified_url, "tailscale") if verified_url else None
-                if target is not None:
-                    completed = gateway_status_command(openclaw_command, command_deadline_at, target)
+        target, completed, automatic_setup_required = resolve_target(
+            snapshot_path,
+            openclaw_command,
+            command_deadline_at,
+            target,
+        )
     except CollectionDeadlineExceeded:
         if candidate_key:
             return publish(
