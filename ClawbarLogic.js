@@ -619,7 +619,8 @@ if (typeof module !== "undefined") {
     agents: agents,
     automations: automations,
     setupCandidates: setupCandidates,
-    panelSections: panelSections,    moveFocus: moveFocus,
+    panelSections: panelSections,
+    moveFocus: moveFocus,
     relativeTime: relativeTime,
     timeUntil: timeUntil,
     absoluteLocalTime: absoluteLocalTime,
@@ -647,7 +648,6 @@ if (typeof module !== "undefined") {
     nodeSignalPresentation: nodeSignalPresentation,
     metadataUnavailableText: metadataUnavailableText,
     makePalette: makePalette,
-    panelSections: panelSections,
     sectionRows: sectionRows,
     sectionKeys: sectionKeys,
     keyKind: keyKind
