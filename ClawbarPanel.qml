@@ -2,6 +2,7 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 import "ClawbarLogic.js" as Logic
+import "ClawbarColor.js" as Color
 
 KeyboardPanel {
   id: root
@@ -32,11 +33,11 @@ KeyboardPanel {
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color panelSurface: Color.popups.background
   readonly property color rawDim: Color.muted
-  readonly property color dim: Logic.readableColor(rawDim, foreground, panelSurface, 4.5)
-  readonly property color selectedSurface: Logic.blendColor(
+  readonly property color dim: Color.readableColor(rawDim, foreground, panelSurface, 4.5)
+  readonly property color selectedSurface: Color.blendColor(
     Style.selectedStateColor(foreground, accent), panelSurface, Style.selectedFillAlpha
   )
-  readonly property color selectedDim: Logic.readableColor(dim, foreground, selectedSurface, 4.5)
+  readonly property color selectedDim: Color.readableColor(dim, foreground, selectedSurface, 4.5)
   readonly property color accent: Color.accent
   readonly property color urgent: bar ? bar.urgent : Color.urgent
   required property color healthy
@@ -46,7 +47,7 @@ KeyboardPanel {
 
   // One palette object carries every color the Operational Rows need; the
   // panel derives it once so sections never re-thread theme colors.
-  readonly property var palette: Logic.makePalette({
+  readonly property var palette: Color.makePalette({
     foreground: String(foreground),
     accent: String(accent),
     urgent: String(urgent),

@@ -227,13 +227,13 @@ class MarketplaceContractTest(unittest.TestCase):
 
     def test_selected_rows_use_theme_aware_readable_secondary_colors(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
-        logic = (ROOT / "ClawbarLogic.js").read_text(encoding="utf-8")
+        color = (ROOT / "ClawbarColor.js").read_text(encoding="utf-8")
         section = (ROOT / "RowSection.qml").read_text(encoding="utf-8")
 
-        self.assertIn("Logic.readableColor(rawDim, foreground, panelSurface, 4.5)", panel)
+        self.assertIn("Color.readableColor(rawDim, foreground, panelSurface, 4.5)", panel)
         self.assertIn("readonly property color selectedDim", panel)
         # Selected-row secondaries resolve through the palette against each surface.
-        self.assertIn("selectedSignalColor: function(tone)", logic)
+        self.assertIn("selectedSignalColor: function(tone)", color)
         self.assertIn("root.palette.selectedSignalColor(rowRoot.dot.tone)", section)
         self.assertIn("root.palette.selectedDim", section)
         self.assertIn("root.palette.dim", section)

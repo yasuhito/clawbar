@@ -4,6 +4,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "ClawbarLogic.js" as Logic
+import "ClawbarColor.js" as Color
 
 BarWidget {
   id: root
@@ -51,7 +52,7 @@ BarWidget {
   readonly property var barSignal: Logic.signalPresentation(
     barSeverity === "critical" ? "failed" : barSeverity === "warning" ? "waiting" : "healthy"
   )
-  readonly property color barSignalColor: Logic.signalColor(
+  readonly property color barSignalColor: Color.signalColor(
     barSignal.tone,
     signalForeground,
     Color.accent,
@@ -62,8 +63,8 @@ BarWidget {
   )
 
   function loadThemeColors(raw) {
-    healthyColor = Logic.themeColorFromTheme(raw, "green", signalForeground)
-    warningColor = Logic.themeColorFromTheme(raw, "yellow", Color.accent)
+    healthyColor = Color.themeColorFromTheme(raw, "green", signalForeground)
+    warningColor = Color.themeColorFromTheme(raw, "yellow", Color.accent)
   }
 
   function readThemeColors() {

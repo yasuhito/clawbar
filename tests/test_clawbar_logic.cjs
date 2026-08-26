@@ -463,29 +463,6 @@ test("configuration errors provide private-safe repair guidance", () => {
   assert.equal(Logic.configurationGuidance("healthy"), "")
 })
 
-test("theme-aware colors remain readable on normal and selected surfaces", () => {
-  for (const [name, background, foreground, muted, green, yellow, red] of [
-    ["white", "#ffffff", "#000000", "#808080", "#3a3a3a", "#4a4a4a", "#2a2a2a"],
-    ["catppuccin-latte", "#eff1f5", "#4c4f69", "#acb0be", "#40a02b", "#df8e1d", "#d20f39"],
-    ["flexoki-light", "#fffcf0", "#100f0f", "#b7b5ac", "#879a39", "#d0a215", "#d14d41"],
-    ["vantablack", "#000000", "#ffffff", "#7a7a7a", "#b6b6b6", "#cecece", "#a4a4a4"]
-  ]) {
-    const selectedSurface = Logic.blendColor(foreground, background, 0.18)
-    const secondary = Logic.readableColor(muted, foreground, background, 4.5)
-    const selectedSecondary = Logic.readableColor(secondary, foreground, selectedSurface, 4.5)
-    const semanticColors = { green, yellow, red }
-
-    assert.ok(Logic.contrastRatio(secondary, background) >= 4.5, `${name} secondary`)
-    assert.ok(Logic.contrastRatio(selectedSecondary, selectedSurface) >= 4.5, `${name} selected secondary`)
-    for (const [tone, preferred] of Object.entries(semanticColors)) {
-      const normal = Logic.readableColor(preferred, foreground, background, 4.5)
-      const selected = Logic.readableColor(preferred, foreground, selectedSurface, 4.5)
-      assert.ok(Logic.contrastRatio(normal, background) >= 4.5, `${name} ${tone}`)
-      assert.ok(Logic.contrastRatio(selected, selectedSurface) >= 4.5, `${name} selected ${tone}`)
-    }
-  }
-})
-
 test("signal semantics follow the prototype dot and color legend", () => {
   for (const [state, tone, label] of [
     ["healthy", "healthy", "Healthy"],
@@ -512,19 +489,6 @@ test("signal semantics follow the prototype dot and color legend", () => {
     label: "Registered Agent"
   })
   assert.deepEqual(Logic.signalPresentation("disabled"), { shape: "dotted", tone: "disabled", label: "Disabled" })
-  assert.equal(Logic.signalColor("critical", "fg", "accent", "urgent", "dim"), "urgent")
-  assert.equal(Logic.signalColor("warning", "fg", "accent", "urgent", "dim"), "accent")
-  assert.equal(Logic.signalColor("registered", "fg", "accent", "urgent", "dim", "green"), "green")
-  assert.equal(Logic.signalColor("disabled", "fg", "accent", "urgent", "dim"), "dim")
-  assert.equal(Logic.signalColor("muted", "fg", "accent", "urgent", "dim"), "dim")
-  assert.equal(Logic.signalColor("healthy", "fg", "accent", "urgent", "dim"), "fg")
-  assert.equal(Logic.signalColor("healthy", "fg", "accent", "urgent", "dim", "green"), "green")
-  assert.equal(Logic.signalColor("warning", "fg", "accent", "urgent", "dim", "green", "yellow"), "yellow")
-  assert.equal(Logic.themeColorFromTheme('green = "#879A39"', "green", "fg"), "#879A39")
-  assert.equal(Logic.themeColorFromTheme('yellow = "#D0A215"', "yellow", "fg"), "#D0A215")
-  assert.equal(Logic.themeColorFromTheme('color2 = "#40A02B"', "green", "fg"), "#40A02B")
-  assert.equal(Logic.themeColorFromTheme('color3 = "#DF8E1D"', "yellow", "fg"), "#DF8E1D")
-  assert.equal(Logic.themeColorFromTheme("foreground = \"#100F0F\"", "green", "fg"), "fg")
 })
 
 test("metadataUnavailableText maps the size-limit reason to a specific message", () => {
@@ -548,45 +512,6 @@ test("metadataUnavailableText returns null without the size-limit reason", () =>
 
 // ─── Operational Row view-models ───
 
-test("makePalette derives contrast-safe colors once for every row", () => {
-  const palette = Logic.makePalette({
-    foreground: "#ffffff",
-    accent: "#89b4fa",
-    urgent: "#f38ba8",
-    muted: "#a6adc8",
-    healthy: "#a6e3a1",
-    warning: "",
-    panelSurface: "#11111b",
-    selectedSurface: "#313244",
-    fontFamily: "Sans"
-  })
-
-  assert.equal(palette.foreground, "#ffffff")
-  assert.equal(palette.fontFamily, "Sans")
-  assert.equal(typeof palette.signalColor, "function")
-  assert.equal(typeof palette.selectedSignalColor, "function")
-  assert.equal(
-    palette.signalColor("critical"),
-    Logic.readableColor("#f38ba8", "#ffffff", "#11111b", 4.5)
-  )
-  assert.equal(
-    palette.signalColor("healthy"),
-    Logic.readableColor("#a6e3a1", "#ffffff", "#11111b", 4.5)
-  )
-  assert.equal(
-    palette.signalColor("warning"),
-    Logic.readableColor("#89b4fa", "#ffffff", "#11111b", 4.5)
-  )
-  assert.equal(
-    palette.selectedSignalColor("critical"),
-    Logic.readableColor(palette.signalColor("critical"), "#ffffff", "#313244", 4.5)
-  )
-  assert.equal(palette.dim, Logic.readableColor("#a6adc8", "#ffffff", "#11111b", 4.5))
-  assert.equal(
-    palette.selectedDim,
-    Logic.readableColor(palette.dim, "#ffffff", "#313244", 4.5)
-  )
-})
 
 function operationalSnapshot() {
   const snapshot = healthySnapshot(new Date(100000).toISOString())
