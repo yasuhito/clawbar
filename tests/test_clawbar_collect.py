@@ -1256,5 +1256,78 @@ class RefreshIntervalTests(unittest.TestCase):
             parser.parse_args(["--refresh-interval", "301"])
 
 
+class CollectGatewaySeamTests(unittest.TestCase):
+    """内部受口（resolve_target / candidate_retry / decode_status_or_fail）の
+    狭いテスト。振る舞いの契約は既存の実行ファイル経由テストが担う。"""
+
+    def test_resolve_target_keeps_selected_candidate_and_skips_automatic_resolution(self) -> None:
+        target = clawbar_gateway.GatewayTarget("wss://example.test", "tailscale")
+        calls: list[tuple] = []
+
+        def fake_command(command, deadline_at, resolved_target=None):
+            calls.append(resolved_target)
+            return subprocess.CompletedProcess(command, 0, "{}", "")
+
+        with mock.patch.object(clawbar_collect, "gateway_status_command", fake_command):
+            resolved, completed, automatic_setup = clawbar_collect.resolve_target(
+                Path("/tmp/unused"), ("openclaw",), 1.0, target
+            )
+
+        self.assertEqual(calls, [target])
+        self.assertEqual(resolved, target)
+        self.assertFalse(automatic_setup)
+        self.assertEqual(completed.returncode, 0)
+
+    def test_resolve_target_falls_back_to_verified_url_once(self) -> None:
+        target = clawbar_gateway.GatewayTarget("wss://fallback.test", "tailscale")
+        with (
+            mock.patch.object(clawbar_collect, "gateway_status_command") as fake_command,
+            mock.patch.object(clawbar_collect, "automatic_resolution_missing", return_value=True),
+            mock.patch.object(clawbar_collect, "discover_node_host", return_value=None),
+            mock.patch.object(clawbar_collect, "GatewayTargetState") as fake_state,
+        ):
+            fake_state.return_value.load_verified_fallback.return_value = "wss://fallback.test"
+            fake_command.side_effect = [
+                subprocess.CompletedProcess(("openclaw",), 1, "", ""),
+                subprocess.CompletedProcess(("openclaw",), 0, "{}", ""),
+            ]
+
+            resolved, completed, automatic_setup = clawbar_collect.resolve_target(
+                Path("/tmp/unused"), ("openclaw",), 1.0, None
+            )
+
+        self.assertEqual(fake_command.call_count, 2)
+        self.assertEqual(resolved, target)
+        self.assertEqual(completed.returncode, 0)
+        self.assertTrue(automatic_setup)
+
+    def test_candidate_retry_publishes_retry_snapshot_with_configured_exit(self) -> None:
+        with mock.patch.object(clawbar_collect, "atomic_write_snapshot") as fake_write:
+            result = clawbar_collect.candidate_retry(
+                Path("/tmp/unused"),
+                None,
+                30,
+                "candidate_unreachable",
+                clawbar_collect.CANDIDATE_UNREACHABLE_GUIDANCE,
+                exit_code=clawbar_collect.ExitCode.COMMAND_TIMEOUT,
+            )
+
+        self.assertEqual(result.exit_code, clawbar_collect.ExitCode.COMMAND_TIMEOUT)
+        snapshot = fake_write.call_args[0][1]
+        self.assertEqual(snapshot["failureKind"], "candidate_unreachable")
+        self.assertEqual(snapshot["setup"]["candidates"], [])
+
+    def test_decode_status_or_fail_rejects_non_gateway_payload(self) -> None:
+        completed = subprocess.CompletedProcess(("openclaw",), 0, json.dumps({"unrelated": True}), "")
+
+        result = clawbar_collect.decode_status_or_fail(
+            Path("/tmp/unused"), None, 30, None, None, completed
+        )
+
+        self.assertIsInstance(result, clawbar_collect.CollectionResult)
+        self.assertEqual(result.exit_code, clawbar_collect.ExitCode.UNSUPPORTED_JSON)
+        self.assertEqual(result.snapshot["gateway"]["state"], "configuration_error")
+
+
 if __name__ == "__main__":
     unittest.main()
