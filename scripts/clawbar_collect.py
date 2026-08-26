@@ -124,11 +124,6 @@ CANDIDATE_UNSUPPORTED_GUIDANCE = (
     "The selected device does not provide a supported OpenClaw Gateway."
 )
 
-
-
-
-
-
 def default_snapshot_path() -> Path:
     state_home = os.environ.get("XDG_STATE_HOME")
     base = Path(state_home) if state_home else Path.home() / ".local" / "state"
