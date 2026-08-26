@@ -107,3 +107,7 @@ _Avoid_: Offline Fleet, Gateway Setup Required
 **Last Known Metadata**:
 Operational Metadata retained from the last successful Gateway collection. It preserves the last observed state while freshness is expressed separately; it never establishes a current Incident and is excluded from current Fleet counts.
 _Avoid_: Current state, Stale Snapshot
+
+**Operational Row**:
+A panel row representing exactly one Gateway Candidate, Node, Registered Agent, or Automation. Every Operational Row presents the same selectable summary and expandable detail regardless of kind; selection follows the row's key, never a positional index.
+_Avoid_: section offset, positional index, per-kind custom row
