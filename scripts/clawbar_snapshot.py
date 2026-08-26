@@ -25,6 +25,26 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
+def snapshot_envelope(
+    schema_version: int,
+    refresh_interval: int,
+    resolution_source: str,
+    gateway_state: str,
+    last_success_at: str | None,
+    consecutive_failures: int,
+) -> dict[str, Any]:
+    """失敗系snapshot共通の envelope。セクションとbarは各builderが加える。"""
+    return {
+        "schemaVersion": schema_version,
+        "generatedAt": utc_now(),
+        "refreshIntervalSeconds": refresh_interval,
+        "resolutionSource": resolution_source,
+        "gateway": {"state": gateway_state},
+        "lastSuccessAt": last_success_at,
+        "consecutiveFailures": consecutive_failures,
+    }
+
+
 def read_bounded_regular_file(path: Path, max_bytes: int = MAX_COLLECTION_BYTES) -> bytes:
     """Read one owner-controlled regular file without following its final link."""
     flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
@@ -113,23 +133,22 @@ def build_failure_snapshot(
         state = "offline"
     else:
         state = "unstable"
-    snapshot = {
-        "schemaVersion": schema_version,
-        "generatedAt": utc_now(),
-        "refreshIntervalSeconds": refresh_interval,
-        "resolutionSource": source if source in resolution_sources else "unresolved",
-        "gateway": {"state": state},
-        "fleet": {"available": False, "nodes": []},
-        "agents": {"available": False, "items": []},
-        "automations": {"available": False, "items": []},
-        "bar": {
-            "kind": "attention",
-            "count": 0 if state == "no_data" else 1,
-            "severity": "critical" if state == "offline" else "warning",
-        },
-        "lastSuccessAt": last_success,
-        "consecutiveFailures": failures,
-        "failureKind": failure_kind,
+    snapshot = snapshot_envelope(
+        schema_version,
+        refresh_interval,
+        source if source in resolution_sources else "unresolved",
+        state,
+        last_success,
+        failures,
+    )
+    snapshot["failureKind"] = failure_kind
+    snapshot["fleet"] = {"available": False, "nodes": []}
+    snapshot["agents"] = {"available": False, "items": []}
+    snapshot["automations"] = {"available": False, "items": []}
+    snapshot["bar"] = {
+        "kind": "attention",
+        "count": 0 if state == "no_data" else 1,
+        "severity": "critical" if state == "offline" else "warning",
     }
     if retained is not None:
         snapshot["lastKnown"] = retained

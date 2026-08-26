@@ -18,11 +18,11 @@ from urllib.parse import urlsplit
 if __package__:
     from .clawbar_bounds import MAX_COLLECTION_BYTES
     from .clawbar_metadata import opaque_candidate_key
-    from .clawbar_snapshot import atomic_write_snapshot, last_known_metadata, load_snapshot, utc_now
+    from .clawbar_snapshot import atomic_write_snapshot, last_known_metadata, load_snapshot, snapshot_envelope
 else:
     from clawbar_bounds import MAX_COLLECTION_BYTES
     from clawbar_metadata import opaque_candidate_key
-    from clawbar_snapshot import atomic_write_snapshot, last_known_metadata, load_snapshot, utc_now
+    from clawbar_snapshot import atomic_write_snapshot, last_known_metadata, load_snapshot, snapshot_envelope
 
 GATEWAY_PORT = 18789
 TAILSCALE_COMMAND = ("tailscale",)
@@ -292,20 +292,19 @@ def build_setup_snapshot(
     setup: dict[str, Any],
     failure_kind: str | None = None,
 ) -> dict[str, Any]:
-    snapshot = {
-        "schemaVersion": schema_version,
-        "generatedAt": utc_now(),
-        "refreshIntervalSeconds": refresh_interval,
-        "resolutionSource": "unresolved",
-        "gateway": {"state": "setup_required"},
-        "fleet": {"available": False, "nodes": []},
-        "agents": {"available": False, "items": []},
-        "automations": {"available": False, "items": []},
-        "lastSuccessAt": None,
-        "consecutiveFailures": 0,
-        "bar": {"count": 0, "severity": "warning"},
-        "setup": setup,
-    }
+    snapshot = snapshot_envelope(
+        schema_version,
+        refresh_interval,
+        "unresolved",
+        "setup_required",
+        None,
+        0,
+    )
+    snapshot["fleet"] = {"available": False, "nodes": []}
+    snapshot["agents"] = {"available": False, "items": []}
+    snapshot["automations"] = {"available": False, "items": []}
+    snapshot["bar"] = {"count": 0, "severity": "warning"}
+    snapshot["setup"] = setup
     if failure_kind:
         snapshot["failureKind"] = failure_kind
     retained = last_known_metadata(previous)

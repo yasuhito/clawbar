@@ -44,6 +44,7 @@ if __package__:
         atomic_write_snapshot,
         build_failure_snapshot,
         last_known_metadata,
+        snapshot_envelope,
         load_snapshot,
         read_bounded_regular_file,
         utc_now,
@@ -79,6 +80,7 @@ else:
         atomic_write_snapshot,
         build_failure_snapshot,
         last_known_metadata,
+        snapshot_envelope,
         load_snapshot,
         read_bounded_regular_file,
         utc_now,
@@ -191,16 +193,15 @@ def configuration_error_snapshot(
     if source is None and previous:
         previous_source = previous.get("resolutionSource")
         source = previous_source if previous_source in RESOLUTION_SOURCES else None
-    snapshot = {
-        "schemaVersion": SCHEMA_VERSION,
-        "generatedAt": utc_now(),
-        "refreshIntervalSeconds": refresh_interval,
-        "resolutionSource": source or "unresolved",
-        "gateway": {"state": "configuration_error"},
-        "lastSuccessAt": last_success if isinstance(last_success, str) else None,
-        "consecutiveFailures": 0,
-        "failureKind": "unsupported_json",
-    }
+    snapshot = snapshot_envelope(
+        SCHEMA_VERSION,
+        refresh_interval,
+        source or "unresolved",
+        "configuration_error",
+        last_success if isinstance(last_success, str) else None,
+        0,
+    )
+    snapshot["failureKind"] = "unsupported_json"
     retained = last_known_metadata(previous)
     if retained is not None:
         snapshot["lastKnown"] = retained
