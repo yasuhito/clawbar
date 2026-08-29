@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Clawbar の全体チェック。commit / push の前に必ず通す。
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+echo "== Python unit tests =="
+python3 -m unittest discover -s tests -t .
+
+echo "== Node unit tests =="
+node --test tests/*.cjs
