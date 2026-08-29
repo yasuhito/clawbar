@@ -26,7 +26,6 @@ if __package__:
         GatewayTarget,
         automatic_resolution_missing,
         discover_node_host,
-        gateway_status_command,
         resolution_source,
         retained_setup_candidates,
         selected_candidate,
@@ -64,7 +63,6 @@ else:
         GatewayTarget,
         automatic_resolution_missing,
         discover_node_host,
-        gateway_status_command,
         resolution_source,
         retained_setup_candidates,
         selected_candidate,
@@ -330,9 +328,9 @@ def resolve_target(
     """
     automatic_setup_required = False
     if target is not None:
-        completed = gateway_status_command(commands, command_deadline_at, target)
+        completed = commands.gateway_status(command_deadline_at, target.url)
         return target, completed, automatic_setup_required
-    completed = gateway_status_command(commands, command_deadline_at)
+    completed = commands.gateway_status(command_deadline_at)
     if completed.returncode != 0:
         automatic_setup_required = automatic_resolution_missing(completed)
         target = discover_node_host(commands, command_deadline_at)
@@ -343,7 +341,7 @@ def resolve_target(
             ).load_verified_fallback()
             target = GatewayTarget(verified_url, "tailscale") if verified_url else None
         if target is not None:
-            completed = gateway_status_command(commands, command_deadline_at, target)
+            completed = commands.gateway_status(command_deadline_at, target.url)
     return target, completed, automatic_setup_required
 
 

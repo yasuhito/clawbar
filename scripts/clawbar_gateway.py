@@ -11,37 +11,13 @@ from typing import Any, Sequence
 from urllib.parse import urlsplit
 
 if __package__:
-    from .clawbar_commands import (
-        CollectionDeadlineExceeded,
-        CommandOutputExceeded,
-        GatewayCommandSurface,
-        MAX_COMMAND_STREAM_BYTES,
-        run_command,
-        seconds_until_deadline,
-    )
+    from .clawbar_commands import CollectionDeadlineExceeded, GatewayCommandSurface
     from .clawbar_metadata import opaque_candidate_key
     from .clawbar_snapshot import atomic_write_snapshot, last_known_metadata, load_snapshot, snapshot_envelope
 else:
-    from clawbar_commands import (
-        CollectionDeadlineExceeded,
-        CommandOutputExceeded,
-        GatewayCommandSurface,
-        MAX_COMMAND_STREAM_BYTES,
-        run_command,
-        seconds_until_deadline,
-    )
+    from clawbar_commands import CollectionDeadlineExceeded, GatewayCommandSurface
     from clawbar_metadata import opaque_candidate_key
     from clawbar_snapshot import atomic_write_snapshot, last_known_metadata, load_snapshot, snapshot_envelope
-
-# CollectionDeadlineExceeded / CommandOutputExceeded / MAX_COMMAND_STREAM_BYTES / run_command
-# は clawbar_commands に移した。既存の呼び出し側とテストのためにここでも再公開する。
-__all__ = [
-    "CollectionDeadlineExceeded",
-    "CommandOutputExceeded",
-    "MAX_COMMAND_STREAM_BYTES",
-    "run_command",
-    "seconds_until_deadline",
-]
 
 GATEWAY_PORT = 18789
 SETUP_GUIDANCE = "Choose a Tailscale device to verify as your OpenClaw Gateway."
@@ -333,11 +309,3 @@ def automatic_resolution_missing(completed: subprocess.CompletedProcess[str]) ->
         return ipaddress.ip_address(hostname).is_loopback
     except ValueError:
         return hostname.lower() == "localhost"
-
-
-def gateway_status_command(
-    commands: GatewayCommandSurface,
-    deadline_at: float,
-    target: GatewayTarget | None = None,
-) -> subprocess.CompletedProcess[str]:
-    return commands.gateway_status(deadline_at, target.url if target is not None else None)
