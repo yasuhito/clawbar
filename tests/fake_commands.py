@@ -54,6 +54,27 @@ def node_not_hosting() -> CommandResult:
     return ok({"service": {"loaded": False, "command": None, "runtime": {"status": "stopped", "state": "inactive"}}})
 
 
+def node_hosting(
+    host: str = "node-gateway.example.test",
+    port: int = 18789,
+    tls: bool = True,
+    context_path: str = "/openclaw-gw",
+) -> CommandResult:
+    """A ``node status`` answer for a device whose OpenClaw node run hosts a Gateway."""
+    arguments = ["/usr/bin/node", "/opt/openclaw.mjs", "node", "run", "--host", host, "--port", str(port)]
+    if tls:
+        arguments.append("--tls")
+    if context_path:
+        arguments.extend(["--context-path", context_path])
+    return ok({
+        "service": {
+            "loaded": True,
+            "command": {"programArguments": arguments},
+            "runtime": {"status": "running", "state": "active"},
+        }
+    })
+
+
 def gateway_unresolved() -> CommandResult:
     """A failed local ``gateway status`` whose JSON shows no loaded service (automatic resolution missing)."""
     return failed(
@@ -84,6 +105,7 @@ class FakeCommandSurface:
             for question, answer in answers.items()
         }
         self.calls: list[tuple[str, dict[str, Any]]] = []
+        self.deadlines: list[float] = []
 
     @classmethod
     def healthy(cls, url: str = LOCAL_GATEWAY_URL, **answers: Answer | list[Answer]) -> "FakeCommandSurface":
@@ -108,12 +130,17 @@ class FakeCommandSurface:
         defaults.update(answers)
         return cls(**defaults)
 
+    def questions(self) -> list[str]:
+        """Every question asked, in order."""
+        return [name for name, _ in self.calls]
+
     def asked(self, question: str) -> list[dict[str, Any]]:
-        """Details of every call to ``question``, in order."""
+        """Details (``url``, ``params``) of every call to ``question``, in order."""
         return [details for name, details in self.calls if name == question]
 
-    def _answer(self, question: str, **details: Any) -> CommandResult:
+    def _answer(self, question: str, deadline_at: float, **details: Any) -> CommandResult:
         self.calls.append((question, details))
+        self.deadlines.append(deadline_at)
         queue = self.answers.get(question)
         if not queue:
             return failed(UNSCRIPTED_EXIT_CODE)
@@ -125,22 +152,22 @@ class FakeCommandSurface:
         return answer
 
     def gateway_status(self, deadline_at: float, url: str | None = None) -> CommandResult:
-        return self._answer("gateway_status", url=url)
+        return self._answer("gateway_status", deadline_at, url=url)
 
     def node_status(self, deadline_at: float) -> CommandResult:
-        return self._answer("node_status")
+        return self._answer("node_status", deadline_at)
 
     def nodes_status(self, deadline_at: float, url: str | None) -> CommandResult:
-        return self._answer("nodes_status", url=url)
+        return self._answer("nodes_status", deadline_at, url=url)
 
     def agents_list(self, deadline_at: float, url: str | None) -> CommandResult:
-        return self._answer("agents_list", url=url)
+        return self._answer("agents_list", deadline_at, url=url)
 
     def tasks_list(self, deadline_at: float, url: str | None) -> CommandResult:
-        return self._answer("tasks_list", url=url)
+        return self._answer("tasks_list", deadline_at, url=url)
 
     def cron_list(self, deadline_at: float, url: str | None, params: dict[str, object]) -> CommandResult:
-        return self._answer("cron_list", url=url, params=params)
+        return self._answer("cron_list", deadline_at, url=url, params=params)
 
     def tailscale_status(self, deadline_at: float) -> CommandResult:
-        return self._answer("tailscale_status")
+        return self._answer("tailscale_status", deadline_at)

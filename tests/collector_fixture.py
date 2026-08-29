@@ -9,19 +9,25 @@ import tempfile
 import textwrap
 from pathlib import Path
 
-from scripts import clawbar_collect, clawbar_commands
+from scripts import clawbar_collect
 
 
 class CollectorFixture:
+    """Shared setup for collector tests.
+
+    ``collect()`` runs one collection in-process through a Gateway Command Surface.
+    ``run_external()`` starts the real collector script with a minimal fake ``openclaw``
+    on PATH, for the few tests about the process itself (deadline, termination, entry
+    points). Incident notifications always reach a fake ``notify-send`` on PATH.
+    """
+
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary_directory.cleanup)
         self.root = Path(self.temporary_directory.name)
         self.snapshot_path = self.root / "state" / "clawbar" / "snapshot.json"
         self.command_path = self.root / "openclaw"
-        self.call_log_path = self.root / "calls.jsonl"
         self.notification_path = self.root / "notify-send"
-        self.tailscale_path = self.root / "tailscale"
         self.notification_log_path = self.root / "notifications.jsonl"
         self.command_path.write_text(
             textwrap.dedent(
@@ -33,27 +39,16 @@ class CollectorFixture:
                 import time
 
                 arguments = sys.argv[1:]
-
-                def maybe_write_oversize_output(environment_name):
-                    if environment_name not in os.environ:
-                        return
-                    remaining = int(os.environ[environment_name])
-                    while remaining:
-                        written = min(65536, remaining)
-                        os.write(sys.stdout.fileno(), b"x" * written)
-                        remaining -= written
-                    raise SystemExit(0)
+                scenario = os.environ.get("FAKE_SCENARIO", "local")
 
                 pid_path = os.environ.get("FAKE_PID_PATH")
                 if pid_path:
                     with open(pid_path, "w", encoding="utf-8") as pid_file:
                         pid_file.write(str(os.getpid()))
-                with open(os.environ["FAKE_CALL_LOG"], "a", encoding="utf-8") as log:
-                    log.write(json.dumps(arguments) + "\\n")
 
                 if arguments[:3] == ["node", "status", "--json"]:
                     time.sleep(float(os.environ.get("FAKE_NODE_DELAY", "0")))
-                    if os.environ.get("FAKE_SCENARIO") == "node_host":
+                    if scenario == "node_host":
                         print(json.dumps({
                             "service": {
                                 "loaded": True,
@@ -75,75 +70,18 @@ class CollectorFixture:
                         }))
                     raise SystemExit(0)
 
-                if arguments[:2] == ["gateway", "status"] and "FAKE_GATEWAY_OUTPUT_BYTES" in os.environ:
-                    maybe_write_oversize_output("FAKE_GATEWAY_OUTPUT_BYTES")
-
-                if arguments[:3] == ["nodes", "status", "--json"]:
-                    maybe_write_oversize_output("FAKE_NODES_OUTPUT_BYTES")
-
-                if arguments[:3] == ["gateway", "call", "agents.list"]:
-                    maybe_write_oversize_output("FAKE_AGENTS_OUTPUT_BYTES")
-
-                if arguments[:3] == ["gateway", "call", "tasks.list"]:
-                    maybe_write_oversize_output("FAKE_TASKS_OUTPUT_BYTES")
-
-                if arguments[:3] == ["nodes", "status", "--json"]:
-                    time.sleep(float(os.environ.get("FAKE_NODES_DELAY", "0")))
-                    output = os.environ.get("FAKE_NODES")
-                    if output is None:
-                        output = json.dumps({"nodes": []})
-                    sys.stdout.write(output)
-                    raise SystemExit(int(os.environ.get("FAKE_NODES_EXIT", "0")))
-
-                if arguments[:3] == ["gateway", "call", "agents.list"]:
-                    output = os.environ.get("FAKE_AGENTS")
-                    if output is None:
-                        output = json.dumps({"agents": []})
-                    sys.stdout.write(output)
-                    raise SystemExit(int(os.environ.get("FAKE_AGENTS_EXIT", "0")))
-
-                if arguments[:3] == ["gateway", "call", "tasks.list"]:
-                    output = os.environ.get("FAKE_TASKS")
-                    if output is None:
-                        output = json.dumps({"tasks": []})
-                    sys.stdout.write(output)
-                    raise SystemExit(int(os.environ.get("FAKE_TASKS_EXIT", "0")))
-
-                if arguments[:3] == ["gateway", "call", "cron.list"]:
-                    time.sleep(float(os.environ.get("FAKE_AUTOMATIONS_DELAY", "0")))
-                    pages = os.environ.get("FAKE_AUTOMATION_PAGES")
-                    if pages is not None:
-                        params = json.loads(arguments[arguments.index("--params") + 1])
-                        output = json.dumps(json.loads(pages)[str(params["offset"])])
-                    else:
-                        output = os.environ.get("FAKE_AUTOMATIONS")
-                        if output is None:
-                            output = json.dumps({"jobs": []})
-                    sys.stdout.write(output)
-                    raise SystemExit(int(os.environ.get("FAKE_AUTOMATIONS_EXIT", "0")))
-
                 if arguments[:2] == ["gateway", "status"]:
                     time.sleep(float(os.environ.get("FAKE_GATEWAY_DELAY", "0")))
-                    scenario = os.environ.get("FAKE_SCENARIO", "local")
-                    candidate_mode = os.environ.get("FAKE_CANDIDATE_MODE", "healthy")
-                    if "--url" in arguments and scenario == "unresolved":
-                        if candidate_mode == "unsupported":
-                            sys.stdout.write(json.dumps({"rpc": {"ok": False}}))
-                        elif candidate_mode == "failed":
-                            raise SystemExit(9)
-                        else:
-                            dialed_url = arguments[arguments.index("--url") + 1]
-                            reported_url = os.environ.get("FAKE_REPORTED_URL", dialed_url)
-                            sys.stdout.write(json.dumps({"rpc": {"ok": True, "url": reported_url}}))
+                    oversize = os.environ.get("FAKE_GATEWAY_OUTPUT_BYTES")
+                    if oversize is not None:
+                        remaining = int(oversize)
+                        while remaining:
+                            written = min(65536, remaining)
+                            os.write(sys.stdout.fileno(), b"x" * written)
+                            remaining -= written
                         raise SystemExit(0)
-                    if scenario in {"node_host", "unresolved"} and "--url" not in arguments:
-                        if scenario == "unresolved":
-                            sys.stdout.write(json.dumps({
-                                "service": {"loaded": False, "runtime": {"status": "stopped"}},
-                                "rpc": {"ok": False, "url": "ws://127.0.0.1:18789"}
-                            }))
-                        else:
-                            sys.stdout.write("connection broken")
+                    if scenario == "node_host" and "--url" not in arguments:
+                        sys.stdout.write("connection broken")
                         sys.stderr.write("invalid token")
                         raise SystemExit(9)
                     sys.stderr.write(os.environ.get("FAKE_STDERR", ""))
@@ -151,13 +89,24 @@ class CollectorFixture:
                     if output is None:
                         if scenario == "node_host":
                             url = arguments[arguments.index("--url") + 1]
-                        elif scenario == "configured_remote":
-                            url = "wss://configured-gateway.example.test:18789"
                         else:
                             url = "ws://127.0.0.1:18789"
                         output = json.dumps({"rpc": {"ok": True, "url": url}})
                     sys.stdout.write(output)
                     raise SystemExit(int(os.environ.get("FAKE_EXIT", "0")))
+
+                if arguments[:3] == ["nodes", "status", "--json"]:
+                    sys.stdout.write(json.dumps({"nodes": []}))
+                    raise SystemExit(0)
+                if arguments[:3] == ["gateway", "call", "agents.list"]:
+                    sys.stdout.write(json.dumps({"agents": []}))
+                    raise SystemExit(0)
+                if arguments[:3] == ["gateway", "call", "tasks.list"]:
+                    sys.stdout.write(json.dumps({"tasks": []}))
+                    raise SystemExit(0)
+                if arguments[:3] == ["gateway", "call", "cron.list"]:
+                    sys.stdout.write(json.dumps({"jobs": []}))
+                    raise SystemExit(0)
 
                 raise SystemExit(64)
                 """
@@ -181,37 +130,13 @@ class CollectorFixture:
             encoding="utf-8",
         )
         self.notification_path.chmod(0o755)
-        self.tailscale_path.write_text(
-            textwrap.dedent(
-                """\
-                #!/usr/bin/env python3
-                import json
-                import os
-                import sys
-                import time
-
-                with open(os.environ["FAKE_CALL_LOG"], "a", encoding="utf-8") as log:
-                    log.write(json.dumps(["tailscale", *sys.argv[1:]]) + "\\n")
-                time.sleep(float(os.environ.get("FAKE_TAILSCALE_DELAY", "0")))
-                output = os.environ.get("FAKE_TAILSCALE_STATUS")
-                if output is not None:
-                    sys.stdout.write(output)
-                raise SystemExit(int(os.environ.get("FAKE_TAILSCALE_EXIT", "0")))
-                """
-            ),
-            encoding="utf-8",
-        )
-        self.tailscale_path.chmod(0o755)
 
     @contextlib.contextmanager
     def fake_environment(self, **values: str):
         updates = {
-            "FAKE_CALL_LOG": str(self.call_log_path),
             "FAKE_SCENARIO": "local",
             "FAKE_NODE_DELAY": "0",
-            "FAKE_NODES_DELAY": "0",
             "FAKE_GATEWAY_DELAY": "0",
-            "FAKE_AUTOMATIONS_DELAY": "0",
             "FAKE_STDERR": "diagnostic output is ignored",
             "FAKE_NOTIFICATION_LOG": str(self.notification_log_path),
             "FAKE_NOTIFICATION_EXIT": "0",
@@ -229,38 +154,6 @@ class CollectorFixture:
                     os.environ.pop(name, None)
                 else:
                     os.environ[name] = value
-
-    def run_collector(
-        self,
-        *,
-        stdout: str | None = None,
-        stderr: str = "diagnostic output is ignored",
-        exit_code: int = 0,
-        node_delay: float = 0,
-        nodes_delay: float = 0,
-        gateway_delay: float = 0,
-        deadline: float = 1,
-        scenario: str = "local",
-    ) -> clawbar_collect.CollectionResult:
-        values = {
-            "FAKE_EXIT": str(exit_code),
-            "FAKE_NODE_DELAY": str(node_delay),
-            "FAKE_NODES_DELAY": str(nodes_delay),
-            "FAKE_GATEWAY_DELAY": str(gateway_delay),
-            "FAKE_STDERR": stderr,
-            "FAKE_AUTOMATIONS_DELAY": "0",
-            "FAKE_SCENARIO": scenario,
-        }
-        if stdout is not None:
-            values["FAKE_STDOUT"] = stdout
-        with self.fake_environment(**values):
-            return clawbar_collect.collect_gateway(
-                self.snapshot_path,
-                refresh_interval=30,
-                commands=clawbar_commands.SubprocessCommandSurface(openclaw=(str(self.command_path),)),
-                collection_deadline=deadline,
-                local_key_secret=b"clawbar-test-node-key-secret-32!",
-            )
 
     def collect(
         self,
@@ -297,7 +190,6 @@ class CollectorFixture:
                 "PATH": f"{self.root}{os.pathsep}{environment['PATH']}",
                 "XDG_STATE_HOME": str(self.root / "external-state"),
                 "XDG_RUNTIME_DIR": str(self.root / "runtime"),
-                "FAKE_CALL_LOG": str(self.call_log_path),
                 "FAKE_SCENARIO": scenario,
                 "FAKE_NOTIFICATION_LOG": str(self.notification_log_path),
                 "FAKE_NOTIFICATION_EXIT": "0",
@@ -321,9 +213,6 @@ class CollectorFixture:
 
     def read_snapshot(self) -> dict[str, object]:
         return json.loads(self.snapshot_path.read_text(encoding="utf-8"))
-
-    def read_calls(self) -> list[list[str]]:
-        return [json.loads(line) for line in self.call_log_path.read_text(encoding="utf-8").splitlines()]
 
     def read_notifications(self) -> list[list[str]]:
         try:
