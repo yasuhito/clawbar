@@ -2,135 +2,57 @@
 
 from __future__ import annotations
 
-import ctypes
 import ipaddress
 import json
-import os
-import selectors
-import signal
 import subprocess
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
 from urllib.parse import urlsplit
 
 if __package__:
-    from .clawbar_bounds import MAX_COLLECTION_BYTES
+    from .clawbar_commands import (
+        TAILSCALE_COMMAND,
+        CollectionDeadlineExceeded,
+        CommandOutputExceeded,
+        MAX_COMMAND_STREAM_BYTES,
+        run_command,
+        seconds_until_deadline,
+    )
     from .clawbar_metadata import opaque_candidate_key
     from .clawbar_snapshot import atomic_write_snapshot, last_known_metadata, load_snapshot, snapshot_envelope
 else:
-    from clawbar_bounds import MAX_COLLECTION_BYTES
+    from clawbar_commands import (
+        TAILSCALE_COMMAND,
+        CollectionDeadlineExceeded,
+        CommandOutputExceeded,
+        MAX_COMMAND_STREAM_BYTES,
+        run_command,
+        seconds_until_deadline,
+    )
     from clawbar_metadata import opaque_candidate_key
     from clawbar_snapshot import atomic_write_snapshot, last_known_metadata, load_snapshot, snapshot_envelope
 
+# CollectionDeadlineExceeded / CommandOutputExceeded / MAX_COMMAND_STREAM_BYTES / run_command
+# は clawbar_commands に移した。既存の呼び出し側とテストのためにここでも再公開する。
+__all__ = [
+    "CollectionDeadlineExceeded",
+    "CommandOutputExceeded",
+    "MAX_COMMAND_STREAM_BYTES",
+    "run_command",
+    "seconds_until_deadline",
+]
+
 GATEWAY_PORT = 18789
-TAILSCALE_COMMAND = ("tailscale",)
 SETUP_GUIDANCE = "Choose a Tailscale device to verify as your OpenClaw Gateway."
 NO_TAILSCALE_GUIDANCE = "Connect Tailscale on this device, then refresh to find Gateway candidates."
 KEY_SECRET_ERROR = "Clawbar cannot derive private Gateway Candidate Keys. Repair its local key secret."
-PR_SET_PDEATHSIG = 1
-MAX_COMMAND_STREAM_BYTES = MAX_COLLECTION_BYTES
-COMMAND_READ_CHUNK_BYTES = 64 * 1024
 
 
 @dataclass(frozen=True)
 class GatewayTarget:
     url: str
     source: str
-
-
-class CollectionDeadlineExceeded(Exception):
-    pass
-
-
-class CommandOutputExceeded(OSError):
-    pass
-
-
-def seconds_until_deadline(deadline_at: float) -> float:
-    seconds = deadline_at - time.monotonic()
-    if seconds <= 0:
-        raise CollectionDeadlineExceeded
-    return seconds
-
-
-def run_command(command: Sequence[str], deadline_at: float) -> subprocess.CompletedProcess[str]:
-    process = subprocess.Popen(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        start_new_session=True,
-        preexec_fn=terminate_with_parent,
-    )
-    stdout = bytearray()
-    stderr = bytearray()
-    selector = selectors.DefaultSelector()
-    assert process.stdout is not None
-    assert process.stderr is not None
-    selector.register(process.stdout, selectors.EVENT_READ, stdout)
-    selector.register(process.stderr, selectors.EVENT_READ, stderr)
-    try:
-        while selector.get_map():
-            events = selector.select(seconds_until_deadline(deadline_at))
-            for key, _ in events:
-                output = key.data
-                chunk = os.read(
-                    key.fd,
-                    min(COMMAND_READ_CHUNK_BYTES, MAX_COMMAND_STREAM_BYTES + 1 - len(output)),
-                )
-                if not chunk:
-                    selector.unregister(key.fileobj)
-                    continue
-                output.extend(chunk)
-                if len(output) > MAX_COMMAND_STREAM_BYTES:
-                    raise CommandOutputExceeded(
-                        f"Command output exceeds {MAX_COMMAND_STREAM_BYTES} bytes"
-                    )
-        return_code = process.wait(timeout=seconds_until_deadline(deadline_at))
-    except (subprocess.TimeoutExpired, CollectionDeadlineExceeded) as error:
-        stop_process_group(process)
-        raise CollectionDeadlineExceeded from error
-    except BaseException:
-        stop_process_group(process)
-        raise
-    finally:
-        selector.close()
-        process.stdout.close()
-        process.stderr.close()
-    return subprocess.CompletedProcess(
-        command,
-        return_code,
-        stdout.decode("utf-8", errors="replace"),
-        stderr.decode("utf-8", errors="replace"),
-    )
-
-
-def terminate_with_parent() -> None:
-    libc = ctypes.CDLL(None, use_errno=True)
-    if libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM, 0, 0, 0) != 0:
-        error_number = ctypes.get_errno()
-        raise OSError(error_number, os.strerror(error_number))
-    if os.getppid() == 1:
-        os.kill(os.getpid(), signal.SIGTERM)
-
-
-def stop_process_group(process: subprocess.Popen[str]) -> None:
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
-    if process.poll() is None:
-        try:
-            process.wait(timeout=0.25)
-        except subprocess.TimeoutExpired:
-            pass
-    try:
-        os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
-    if process.poll() is None:
-        process.wait()
 
 
 def command_option(arguments: Sequence[str], option: str) -> str | None:
