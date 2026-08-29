@@ -2,15 +2,14 @@ const test = require("node:test")
 const assert = require("node:assert/strict")
 const Snapshot = require("../ClawbarSnapshot.js")
 const Presentation = require("../ClawbarPresentation.js")
+const snapshotFixtures = require("./fixtures/snapshots.json")
 
 function healthySnapshot(generatedAt, refreshIntervalSeconds = 30) {
-  return {
-    schemaVersion: 1,
-    generatedAt,
-    refreshIntervalSeconds,
-    resolutionSource: "local",
-    gateway: { state: "healthy" }
-  }
+  const snapshot = structuredClone(snapshotFixtures.healthy)
+  snapshot.generatedAt = generatedAt
+  snapshot.lastSuccessAt = generatedAt
+  snapshot.refreshIntervalSeconds = refreshIntervalSeconds
+  return snapshot
 }
 
 function operationalSnapshot() {
@@ -64,6 +63,7 @@ test("panel rows preserve Gateway order and keyboard focus wraps", () => {
     available: true,
     items: [{ key: "agent:planner", name: "planner" }, { key: "agent:builder", name: "builder" }]
   }
+  snapshot.automations = { available: true, items: [] }
 
   const sections = Presentation.panelSections(Snapshot.sectionData(snapshot, "healthy"))
   const keys = Presentation.sectionKeys(sections)

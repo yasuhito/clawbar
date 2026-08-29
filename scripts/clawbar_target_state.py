@@ -7,15 +7,17 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 if __package__:
-    from .clawbar_snapshot import atomic_write_snapshot, load_snapshot
+    from .clawbar_snapshot import atomic_write_snapshot, read_json_document
 else:
-    from clawbar_snapshot import atomic_write_snapshot, load_snapshot
+    from clawbar_snapshot import atomic_write_snapshot, read_json_document
+
+
+VERIFIED_TARGET_SCHEMA_VERSION = 1
 
 
 @dataclass(frozen=True)
 class GatewayTargetState:
     snapshot_path: Path
-    schema_version: int
 
     @property
     def verified_fallback_path(self) -> Path:
@@ -30,15 +32,19 @@ class GatewayTargetState:
         atomic_write_snapshot(
             self.verified_fallback_path,
             {
-                "schemaVersion": self.schema_version,
+                "schemaVersion": VERIFIED_TARGET_SCHEMA_VERSION,
                 "source": "tailscale",
                 "url": url,
             },
         )
 
     def load_verified_fallback(self) -> str | None:
-        state = load_snapshot(self.verified_fallback_path, self.schema_version)
-        if not state or state.get("source") != "tailscale":
+        state = read_json_document(self.verified_fallback_path)
+        if (
+            not state
+            or state.get("schemaVersion") != VERIFIED_TARGET_SCHEMA_VERSION
+            or state.get("source") != "tailscale"
+        ):
             return None
         url = state.get("url")
         return url if isinstance(url, str) and _safe_gateway_url(url) else None

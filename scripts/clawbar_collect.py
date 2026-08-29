@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Callable, Sequence
 
 if __package__:
+    from . import clawbar_snapshot as snapshot_contract
     from .clawbar_automation import collect_automation_surface
     from .clawbar_commands import (
         CollectionDeadlineExceeded,
@@ -23,34 +24,26 @@ if __package__:
         SubprocessCommandSurface,
     )
     from .clawbar_gateway import (
+        SETUP_GUIDANCE,
         GatewayTarget,
         automatic_resolution_missing,
         discover_node_host,
         resolution_source,
-        retained_setup_candidates,
         selected_candidate,
         setup_required_snapshot,
         setup_retry_snapshot,
-        setup_section,
     )
     from .clawbar_incidents import process_incident_transitions
-    from .clawbar_metadata import (
-        OUTPUT_EXCEEDED_LIMIT,
-        build_current_snapshot,
-        load_local_key_secret,
-        sanitize_metadata,
-    )
+    from .clawbar_metadata import OUTPUT_EXCEEDED_LIMIT, load_local_key_secret, sanitize_metadata
     from .clawbar_snapshot import (
+        SnapshotBuilder,
         atomic_write_snapshot,
-        build_failure_snapshot,
-        last_known_metadata,
-        snapshot_envelope,
-        load_snapshot,
         read_bounded_regular_file,
-        utc_now,
+        read_json_document,
     )
     from .clawbar_target_state import GatewayTargetState
 else:
+    import clawbar_snapshot as snapshot_contract
     from clawbar_automation import collect_automation_surface
     from clawbar_commands import (
         CollectionDeadlineExceeded,
@@ -60,41 +53,30 @@ else:
         SubprocessCommandSurface,
     )
     from clawbar_gateway import (
+        SETUP_GUIDANCE,
         GatewayTarget,
         automatic_resolution_missing,
         discover_node_host,
         resolution_source,
-        retained_setup_candidates,
         selected_candidate,
         setup_required_snapshot,
         setup_retry_snapshot,
-        setup_section,
     )
     from clawbar_incidents import process_incident_transitions
-    from clawbar_metadata import (
-        OUTPUT_EXCEEDED_LIMIT,
-        build_current_snapshot,
-        load_local_key_secret,
-        sanitize_metadata,
-    )
+    from clawbar_metadata import OUTPUT_EXCEEDED_LIMIT, load_local_key_secret, sanitize_metadata
     from clawbar_snapshot import (
+        SnapshotBuilder,
         atomic_write_snapshot,
-        build_failure_snapshot,
-        last_known_metadata,
-        snapshot_envelope,
-        load_snapshot,
         read_bounded_regular_file,
-        utc_now,
+        read_json_document,
     )
     from clawbar_target_state import GatewayTargetState
 
-SCHEMA_VERSION = 1
 DEFAULT_REFRESH_INTERVAL_SECONDS = 30
 MIN_REFRESH_INTERVAL_SECONDS = 15
 MAX_REFRESH_INTERVAL_SECONDS = 300
 COLLECTION_DEADLINE_SECONDS = 12.0
 SNAPSHOT_WRITE_RESERVE_SECONDS = 0.5
-RESOLUTION_SOURCES = frozenset({"local", "configured_remote", "node_host", "tailscale"})
 
 
 class ExitCode(IntEnum):
@@ -165,7 +147,10 @@ def parse_refresh_interval(value: str) -> int:
 
 
 def load_previous_snapshot(path: Path) -> dict[str, Any] | None:
-    return load_snapshot(path, SCHEMA_VERSION)
+    snapshot = read_json_document(path)
+    if snapshot is None or snapshot.get("schemaVersion") != snapshot_contract.SCHEMA_VERSION:
+        return None
+    return snapshot
 
 
 def print_bounded_text_file(path: Path) -> ExitCode:
@@ -177,33 +162,16 @@ def print_bounded_text_file(path: Path) -> ExitCode:
     return ExitCode.OK
 
 
-def configuration_error_snapshot(
+def configuration_error_source(
     previous: dict[str, Any] | None,
-    refresh_interval: int,
     status: dict[str, Any],
     source_hint: str | None,
-) -> dict[str, Any]:
-    last_success = previous.get("lastSuccessAt") if previous else None
+) -> str | None:
     source = resolution_source(status, source_hint)
-    if source is None and previous:
-        previous_source = previous.get("resolutionSource")
-        source = previous_source if previous_source in RESOLUTION_SOURCES else None
-    snapshot = snapshot_envelope(
-        SCHEMA_VERSION,
-        refresh_interval,
-        source or "unresolved",
-        "configuration_error",
-        last_success if isinstance(last_success, str) else None,
-        0,
-    )
-    snapshot["failureKind"] = "unsupported_json"
-    retained = last_known_metadata(previous)
-    if retained is not None:
-        snapshot["lastKnown"] = retained
-    return snapshot
-
-
-
+    if source is not None:
+        return source
+    previous_source = previous.get("resolutionSource") if previous else None
+    return previous_source if previous_source in snapshot_contract.RESOLUTION_SOURCES else None
 
 
 
@@ -223,13 +191,7 @@ def publish_failure(
     return publish(
         snapshot_path,
         exit_code,
-        build_failure_snapshot(
-            previous,
-            refresh_interval,
-            failure_kind,
-            SCHEMA_VERSION,
-            RESOLUTION_SOURCES,
-        ),
+        SnapshotBuilder(previous, refresh_interval).failure(failure_kind),
     )
 
 
@@ -287,7 +249,7 @@ def publish_current(
     snapshot: dict[str, Any],
     target: GatewayTarget | None,
 ) -> CollectionResult:
-    target_state = GatewayTargetState(snapshot_path, SCHEMA_VERSION)
+    target_state = GatewayTargetState(snapshot_path)
     if target is not None and target.source == "tailscale":
         target_state.record_verified_fallback(target.url)
     target_state.discard_legacy_current_target()
@@ -307,9 +269,7 @@ def candidate_retry(
         snapshot_path,
         exit_code,
         setup_retry_snapshot(
-            previous,
-            refresh_interval,
-            SCHEMA_VERSION,
+            SnapshotBuilder(previous, refresh_interval),
             failure_kind,
             guidance,
         ),
@@ -335,10 +295,7 @@ def resolve_target(
         automatic_setup_required = automatic_resolution_missing(completed)
         target = discover_node_host(commands, command_deadline_at)
         if target is None:
-            verified_url = GatewayTargetState(
-                snapshot_path,
-                SCHEMA_VERSION,
-            ).load_verified_fallback()
+            verified_url = GatewayTargetState(snapshot_path).load_verified_fallback()
             target = GatewayTarget(verified_url, "tailscale") if verified_url else None
         if target is not None:
             completed = commands.gateway_status(command_deadline_at, target.url)
@@ -358,16 +315,13 @@ def decode_status_or_fail(
     戻り値は CollectionResult ならここで確定（呼び出し側は即 return）。
     (status, source) なら収集へ続行する。
     """
+    builder = SnapshotBuilder(previous, refresh_interval)
     try:
         status = json.loads(completed.stdout)
     except json.JSONDecodeError:
         if candidate_key:
-            snapshot = configuration_error_snapshot(previous, refresh_interval, {}, None)
-            snapshot["failureKind"] = "malformed_json"
-            snapshot["setup"] = setup_section(
-                retained_setup_candidates(previous),
-                CANDIDATE_UNSUPPORTED_GUIDANCE,
-            )
+            setup = (None, SETUP_GUIDANCE, CANDIDATE_UNSUPPORTED_GUIDANCE)
+            snapshot = builder.configuration_error(None, "malformed_json", setup)
             return publish(snapshot_path, ExitCode.MALFORMED_JSON, snapshot)
         return publish_failure(
             snapshot_path,
@@ -381,17 +335,12 @@ def decode_status_or_fail(
         status = {}
     source = resolution_source(status, target.source if target else None)
     if source is None:
-        snapshot = configuration_error_snapshot(
-            previous,
-            refresh_interval,
-            status,
-            target.source if target else None,
+        setup = (None, SETUP_GUIDANCE, CANDIDATE_UNSUPPORTED_GUIDANCE) if candidate_key else None
+        snapshot = builder.configuration_error(
+            configuration_error_source(previous, status, target.source if target else None),
+            "unsupported_json",
+            setup,
         )
-        if candidate_key:
-            snapshot["setup"] = setup_section(
-                retained_setup_candidates(previous),
-                CANDIDATE_UNSUPPORTED_GUIDANCE,
-            )
         return publish(snapshot_path, ExitCode.UNSUPPORTED_JSON, snapshot)
     return status, source
 
@@ -414,7 +363,7 @@ def collect_gateway(
         secret = local_key_secret or load_local_key_secret()
     except OSError:
         secret = None
-    target = selected_candidate(snapshot_path, candidate_key, SCHEMA_VERSION) if candidate_key else None
+    target = selected_candidate(snapshot_path, candidate_key) if candidate_key else None
 
     if candidate_key and target is None:
         return candidate_retry(
@@ -489,10 +438,8 @@ def collect_gateway(
                 ExitCode.OK,
                 setup_required_snapshot(
                     snapshot_path,
-                    previous,
-                    refresh_interval,
+                    SnapshotBuilder(previous, refresh_interval),
                     command_deadline_at,
-                    SCHEMA_VERSION,
                     secret,
                     commands,
                 ),
@@ -531,21 +478,14 @@ def collect_gateway(
         automation_payload,
         secret,
     )
-    snapshot = build_current_snapshot(
-        SCHEMA_VERSION,
-        utc_now(),
-        refresh_interval,
+    snapshot = SnapshotBuilder(previous, refresh_interval).current(
         source,
         fleet,
         agents,
         automations,
         automation_failure,
-        metadata_failures=metadata_failures,
+        metadata_failures,
     )
-    if fleet is None:
-        retained = last_known_metadata(previous)
-        if retained and retained.get("fleet", {}).get("available") is True:
-            snapshot["lastKnown"] = retained
     return publish_current(snapshot_path, snapshot, target)
 
 

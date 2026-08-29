@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import Any
 
 if __package__:
-    from .clawbar_snapshot import atomic_write_snapshot, load_snapshot
+    from .clawbar_snapshot import atomic_write_snapshot, read_json_document
 else:
-    from clawbar_snapshot import atomic_write_snapshot, load_snapshot
+    from clawbar_snapshot import atomic_write_snapshot, read_json_document
 
 INCIDENT_STATE_SCHEMA_VERSION = 1
 NOTIFICATION_TIMEOUT_SECONDS = 0.25
@@ -149,7 +149,9 @@ def process_incident_transitions(snapshot: dict[str, Any]) -> None:
         lock_descriptor = os.open(state_path.with_suffix(".lock"), os.O_RDWR | os.O_CREAT, 0o600)
         with os.fdopen(lock_descriptor, "r+") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
-            previous = load_snapshot(state_path, INCIDENT_STATE_SCHEMA_VERSION)
+            previous = read_json_document(state_path)
+            if previous and previous.get("schemaVersion") != INCIDENT_STATE_SCHEMA_VERSION:
+                previous = None
             state, starts, recoveries = reconcile_incidents(snapshot, previous)
             atomic_write_snapshot(state_path, state)
             dispatch_notification(starts, recovered=False)

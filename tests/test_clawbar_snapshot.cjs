@@ -2,15 +2,14 @@ const test = require("node:test")
 const assert = require("node:assert/strict")
 const Snapshot = require("../ClawbarSnapshot.js")
 const Presentation = require("../ClawbarPresentation.js")
+const snapshotFixtures = require("./fixtures/snapshots.json")
 
 function healthySnapshot(generatedAt, refreshIntervalSeconds = 30) {
-  return {
-    schemaVersion: 1,
-    generatedAt,
-    refreshIntervalSeconds,
-    resolutionSource: "local",
-    gateway: { state: "healthy" }
-  }
+  const snapshot = structuredClone(snapshotFixtures.healthy)
+  snapshot.generatedAt = generatedAt
+  snapshot.lastSuccessAt = generatedAt
+  snapshot.refreshIntervalSeconds = refreshIntervalSeconds
+  return snapshot
 }
 
 test("configuration errors render distinctly", () => {
@@ -19,6 +18,18 @@ test("configuration errors render distinctly", () => {
 
   assert.equal(Snapshot.snapshotState(snapshot, 100000), "configuration_error")
   assert.equal(Presentation.summary("configuration_error", "local"), "OpenClaw Gateway configuration error")
+})
+
+test("configuration errors use the same Snapshot shape as other failures", () => {
+  const snapshot = structuredClone(snapshotFixtures["configuration-error"])
+
+  for (const section of ["fleet", "agents", "automations"]) {
+    assert.deepEqual(snapshot[section], {
+      available: false,
+      [section === "fleet" ? "nodes" : "items"]: []
+    })
+  }
+  assert.deepEqual(snapshot.bar, { kind: "attention", count: 1, severity: "critical" })
 })
 
 test("healthy snapshots become stale after three refresh intervals", () => {

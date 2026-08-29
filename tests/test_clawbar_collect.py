@@ -16,6 +16,7 @@ from pathlib import Path
 
 from scripts import clawbar_collect, clawbar_commands, clawbar_gateway, clawbar_metadata, clawbar_snapshot
 from scripts.clawbar_commands import CollectionDeadlineExceeded, CommandOutputExceeded, SubprocessCommandSurface
+from scripts.clawbar_snapshot import SCHEMA_VERSION
 from tests.collector_fixture import CollectorFixture
 from tests.fake_commands import (
     LOCAL_GATEWAY_URL,
@@ -113,7 +114,7 @@ class BoundedInputTests(unittest.TestCase):
             link = root / "snapshot.json"
             link.symlink_to(target)
 
-            self.assertIsNone(clawbar_snapshot.load_snapshot(link, 1))
+            self.assertIsNone(clawbar_snapshot.read_json_document(link))
 
     def test_snapshot_reader_rejects_files_over_the_limit(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -121,7 +122,7 @@ class BoundedInputTests(unittest.TestCase):
             with snapshot.open("wb") as output:
                 output.truncate(clawbar_snapshot.MAX_STATE_FILE_BYTES + 1)
 
-            self.assertIsNone(clawbar_snapshot.load_snapshot(snapshot, 1))
+            self.assertIsNone(clawbar_snapshot.read_json_document(snapshot))
 
     def test_snapshot_reader_rejects_fifo_without_waiting_for_a_writer(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -133,8 +134,8 @@ class BoundedInputTests(unittest.TestCase):
                     "-c",
                     (
                         "from pathlib import Path; "
-                        "from scripts.clawbar_snapshot import load_snapshot; "
-                        "print(load_snapshot(Path(r'" + str(fifo) + "'), 1))"
+                        "from scripts.clawbar_snapshot import read_json_document; "
+                        "print(read_json_document(Path(r'" + str(fifo) + "')))"
                     ),
                 ],
                 cwd=Path(__file__).resolve().parents[1],
@@ -647,7 +648,7 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         self.state_directory.mkdir(parents=True)
         clawbar_gateway.candidate_state_path(self.snapshot_path).write_text(
             json.dumps({
-                "schemaVersion": clawbar_collect.SCHEMA_VERSION,
+                "schemaVersion": SCHEMA_VERSION,
                 "candidates": {candidate_key: {"url": ALPHA_URL}},
             }),
             encoding="utf-8",
@@ -664,7 +665,7 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
     def test_a_verified_fallback_is_dialed_once_when_automatic_resolution_is_missing(self) -> None:
         self.state_directory.mkdir(parents=True)
         (self.state_directory / "gateway-verified-target.json").write_text(
-            json.dumps({"schemaVersion": clawbar_collect.SCHEMA_VERSION, "source": "tailscale", "url": ALPHA_URL}),
+            json.dumps({"schemaVersion": SCHEMA_VERSION, "source": "tailscale", "url": ALPHA_URL}),
             encoding="utf-8",
         )
         commands = FakeCommandSurface.healthy(
@@ -717,7 +718,10 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
             snapshot["setup"]["guidance"],
             "Choose a Tailscale device to verify as your OpenClaw Gateway.",
         )
-        self.assertEqual(snapshot["bar"], {"count": 0, "severity": "warning"})
+        self.assertEqual(
+            snapshot["bar"],
+            {"kind": "none", "count": 0, "severity": "warning"},
+        )
         serialized = json.dumps(snapshot)
         self.assertNotIn("PRIVATE-", serialized)
         self.assertNotIn("gateway-alpha.example.ts.net", serialized)
@@ -889,7 +893,7 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         candidate_key = "candidate:test"
         (self.state_directory / "gateway-candidates.json").write_text(
             json.dumps({
-                "schemaVersion": clawbar_collect.SCHEMA_VERSION,
+                "schemaVersion": SCHEMA_VERSION,
                 "candidates": {candidate_key: {"url": "wss://gateway-alpha.example.ts.net:18789"}},
             }),
             encoding="utf-8",
