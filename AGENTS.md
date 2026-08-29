@@ -4,103 +4,29 @@
 
 ### Issue tracker
 
-Issues are tracked with Beads Rust (`br`) in this repository. See `docs/agents/issue-tracker.md`.
+課題は GitHub Issues で管理する。外部 Pull request は triage 対象にしない。詳細は `docs/agents/issue-tracker.md` を参照する。
 
 ### Triage labels
 
-Use the canonical triage labels stored in Beads. See `docs/agents/triage-labels.md`.
+Matt 系スキルの標準 triage 役割は、同名の GitHub label に対応させる。詳細は `docs/agents/triage-labels.md` を参照する。
 
 ### Domain docs
 
-This repository uses a single-context domain-doc layout. See `docs/agents/domain.md`.
+このリポジトリは single-context として扱い、ルートの `CONTEXT.md` と `docs/adr/` を使う。詳細は `docs/agents/domain.md` を参照する。
 
-<!-- bv-agent-instructions-v3 -->
+## GitHub issue 規則
 
----
+- GitHub issue を作成するとき、タイトルは日本語にする。
+- 自動実装に渡す issue は、本文に実装契約を書く。`## 実装内容`、`## 受け入れ基準`、`## 対象外` の 3 節を必ず置く。
+- 親子関係や依存関係は、本文ではなく GitHub の Relationships metadata（sub-issue、blocked by）に入れる。
 
-## Beads Workflow Integration
+## 検証規則
 
-This project uses [beads_rust](https://github.com/Dicklesworthstone/beads_rust) (`br`) for issue tracking and [beads_viewer](https://github.com/Dicklesworthstone/beads_viewer) (`bv`) for graph-aware triage. Issues are stored in `.beads/` and tracked in git. Current `br` workspaces normally export `.beads/issues.jsonl`; older `bd`/legacy workspaces may use `.beads/beads.jsonl`. `bv` auto-discovers the supported JSONL files, so agents should use `br`/`bv` commands instead of hard-coding a single filename.
+- commit や push の前には、全体チェック `scripts/check` を最新状態で通す。
+- 部分的なテストや前回の成功結果ではなく、その時点の作業木に対する最新の実行結果を確認する。
 
-### Using bv as an AI sidecar
+## 自動化ループ
 
-bv is a graph-aware triage engine for Beads projects. Instead of parsing .beads/issues.jsonl / .beads/beads.jsonl directly or hallucinating graph traversal, use robot flags for deterministic, dependency-aware outputs with precomputed metrics (PageRank, betweenness, critical path, cycles, HITS, eigenvector, k-core).
-
-**Scope boundary:** bv handles *what to work on* (triage, priority, planning). `br` handles creating, modifying, and closing beads.
-
-**CRITICAL: Use ONLY --robot-* flags. Bare bv launches an interactive TUI that blocks your session.**
-
-#### The Workflow: Start With Triage
-
-**`bv --robot-triage` is your single entry point.** It returns everything you need in one call:
-- `quick_ref`: at-a-glance counts + top 3 picks
-- `recommendations`: ranked actionable items with scores, reasons, unblock info
-- `quick_wins`: low-effort high-impact items
-- `blockers_to_clear`: items that unblock the most downstream work
-- `project_health`: status/type/priority distributions, graph metrics
-- `commands`: copy-paste shell commands for next steps
-
-```bash
-bv --robot-triage        # THE MEGA-COMMAND: start here
-bv --robot-next          # Minimal: just the single top pick + claim command
-
-# Token-optimized output (TOON) for lower LLM context usage:
-bv --robot-triage --format toon
-```
-
-Before claiming, verify current state with `br show <id> --json` or `br ready --json`. `recommendations` can include graph-important blocked or assigned work; only `quick_ref.top_picks` and non-empty `claim_command` fields represent claimable work.
-
-#### Other bv Commands
-
-| Command | Returns |
-|---------|---------|
-| `--robot-plan` | Parallel execution tracks with unblocks lists |
-| `--robot-priority` | Priority misalignment detection with confidence |
-| `--robot-insights` | Full metrics: PageRank, betweenness, HITS, eigenvector, critical path, cycles, k-core |
-| `--robot-alerts` | Stale issues, blocking cascades, priority mismatches |
-| `--robot-suggest` | Hygiene: duplicates, missing deps, label suggestions, cycle breaks |
-| `--robot-diff --diff-since <ref>` | Changes since ref: new/closed/modified issues |
-| `--robot-graph [--graph-format=json\|dot\|mermaid]` | Dependency graph export |
-
-#### Scoping & Filtering
-
-```bash
-bv --robot-plan --label backend              # Scope to label's subgraph
-bv --robot-insights --as-of HEAD~30          # Historical point-in-time
-bv --recipe actionable --robot-plan          # Pre-filter: ready to work (no blockers)
-bv --recipe high-impact --robot-triage       # Pre-filter: top PageRank scores
-```
-
-### br Commands for Issue Management
-
-```bash
-br ready --json                       # Show issues ready to work (no blockers)
-br list --status=open --json          # All open issues
-br show <id> --json                   # Full issue details with dependencies
-br create --title="..." --type=task --priority=2 --json
-br update <id> --status=in_progress --json
-br close <id> --reason="Completed" --json
-br close <id1> <id2> --reason="Completed" --json
-br sync --flush-only                  # Export DB to JSONL after Beads mutations
-```
-
-### Workflow Pattern
-
-1. **Triage**: Run `bv --robot-triage` to find the highest-impact actionable work
-2. **Claim**: Use `br update <id> --status=in_progress --json`
-3. **Work**: Implement the task
-4. **Complete**: Use `br close <id> --reason="Completed" --json`
-5. **Sync**: Run `br sync --flush-only` after Beads mutations so the JSONL export is current
-
-### Key Concepts
-
-- **Dependencies**: Issues can block other issues. `br ready --json` shows only unblocked work.
-- **Priority**: P0=critical, P1=high, P2=medium, P3=low, P4=backlog (use numbers 0-4, not words)
-- **Types**: task, bug, feature, epic, chore, docs, question
-- **Blocking**: `br dep add <issue> <depends-on>` to add dependencies
-
-### Git Policy
-
-`br` never commits or pushes. Follow this repository's own git instructions before staging, committing, or pushing. If the repository says "commit only when asked," that rule overrides any generic workflow advice.
-
-<!-- end-bv-agent-instructions -->
+- Orca automation `clawbar issue coordinator` が `ready-for-agent` と `agent:implement` の両方を持つ issue を worker に渡し、PR を作る。
+- Orca automation `clawbar PR reviewer` が `agent:review` の PR をレビューし、ゲートを通過した場合だけマージする。
+- 自動化に渡したくない issue には `agent:implement` を付けない。`agent:blocked` が付いた issue / PR は人間が原因を確認するまで自動処理されない。
