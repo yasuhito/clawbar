@@ -76,6 +76,10 @@ _Avoid_: Gateway failure, Node failure, skipped run
 An Automation that remains configured but is not scheduled to run. It remains visible by name and last-run time as muted Operational Metadata but never creates an Attention Item or Incident.
 _Avoid_: Automation Failure, unavailable Automation
 
+**Snapshot**:
+The single document one collection publishes for the bar and panel to read: the recorded Gateway state, the Fleet, Agents, and Automations sections, the Attention Item summary, and any Last Known Metadata or fallback candidates. Every Gateway state has exactly one Snapshot shape, shared by live collection, the developer demonstration, and test fixtures.
+_Avoid_: cache, state file, JSON, payload
+
 **Stale Snapshot**:
 A Fleet snapshot whose age exceeds three configured refresh intervals. It no longer establishes current Gateway or Node health.
 _Avoid_: Offline Gateway, Offline Fleet, cached failure
@@ -109,8 +113,8 @@ A connected Gateway that currently reports no Nodes. It is distinct from Gateway
 _Avoid_: Offline Fleet, Gateway Setup Required
 
 **Last Known Metadata**:
-Operational Metadata retained from the last successful Gateway collection. It preserves the last observed state while freshness is expressed separately; it never establishes a current Incident and is excluded from current Fleet counts.
-_Avoid_: Current state, Stale Snapshot
+Operational Metadata retained from the most recent Gateway collection in which every section was available, falling back to the last successful collection; a Degraded Gateway therefore carries earlier complete metadata forward rather than its own partial sections. It preserves the last observed state while freshness is expressed separately; it never establishes a current Incident and is excluded from current Fleet counts.
+_Avoid_: Current state, Stale Snapshot, partial metadata
 
 **Operational Row**:
 A panel row representing exactly one Gateway Candidate, Node, Registered Agent, or Automation. Every Operational Row presents the same selectable summary and expandable detail regardless of kind; selection follows the row's key, never a positional index.
