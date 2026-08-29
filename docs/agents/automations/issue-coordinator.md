@@ -205,9 +205,23 @@ worker_terminal=$(printf '%s' "$terminal_json" | jq -r '.result.terminal.handle 
 # PR review の修正を同じ実装ワーカーへ返せるよう、handle を worktree comment に保存する。
 orca-ide worktree set --worktree path:"$worktree_path" --comment "issue=#<N>; implementer=$worker_terminal" --json
 
+# tui-idle は pi の描画完了より早く返ることがある。pi のフッター（model 名）が出るまで待ってから送る。
 orca-ide terminal wait --terminal "$worker_terminal" --for tui-idle --timeout-ms 300000 --json
+for attempt in $(seq 1 30); do
+  orca-ide terminal read --terminal "$worker_terminal" --json | grep -q 'gpt-5.6-sol' && break
+  sleep 2
+done
 orca-ide terminal send --terminal "$worker_terminal" --text "$IMPLEMENT_PROMPT" --enter --json
+
+# 送信が受理されたか確認する。pi が動き出すと画面に「Working」や tool 実行の行が出る。
+# 30 秒待っても入力欄が空のまま idle なら、1 回だけ再送する。
+sleep 30
+if ! orca-ide terminal read --terminal "$worker_terminal" --json | grep -Eq 'Working|Issue #<N>|esc.*interrupt.*working'; then
+  orca-ide terminal send --terminal "$worker_terminal" --text "$IMPLEMENT_PROMPT" --enter --json
+fi
 ```
+
+送信テキストが pi の初期化中に捨てられる競合が実際に起きたことがある（2026-08-29 run #1）。フッター待ちと 1 回の再送を省略しない。
 
 `IMPLEMENT_PROMPT`:
 

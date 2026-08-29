@@ -163,8 +163,18 @@ terminal_json=$(orca-ide terminal create \
   --json)
 review_terminal=$(printf '%s' "$terminal_json" | jq -r '.result.terminal.handle // .result.handle')
 
+# tui-idle は pi の描画完了より早く返ることがある。pi のフッター（model 名）が出るまで待ってから送る。
 orca-ide terminal wait --terminal "$review_terminal" --for tui-idle --timeout-ms 300000 --json
+for attempt in $(seq 1 30); do
+  orca-ide terminal read --terminal "$review_terminal" --json | grep -q 'gpt-5.6-sol' && break
+  sleep 2
+done
 orca-ide terminal send --terminal "$review_terminal" --text "$REVIEW_PROMPT" --enter --json
+# 30 秒待っても入力欄が空のまま idle なら、1 回だけ再送する。
+sleep 30
+if ! orca-ide terminal read --terminal "$review_terminal" --json | grep -Eq 'Working|PR #<PR>'; then
+  orca-ide terminal send --terminal "$review_terminal" --text "$REVIEW_PROMPT" --enter --json
+fi
 ```
 
 `REVIEW_PROMPT`:
@@ -311,9 +321,13 @@ terminal_json=$(orca-ide terminal create \
 implementer=$(printf '%s' "$terminal_json" | jq -r '.result.terminal.handle // .result.handle')
 orca-ide worktree set --worktree path:"<worktreePath>" --comment "issue=#<N>; pr=#<PR>; implementer=$implementer" --json
 orca-ide terminal wait --terminal "$implementer" --for tui-idle --timeout-ms 300000 --json
+for attempt in $(seq 1 30); do
+  orca-ide terminal read --terminal "$implementer" --json | grep -q 'gpt-5.6-sol' && break
+  sleep 2
+done
 ```
 
-`FIX_PROMPT` に `review_report` 全文を含め、実装担当へ送る。
+`FIX_PROMPT` に `review_report` 全文を含め、実装担当へ `terminal send --enter` で送る。送信の 30 秒後に `terminal read` で pi が動き出したこと（`Working` など）を確認し、入力欄が空のまま idle なら 1 回だけ再送する。
 
 ```text
 PR #<PR> の独立レビュー指摘を修正してください。
