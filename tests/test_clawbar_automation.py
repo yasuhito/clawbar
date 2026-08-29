@@ -5,22 +5,11 @@ import unittest
 
 from scripts import clawbar_collect
 from tests.collector_fixture import CollectorFixture
+from tests.fake_commands import FakeCommandSurface, failed, ok
 
 
 class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
-    @staticmethod
-    def automation_surface(automation_id: str = "stable-automation-id") -> dict[str, object]:
-        return {
-            "jobs": [{
-                "id": automation_id,
-                "name": "Investigate",
-                "enabled": True,
-                "schedule": {"kind": "cron"},
-                "state": {},
-            }]
-        }
-
-    def test_executable_sanitizes_orders_and_aggregates_automations(self) -> None:
+    def test_collection_sanitizes_orders_and_aggregates_automations(self) -> None:
         private_sentinels = [
             "PRIVATE-PAYLOAD",
             "PRIVATE-DESTINATION",
@@ -92,16 +81,12 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
         }
         nodes = {"nodes": [{"nodeId": "offline-node", "displayName": "Offline", "connected": False}]}
 
-        result = self.run_external(
-            "local",
-            environment_overrides={
-                "FAKE_AUTOMATIONS": json.dumps(automations),
-                "FAKE_NODES": json.dumps(nodes),
-            },
+        result = self.collect(
+            FakeCommandSurface.healthy(cron_list=ok(automations), nodes_status=ok(nodes))
         )
 
-        self.assertEqual(result.returncode, clawbar_collect.ExitCode.OK, result.stderr)
-        snapshot = json.loads(result.stdout)
+        self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
+        snapshot = result.snapshot
         items = snapshot["automations"]["items"]
         self.assertEqual(
             [item["name"] for item in items],
@@ -120,58 +105,44 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(items[6]["enabled"], False)
         self.assertEqual(snapshot["gateway"], {"state": "healthy"})
         self.assertEqual(snapshot["bar"], {"count": 1, "kind": "attention", "severity": "critical"})
+        published = json.dumps(snapshot)
         for sentinel in private_sentinels:
-            self.assertNotIn(sentinel, result.stdout)
+            self.assertNotIn(sentinel, published)
 
     def test_automation_empty_unavailable_and_limit_states_are_explicit(self) -> None:
-        scenarios = [
-            (
-                "empty",
-                {"FAKE_AUTOMATIONS": json.dumps({"jobs": []})},
-                {"available": True, "items": []},
-                {"state": "healthy"},
-            ),
-            (
-                "failed",
-                {"FAKE_AUTOMATIONS_EXIT": "9"},
-                {"available": False, "items": [], "reason": "unavailable"},
-                {"state": "degraded"},
-            ),
-            (
-                "too-many",
+        too_many = {
+            "jobs": [
                 {
-                    "FAKE_AUTOMATIONS": json.dumps({
-                        "jobs": [
-                            {
-                                "id": f"automation-{index}",
-                                "name": f"Automation {index}",
-                                "enabled": True,
-                                "schedule": {"kind": "cron"},
-                                "state": {"lastRunStatus": "error"},
-                            }
-                            for index in range(501)
-                        ]
-                    })
-                },
-                {"available": False, "items": [], "reason": "more_than_500"},
-                {"state": "degraded"},
-            ),
+                    "id": f"automation-{index}",
+                    "name": f"Automation {index}",
+                    "enabled": True,
+                    "schedule": {"kind": "cron"},
+                    "state": {"lastRunStatus": "error"},
+                }
+                for index in range(501)
+            ]
+        }
+        scenarios = [
+            ("empty", ok({"jobs": []}), {"available": True, "items": []}, {"state": "healthy"}),
+            ("failed", failed(9), {"available": False, "items": [], "reason": "unavailable"}, {"state": "degraded"}),
+            ("too-many", ok(too_many), {"available": False, "items": [], "reason": "more_than_500"}, {"state": "degraded"}),
         ]
-        for name, overrides, expected_automations, expected_gateway in scenarios:
+        for name, cron_answer, expected_automations, expected_gateway in scenarios:
             with self.subTest(name=name):
-                overrides["XDG_STATE_HOME"] = str(self.root / f"{name}-state")
-                result = self.run_external("local", environment_overrides=overrides)
-                snapshot = json.loads(result.stdout)
+                result = self.collect(
+                    FakeCommandSurface.healthy(cron_list=cron_answer),
+                    snapshot_path=self.root / f"{name}-state" / "snapshot.json",
+                )
 
-                self.assertEqual(result.returncode, clawbar_collect.ExitCode.OK, result.stderr)
-                self.assertEqual(snapshot["automations"], expected_automations)
-                self.assertEqual(snapshot["gateway"], expected_gateway)
+                self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
+                self.assertEqual(result.snapshot["automations"], expected_automations)
+                self.assertEqual(result.snapshot["gateway"], expected_gateway)
                 expected_bar = (
                     {"count": 0, "kind": "none", "severity": "healthy"}
                     if name == "empty"
                     else {"count": 1, "kind": "attention", "severity": "warning"}
                 )
-                self.assertEqual(snapshot["bar"], expected_bar)
+                self.assertEqual(result.snapshot["bar"], expected_bar)
 
     def test_automation_collection_pages_within_supported_limit(self) -> None:
         jobs = [
@@ -185,23 +156,18 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
             for index in range(450)
         ]
         pages = {
-            "0": {"jobs": jobs[:200], "total": 450, "hasMore": True, "nextOffset": 200},
-            "200": {"jobs": jobs[200:400], "total": 450, "hasMore": True, "nextOffset": 400},
-            "400": {"jobs": jobs[400:], "total": 450, "hasMore": False},
+            0: {"jobs": jobs[:200], "total": 450, "hasMore": True, "nextOffset": 200},
+            200: {"jobs": jobs[200:400], "total": 450, "hasMore": True, "nextOffset": 400},
+            400: {"jobs": jobs[400:], "total": 450, "hasMore": False},
         }
+        commands = FakeCommandSurface.healthy(cron_list=lambda url, params: ok(pages[params["offset"]]))
 
-        result = self.run_external(
-            "local",
-            environment_overrides={"FAKE_AUTOMATION_PAGES": json.dumps(pages)},
-        )
+        result = self.collect(commands)
 
-        self.assertEqual(result.returncode, clawbar_collect.ExitCode.OK, result.stderr)
-        snapshot = json.loads(result.stdout)
-        self.assertEqual(len(snapshot["automations"]["items"]), 450)
-        cron_calls = [call for call in self.read_calls() if call[:3] == ["gateway", "call", "cron.list"]]
-        params = [json.loads(call[call.index("--params") + 1]) for call in cron_calls]
+        self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
+        self.assertEqual(len(result.snapshot["automations"]["items"]), 450)
         self.assertEqual(
-            params,
+            [call["params"] for call in commands.asked("cron_list")],
             [
                 {"includeDisabled": True, "limit": 200, "offset": 0},
                 {"includeDisabled": True, "limit": 200, "offset": 200},
@@ -210,16 +176,14 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
         )
 
     def test_healthy_bar_does_not_count_running_agent_tasks(self) -> None:
-        agents = {"agents": [{"id": "planner"}]}
-        tasks = {"tasks": [{"agentId": "planner", "status": "running"}]}
-
-        result = self.run_external(
-            "local",
-            environment_overrides={"FAKE_AGENTS": json.dumps(agents), "FAKE_TASKS": json.dumps(tasks)},
+        commands = FakeCommandSurface.healthy(
+            agents_list=ok({"agents": [{"id": "planner"}]}),
+            tasks_list=ok({"tasks": [{"agentId": "planner", "status": "running"}]}),
         )
 
-        snapshot = json.loads(result.stdout)
-        self.assertEqual(snapshot["bar"], {"count": 0, "kind": "none", "severity": "healthy"})
+        result = self.collect(commands)
+
+        self.assertEqual(result.snapshot["bar"], {"count": 0, "kind": "none", "severity": "healthy"})
 
 
 if __name__ == "__main__":

@@ -262,6 +262,27 @@ class CollectorFixture:
                 local_key_secret=b"clawbar-test-node-key-secret-32!",
             )
 
+    def collect(
+        self,
+        commands: object,
+        *,
+        snapshot_path: Path | None = None,
+        candidate_key: str | None = None,
+        deadline: float = 1,
+        secret: bytes | None = b"clawbar-test-node-key-secret-32!",
+        **environment: str,
+    ) -> clawbar_collect.CollectionResult:
+        """Run one collection in-process through the Gateway Command Surface ``commands``."""
+        with self.fake_environment(**environment):
+            return clawbar_collect.collect_gateway(
+                snapshot_path or self.snapshot_path,
+                refresh_interval=30,
+                commands=commands,
+                collection_deadline=deadline,
+                local_key_secret=secret,
+                candidate_key=candidate_key,
+            )
+
     def run_external(
         self,
         scenario: str,
