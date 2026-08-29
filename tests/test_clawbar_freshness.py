@@ -5,7 +5,9 @@ import threading
 import unittest
 
 from scripts import clawbar_collect
+from scripts.clawbar_commands import CollectionDeadlineExceeded
 from tests.collector_fixture import CollectorFixture
+from tests.fake_commands import FakeCommandSurface, gateway_unresolved, node_not_hosting, ok
 
 
 class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
@@ -19,10 +21,9 @@ class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
                 }
             ]
         }
-        with self.fake_environment(FAKE_NODES=json.dumps(nodes)):
-            healthy = self.run_collector()
-        first_failure = self.run_collector(stdout="connection broken", exit_code=9)
-        second_failure = self.run_collector(stdout="connection broken", exit_code=9)
+        healthy = self.collect(FakeCommandSurface.healthy(nodes_status=ok(nodes)))
+        first_failure = self.collect(FakeCommandSurface.lost())
+        second_failure = self.collect(FakeCommandSurface.lost())
 
         self.assertEqual(first_failure.snapshot["gateway"], {"state": "unstable"})
         self.assertEqual(first_failure.snapshot["consecutiveFailures"], 1)
@@ -43,8 +44,7 @@ class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(second_failure.snapshot["consecutiveFailures"], 2)
         self.assertEqual(second_failure.snapshot["lastKnown"], first_failure.snapshot["lastKnown"])
 
-        with self.fake_environment(FAKE_NODES=json.dumps(nodes)):
-            recovered = self.run_collector()
+        recovered = self.collect(FakeCommandSurface.healthy(nodes_status=ok(nodes)))
 
         self.assertEqual(recovered.snapshot["gateway"], {"state": "healthy"})
         self.assertEqual(recovered.snapshot["consecutiveFailures"], 0)
@@ -53,8 +53,8 @@ class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(recovered.snapshot["fleet"]["nodes"][0]["name"], "studio-ops")
 
     def test_repeated_initial_failures_remain_no_data_yet(self) -> None:
-        first = self.run_collector(stdout="connection broken", exit_code=9)
-        second = self.run_collector(stdout="connection broken", exit_code=9)
+        first = self.collect(FakeCommandSurface.lost())
+        second = self.collect(FakeCommandSurface.lost())
 
         self.assertEqual(first.snapshot["gateway"], {"state": "no_data"})
         self.assertEqual(second.snapshot["gateway"], {"state": "no_data"})
@@ -71,17 +71,16 @@ class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
                 }
             ]
         }
-        with self.fake_environment(FAKE_NODES=json.dumps(nodes)):
-            healthy = self.run_collector()
+        healthy = self.collect(FakeCommandSurface.healthy(nodes_status=ok(nodes)))
         self.assertEqual(len(healthy.snapshot["fleet"]["nodes"]), 1)
 
-        degraded = self.run_collector(nodes_delay=0.3, deadline=0.1)
+        degraded = self.collect(FakeCommandSurface.healthy(nodes_status=CollectionDeadlineExceeded()))
 
         self.assertEqual(degraded.snapshot["gateway"], {"state": "degraded"})
         self.assertEqual(degraded.snapshot["fleet"], {"available": False, "nodes": []})
         self.assertEqual(degraded.snapshot["lastKnown"]["fleet"], healthy.snapshot["fleet"])
 
-        failed = self.run_collector(stdout="connection broken", exit_code=9)
+        failed = self.collect(FakeCommandSurface.lost())
 
         self.assertEqual(failed.snapshot["gateway"], {"state": "unstable"})
         self.assertEqual(failed.snapshot["lastKnown"]["fleet"], healthy.snapshot["fleet"])
@@ -150,22 +149,23 @@ class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
             json.loads(healthy.stdout)["generatedAt"],
         )
     def test_missing_resolution_after_success_is_gateway_loss_not_setup(self) -> None:
-        healthy = self.run_external("local")
-        self.call_log_path.unlink(missing_ok=True)
+        healthy = self.collect(FakeCommandSurface.healthy())
+        unresolved = [
+            FakeCommandSurface(gateway_status=gateway_unresolved(), node_status=node_not_hosting())
+            for _ in range(2)
+        ]
 
-        first_failure = self.run_external("unresolved")
-        second_failure = self.run_external("unresolved")
+        first_failure = self.collect(unresolved[0])
+        second_failure = self.collect(unresolved[1])
 
-        self.assertEqual(healthy.returncode, clawbar_collect.ExitCode.OK, healthy.stderr)
-        self.assertEqual(first_failure.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
-        self.assertEqual(second_failure.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
-        first_snapshot = json.loads(first_failure.stdout)
-        second_snapshot = json.loads(second_failure.stdout)
-        self.assertEqual(first_snapshot["gateway"], {"state": "unstable"})
-        self.assertEqual(second_snapshot["gateway"], {"state": "offline"})
-        self.assertEqual(first_snapshot["resolutionSource"], "local")
-        self.assertNotIn(["tailscale", "status", "--json"], self.read_calls())
-
+        self.assertEqual(healthy.exit_code, clawbar_collect.ExitCode.OK)
+        self.assertEqual(first_failure.exit_code, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(second_failure.exit_code, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(first_failure.snapshot["gateway"], {"state": "unstable"})
+        self.assertEqual(second_failure.snapshot["gateway"], {"state": "offline"})
+        self.assertEqual(first_failure.snapshot["resolutionSource"], "local")
+        for commands in unresolved:
+            self.assertEqual(commands.asked("tailscale_status"), [])
 
 
 if __name__ == "__main__":

@@ -49,6 +49,20 @@ def gateway_ok(url: str = LOCAL_GATEWAY_URL) -> CommandResult:
     return ok({"rpc": {"ok": True, "url": url}})
 
 
+def node_not_hosting() -> CommandResult:
+    """A ``node status`` answer for a device that hosts no Gateway."""
+    return ok({"service": {"loaded": False, "command": None, "runtime": {"status": "stopped", "state": "inactive"}}})
+
+
+def gateway_unresolved() -> CommandResult:
+    """A failed local ``gateway status`` whose JSON shows no loaded service (automatic resolution missing)."""
+    return failed(
+        9,
+        json.dumps({"service": {"loaded": False, "runtime": {"status": "stopped"}}, "rpc": {"ok": False, "url": LOCAL_GATEWAY_URL}}),
+        "invalid token",
+    )
+
+
 def echo_dialed_url(reported_url: str | None = None) -> Callable[..., CommandResult]:
     """A ``gateway status`` answer that reports the dialed ``--url`` (or ``reported_url``)."""
 
@@ -80,6 +94,16 @@ class FakeCommandSurface:
             "agents_list": ok({"agents": []}),
             "tasks_list": ok({"tasks": []}),
             "cron_list": ok({"jobs": []}),
+        }
+        defaults.update(answers)
+        return cls(**defaults)
+
+    @classmethod
+    def lost(cls, stdout: str = "connection broken", returncode: int = 9, **answers: Answer | list[Answer]) -> "FakeCommandSurface":
+        """A Gateway that no longer answers and a device that hosts none; ``answers`` override any question."""
+        defaults: dict[str, Answer | list[Answer]] = {
+            "gateway_status": failed(returncode, stdout, "invalid token"),
+            "node_status": node_not_hosting(),
         }
         defaults.update(answers)
         return cls(**defaults)
