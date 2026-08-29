@@ -2,31 +2,23 @@
 
 from __future__ import annotations
 
-import json
-from typing import Callable, Sequence
+from typing import Callable
 
 if __package__:
     from .clawbar_bounds import MAX_METADATA_ITEMS
 else:
     from clawbar_bounds import MAX_METADATA_ITEMS
 
-ReadSurface = Callable[[Sequence[str]], object | None]
+ReadPage = Callable[[dict[str, object]], object | None]
 
 
-def collect_automation_surface(read_surface: ReadSurface) -> object | None:
+def collect_automation_surface(read_page: ReadPage) -> object | None:
+    """cron.list を includeDisabled 付きでページ送りし、上限内なら全 job を返す。"""
     jobs: list[object] = []
     offset = 0
     while True:
         limit = min(200, MAX_METADATA_ITEMS + 1 - len(jobs))
-        params = {"includeDisabled": True, "limit": limit, "offset": offset}
-        payload = read_surface((
-            "gateway",
-            "call",
-            "cron.list",
-            "--params",
-            json.dumps(params, separators=(",", ":"), sort_keys=True),
-            "--json",
-        ))
+        payload = read_page({"includeDisabled": True, "limit": limit, "offset": offset})
         if not isinstance(payload, dict) or not isinstance(payload.get("jobs"), list):
             return None
         total = payload.get("total")

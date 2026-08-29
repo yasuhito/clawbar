@@ -12,9 +12,9 @@ from urllib.parse import urlsplit
 
 if __package__:
     from .clawbar_commands import (
-        TAILSCALE_COMMAND,
         CollectionDeadlineExceeded,
         CommandOutputExceeded,
+        GatewayCommandSurface,
         MAX_COMMAND_STREAM_BYTES,
         run_command,
         seconds_until_deadline,
@@ -23,9 +23,9 @@ if __package__:
     from .clawbar_snapshot import atomic_write_snapshot, last_known_metadata, load_snapshot, snapshot_envelope
 else:
     from clawbar_commands import (
-        TAILSCALE_COMMAND,
         CollectionDeadlineExceeded,
         CommandOutputExceeded,
+        GatewayCommandSurface,
         MAX_COMMAND_STREAM_BYTES,
         run_command,
         seconds_until_deadline,
@@ -163,9 +163,11 @@ def tailscale_candidate(device: object) -> tuple[str, str, str] | None:
     return device_id.strip(), name.strip(), f"ws://{url_host}:{GATEWAY_PORT}"
 
 
-def discover_tailscale_candidates(deadline_at: float) -> list[tuple[str, str, str]]:
+def discover_tailscale_candidates(
+    commands: GatewayCommandSurface, deadline_at: float
+) -> list[tuple[str, str, str]]:
     try:
-        completed = run_command([*TAILSCALE_COMMAND, "status", "--json"], deadline_at)
+        completed = commands.tailscale_status(deadline_at)
     except (CollectionDeadlineExceeded, OSError):
         return []
     try:
@@ -258,12 +260,13 @@ def setup_required_snapshot(
     deadline_at: float,
     schema_version: int,
     candidate_key_secret: bytes | None,
+    commands: GatewayCommandSurface,
 ) -> dict[str, Any]:
     if candidate_key_secret is None:
         setup = setup_section(retained_setup_candidates(previous), KEY_SECRET_ERROR)
         setup["guidance"] = KEY_SECRET_ERROR
         return build_setup_snapshot(previous, refresh_interval, schema_version, setup)
-    candidates = discover_tailscale_candidates(deadline_at)
+    candidates = discover_tailscale_candidates(commands, deadline_at)
     keyed_candidates = [
         (opaque_candidate_key(device_id, candidate_key_secret), name, url)
         for device_id, name, url in candidates
@@ -288,8 +291,8 @@ def setup_required_snapshot(
     )
 
 
-def discover_node_host(openclaw_command: Sequence[str], deadline_at: float) -> GatewayTarget | None:
-    completed = run_command([*openclaw_command, "node", "status", "--json"], deadline_at)
+def discover_node_host(commands: GatewayCommandSurface, deadline_at: float) -> GatewayTarget | None:
+    completed = commands.node_status(deadline_at)
     if completed.returncode != 0:
         return None
     try:
@@ -333,21 +336,8 @@ def automatic_resolution_missing(completed: subprocess.CompletedProcess[str]) ->
 
 
 def gateway_status_command(
-    openclaw_command: Sequence[str],
+    commands: GatewayCommandSurface,
     deadline_at: float,
     target: GatewayTarget | None = None,
-    timeout_milliseconds: int = 10_000,
 ) -> subprocess.CompletedProcess[str]:
-    timeout = max(1, min(timeout_milliseconds, int(seconds_until_deadline(deadline_at) * 1000)))
-    command = [
-        *openclaw_command,
-        "gateway",
-        "status",
-        "--json",
-        "--require-rpc",
-        "--timeout",
-        str(timeout),
-    ]
-    if target is not None:
-        command.extend(["--url", target.url])
-    return run_command(command, deadline_at)
+    return commands.gateway_status(deadline_at, target.url if target is not None else None)

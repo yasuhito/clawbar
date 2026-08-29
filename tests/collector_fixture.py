@@ -9,7 +9,7 @@ import tempfile
 import textwrap
 from pathlib import Path
 
-from scripts import clawbar_collect
+from scripts import clawbar_collect, clawbar_commands
 
 
 class CollectorFixture:
@@ -257,7 +257,7 @@ class CollectorFixture:
             return clawbar_collect.collect_gateway(
                 self.snapshot_path,
                 refresh_interval=30,
-                openclaw_command=[str(self.command_path)],
+                commands=clawbar_commands.SubprocessCommandSurface(openclaw=(str(self.command_path),)),
                 collection_deadline=deadline,
                 local_key_secret=b"clawbar-test-node-key-secret-32!",
             )

@@ -6,28 +6,29 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import subprocess
 import sys
 import time
 from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 if __package__:
     from .clawbar_automation import collect_automation_surface
-    from .clawbar_bounds import MAX_METADATA_ITEMS
-    from .clawbar_gateway import (
+    from .clawbar_commands import (
         CollectionDeadlineExceeded,
         CommandOutputExceeded,
+        CommandResult,
+        GatewayCommandSurface,
+        SubprocessCommandSurface,
+    )
+    from .clawbar_gateway import (
         GatewayTarget,
         automatic_resolution_missing,
         discover_node_host,
         gateway_status_command,
         resolution_source,
         retained_setup_candidates,
-        run_command,
-        seconds_until_deadline,
         selected_candidate,
         setup_required_snapshot,
         setup_retry_snapshot,
@@ -52,18 +53,20 @@ if __package__:
     from .clawbar_target_state import GatewayTargetState
 else:
     from clawbar_automation import collect_automation_surface
-    from clawbar_bounds import MAX_METADATA_ITEMS
-    from clawbar_gateway import (
+    from clawbar_commands import (
         CollectionDeadlineExceeded,
         CommandOutputExceeded,
+        CommandResult,
+        GatewayCommandSurface,
+        SubprocessCommandSurface,
+    )
+    from clawbar_gateway import (
         GatewayTarget,
         automatic_resolution_missing,
         discover_node_host,
         gateway_status_command,
         resolution_source,
         retained_setup_candidates,
-        run_command,
-        seconds_until_deadline,
         selected_candidate,
         setup_required_snapshot,
         setup_retry_snapshot,
@@ -93,7 +96,6 @@ MIN_REFRESH_INTERVAL_SECONDS = 15
 MAX_REFRESH_INTERVAL_SECONDS = 300
 COLLECTION_DEADLINE_SECONDS = 12.0
 SNAPSHOT_WRITE_RESERVE_SECONDS = 0.5
-OPENCLAW_TIMEOUT_MILLISECONDS = 10_000
 RESOLUTION_SOURCES = frozenset({"local", "configured_remote", "node_host", "tailscale"})
 
 
@@ -236,23 +238,7 @@ def publish_failure(
 
 
 
-def metadata_command(
-    openclaw_command: Sequence[str],
-    arguments: Sequence[str],
-    deadline_at: float,
-    target: GatewayTarget | None,
-) -> subprocess.CompletedProcess[str]:
-    timeout_milliseconds = max(
-        1,
-        min(OPENCLAW_TIMEOUT_MILLISECONDS, int(seconds_until_deadline(deadline_at) * 1000)),
-    )
-    command = [*openclaw_command, *arguments, "--timeout", str(timeout_milliseconds)]
-    if target is not None:
-        command.extend(["--url", target.url])
-    return run_command(command, deadline_at)
-
-
-def decode_json(completed: subprocess.CompletedProcess[str]) -> object | None:
+def decode_json(completed: CommandResult) -> object | None:
     if completed.returncode != 0:
         return None
     try:
@@ -260,52 +246,39 @@ def decode_json(completed: subprocess.CompletedProcess[str]) -> object | None:
     except json.JSONDecodeError:
         return None
 
-METADATA_SURFACES = (
-    ("nodes", "status", "--json"),
-    ("gateway", "call", "agents.list", "--params", "{}", "--json"),
-    ("gateway", "call", "tasks.list", "--params", f'{{"limit":{MAX_METADATA_ITEMS}}}', "--json"),
-)
-
-
-def read_metadata_surface(
-    openclaw_command: Sequence[str],
-    arguments: Sequence[str],
-    deadline_at: float,
-    target: GatewayTarget | None,
-) -> tuple[object | None, str | None]:
+def read_metadata_surface(ask: Callable[[], CommandResult]) -> tuple[object | None, str | None]:
+    """1 つの metadata 質問を投げ、(payload, 失敗理由) を返す。失敗は Degraded Gateway に留める。"""
     try:
-        return (
-            decode_json(metadata_command(openclaw_command, arguments, deadline_at, target)),
-            None,
-        )
+        return decode_json(ask()), None
     except CommandOutputExceeded:
         return None, OUTPUT_EXCEEDED_LIMIT
     except (CollectionDeadlineExceeded, OSError):
         return None, None
 
 
-
-
-METADATA_SURFACE_NAMES = ("fleet", "agents", "tasks")
-
-
 def collect_metadata(
-    openclaw_command: Sequence[str],
+    commands: GatewayCommandSurface,
     deadline_at: float,
     target: GatewayTarget | None,
 ) -> tuple[object | None, object | None, object | None, object | None, dict[str, str | None]]:
+    url = target.url if target is not None else None
+    surfaces: tuple[tuple[str, Callable[[], CommandResult]], ...] = (
+        ("fleet", lambda: commands.nodes_status(deadline_at, url)),
+        ("agents", lambda: commands.agents_list(deadline_at, url)),
+        ("tasks", lambda: commands.tasks_list(deadline_at, url)),
+    )
     payloads: list[object | None] = []
     failures: dict[str, str | None] = {}
-    for name, arguments in zip(METADATA_SURFACE_NAMES, METADATA_SURFACES):
-        payload, failure = read_metadata_surface(openclaw_command, arguments, deadline_at, target)
+    for name, ask in surfaces:
+        payload, failure = read_metadata_surface(ask)
         payloads.append(payload)
         failures[name] = failure
 
-    def read_automation(arguments: Sequence[str]) -> object | None:
-        payload, _ = read_metadata_surface(openclaw_command, arguments, deadline_at, target)
+    def read_automation_page(params: dict[str, object]) -> object | None:
+        payload, _ = read_metadata_surface(lambda: commands.cron_list(deadline_at, url, params))
         return payload
 
-    automation_payload = collect_automation_surface(read_automation)
+    automation_payload = collect_automation_surface(read_automation_page)
     return (*payloads, automation_payload, failures)
 
 
@@ -347,22 +320,22 @@ def candidate_retry(
 
 def resolve_target(
     snapshot_path: Path,
-    openclaw_command: Sequence[str],
+    commands: GatewayCommandSurface,
     command_deadline_at: float,
     target: GatewayTarget | None,
-) -> tuple[GatewayTarget | None, subprocess.CompletedProcess[str], bool]:
+) -> tuple[GatewayTarget | None, CommandResult, bool]:
     """行き先決め: 選ばれた候補または自動解決でGateway応答を取得する。
 
     CollectionDeadlineExceeded と OSError は呼び出し側へそのまま伝わる。
     """
     automatic_setup_required = False
     if target is not None:
-        completed = gateway_status_command(openclaw_command, command_deadline_at, target)
+        completed = gateway_status_command(commands, command_deadline_at, target)
         return target, completed, automatic_setup_required
-    completed = gateway_status_command(openclaw_command, command_deadline_at)
+    completed = gateway_status_command(commands, command_deadline_at)
     if completed.returncode != 0:
         automatic_setup_required = automatic_resolution_missing(completed)
-        target = discover_node_host(openclaw_command, command_deadline_at)
+        target = discover_node_host(commands, command_deadline_at)
         if target is None:
             verified_url = GatewayTargetState(
                 snapshot_path,
@@ -370,7 +343,7 @@ def resolve_target(
             ).load_verified_fallback()
             target = GatewayTarget(verified_url, "tailscale") if verified_url else None
         if target is not None:
-            completed = gateway_status_command(openclaw_command, command_deadline_at, target)
+            completed = gateway_status_command(commands, command_deadline_at, target)
     return target, completed, automatic_setup_required
 
 
@@ -380,7 +353,7 @@ def decode_status_or_fail(
     refresh_interval: int,
     candidate_key: str | None,
     target: GatewayTarget | None,
-    completed: subprocess.CompletedProcess[str],
+    completed: CommandResult,
 ) -> CollectionResult | tuple[dict[str, Any], str | None]:
     """答え読み取り: Gateway応答を解読し source を判定する。
 
@@ -428,11 +401,13 @@ def decode_status_or_fail(
 def collect_gateway(
     snapshot_path: Path,
     refresh_interval: int,
-    openclaw_command: Sequence[str] = ("openclaw",),
+    *,
+    commands: GatewayCommandSurface,
     collection_deadline: float = COLLECTION_DEADLINE_SECONDS,
     local_key_secret: bytes | None = None,
     candidate_key: str | None = None,
 ) -> CollectionResult:
+    """1 回の収集。外部 CLI へは commands（Gateway Command Surface）だけを通して話す。"""
     refresh_interval = validate_refresh_interval(refresh_interval)
     deadline_at = time.monotonic() + collection_deadline
     command_deadline_at = deadline_at - min(SNAPSHOT_WRITE_RESERVE_SECONDS, collection_deadline / 10)
@@ -455,7 +430,7 @@ def collect_gateway(
     try:
         target, completed, automatic_setup_required = resolve_target(
             snapshot_path,
-            openclaw_command,
+            commands,
             command_deadline_at,
             target,
         )
@@ -521,6 +496,7 @@ def collect_gateway(
                     command_deadline_at,
                     SCHEMA_VERSION,
                     secret,
+                    commands,
                 ),
             )
         return publish_failure(
@@ -545,7 +521,7 @@ def collect_gateway(
 
     fleet_payload, agent_payload, task_payload, automation_payload, metadata_failures = (
         collect_metadata(
-            openclaw_command,
+            commands,
             command_deadline_at,
             target,
         )
@@ -625,6 +601,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     result = collect_gateway(
         snapshot_path,
         arguments.refresh_interval,
+        commands=SubprocessCommandSurface(),
         candidate_key=arguments.verify_candidate,
     )
     json.dump(result.snapshot, sys.stdout, separators=(",", ":"), sort_keys=True)
