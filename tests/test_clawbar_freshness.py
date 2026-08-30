@@ -57,7 +57,15 @@ class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
         second = self.collect(FakeCommandSurface.lost())
 
         self.assertEqual(first.snapshot["gateway"], {"state": "no_data"})
+        self.assertEqual(
+            first.snapshot["bar"],
+            {"kind": "none", "count": 0, "severity": "warning"},
+        )
         self.assertEqual(second.snapshot["gateway"], {"state": "no_data"})
+        self.assertEqual(
+            second.snapshot["bar"],
+            {"kind": "none", "count": 0, "severity": "warning"},
+        )
         self.assertEqual(second.snapshot["consecutiveFailures"], 2)
         self.assertNotIn("lastKnown", second.snapshot)
 

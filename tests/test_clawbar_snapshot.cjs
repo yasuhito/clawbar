@@ -54,7 +54,7 @@ test("stale timing takes precedence over an old Offline Gateway", () => {
 test("first collection exposes Collecting then No data yet", () => {
   const snapshot = healthySnapshot(new Date(100000).toISOString())
   snapshot.gateway.state = "no_data"
-  snapshot.bar = { kind: "attention", count: 0, severity: "warning" }
+  snapshot.bar = { kind: "none", count: 0, severity: "warning" }
 
   assert.equal(Presentation.summary("collecting", "unresolved", 0, "warning"), "Collecting OpenClaw Gateway status")
   assert.equal(Snapshot.snapshotState(snapshot, 100000), "no_data")
