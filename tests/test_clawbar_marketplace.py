@@ -124,9 +124,9 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertNotIn("j/k · arrows", panel)
 
     def test_panel_omits_empty_agents_section(self) -> None:
-        panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
+        panel_model = (ROOT / "ClawbarPanelModel.js").read_text(encoding="utf-8")
 
-        self.assertIn("root.agents.length > 0", panel)
+        self.assertIn("data.agents.length > 0 || agentsUnavailable", panel_model)
 
     def test_panel_omits_the_obsolete_fleet_rail(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
@@ -189,17 +189,33 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("height: summaryArea.height + detailReveal.height", section)
         self.assertIn("expanded: rowRoot.selected", section)
         self.assertIn("Accessible.ignored: !expanded", reveal)
-        for kind in ("node", "agent", "automation"):
-            self.assertIn(f'{kind}DetailDelegate', panel)
+        self.assertEqual(section.count("DetailCard {"), 1)
+        self.assertIn("sourceComponent: detailCardComponent", section)
         self.assertIn("signal selectionGeometryChanged()", section)
         self.assertIn("onSelectionGeometryChanged", panel)
 
-    def test_open_operational_row_detail_properties_remain_bound(self) -> None:
+    def test_operational_row_detail_uses_declarative_bindings(self) -> None:
         section = (ROOT / "RowSection.qml").read_text(encoding="utf-8")
-        on_loaded = section.split("onLoaded: {", 1)[1].split("\n            }", 1)[0]
 
-        self.assertEqual(len(re.findall(r"^\s*item\.\w+\s*=", on_loaded, re.MULTILINE)), 4)
-        self.assertEqual(re.findall(r"item\.(\w+) = Qt\.binding", on_loaded), ["vm", "palette", "nowMs", "historical"])
+        self.assertNotIn("onLoaded:", section)
+        self.assertNotIn("item.vm =", section)
+        self.assertIn("vm: rowRoot.modelData", section)
+        self.assertIn("palette: root.palette", section)
+        self.assertIn("nowMs: root.nowMs", section)
+
+    def test_operational_row_detail_loader_skips_collapsed_and_empty_rows(self) -> None:
+        section = (ROOT / "RowSection.qml").read_text(encoding="utf-8")
+
+        self.assertIn("Loader {", section)
+        self.assertIn(
+            "active: rowRoot.modelData.detail.length > 0",
+            section,
+        )
+        self.assertIn("&& (rowRoot.selected || detailReveal.height > 0)", section)
+        self.assertIn(
+            "contentHeight: cardLoader.active && cardLoader.item",
+            section,
+        )
 
     def test_automation_selection_has_no_run_history_action(self) -> None:
         sources = "\n".join(
@@ -208,7 +224,7 @@ class MarketplaceContractTest(unittest.TestCase):
                 "Clawbar.qml",
                 "ClawbarPanel.qml",
                 "RowSection.qml",
-                "AutomationDetailCard.qml",
+                "DetailCard.qml",
             )
         )
 
@@ -223,7 +239,7 @@ class MarketplaceContractTest(unittest.TestCase):
     def test_registered_agents_use_a_static_green_dot_without_activity_claims(self) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
         presentation = (ROOT / "ClawbarPresentation.js").read_text(encoding="utf-8")
-        detail = (ROOT / "AgentDetailCard.qml").read_text(encoding="utf-8")
+        detail = (ROOT / "DetailCard.qml").read_text(encoding="utf-8")
 
         # The static registered-agent dot is a view-model fact, rendered generically.
         self.assertIn("dot: SIGNAL_PRESENTATIONS.registered_agent", presentation)
@@ -259,31 +275,35 @@ class MarketplaceContractTest(unittest.TestCase):
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
         section = (ROOT / "RowSection.qml").read_text(encoding="utf-8")
 
-        # Detail cards instantiate inside their row delegate through the shared loader.
-        # Detail cards appear only as inline delegate components, never hoisted.
-        detail_refs = sorted(re.findall(r"\w+DetailCard \{\}", panel))
-        self.assertEqual(detail_refs, [
-            "AgentDetailCard {}",
-            "AutomationDetailCard {}",
-            "NodeDetailCard {}",
-        ])
+        # A single shared DetailCard component is loaded only for the open row.
+        self.assertEqual(section.count("DetailCard {"), 1)
+        self.assertIn("sourceComponent: detailCardComponent", section)
+        self.assertNotIn("DetailCard {", panel)
+        self.assertEqual(
+            sorted(path.name for path in ROOT.glob("*DetailCard.qml")),
+            ["DetailCard.qml"],
+        )
         self.assertNotIn("id: selectedCard", panel)
 
     def test_operational_details_use_compact_single_line_timestamps(self) -> None:
-        details = "\n".join(
-            (ROOT / path).read_text(encoding="utf-8")
-            for path in (
-                "NodeDetailCard.qml",
-                "AgentDetailCard.qml",
-                "AutomationDetailCard.qml",
-            )
-        )
+        details = (ROOT / "DetailCard.qml").read_text(encoding="utf-8")
 
-        self.assertIn("Presentation.compactAbsoluteLocalTime", details)
+        self.assertIn("modelData.spoken", details)
         self.assertNotIn("wrapMode: Text.Wrap", details)
         self.assertIn("wrapMode: Text.NoWrap", details)
         self.assertIn("elide: Text.ElideRight", details)
         self.assertIn("Accessible.description", details)
+
+    def test_panel_reads_only_the_operational_panel_model(self) -> None:
+        panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
+        widget = (ROOT / "Clawbar.qml").read_text(encoding="utf-8")
+
+        self.assertNotIn("root.snapshot.", panel)
+        self.assertNotIn("root.metadata.", panel)
+        self.assertNotIn("required property var snapshot", panel)
+        self.assertNotIn('import "ClawbarSnapshot.js"', panel)
+        self.assertIn("required property var panelModel", panel)
+        self.assertIn("panelModel: root.operationalPanelModel", widget)
 
     def test_demo_publishes_all_twelve_sanitized_scenarios(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

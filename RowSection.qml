@@ -13,12 +13,9 @@ Item {
   required property var palette
   required property string selectedKey
   required property double nowMs
-  required property bool historical
   required property bool motionEnabled
   required property int fadeDuration
   required property int expandDuration
-  // Component receiving: vm, palette, nowMs, historical. Null = action rows only.
-  required property Component detailComponent
   // Shown in the selected action row's right slot instead of its base label.
   property string activeActionLabel: ""
   property bool interactive: true
@@ -152,7 +149,8 @@ Item {
               ? root.palette.accent
               : rowRoot.selected
                 ? root.palette.selectedSignalColor(rowRoot.dot.tone)
-                : root.historical ? root.palette.dim : root.palette.signalColor(rowRoot.dot.tone)
+                : rowRoot.modelData.historical
+                  ? root.palette.dim : root.palette.signalColor(rowRoot.dot.tone)
             font.family: root.palette.fontFamily
             font.pixelSize: Style.font.caption
             font.bold: modelData.statusStyle === "action"
@@ -162,25 +160,34 @@ Item {
         DetailReveal {
           id: detailReveal
           width: parent.width
-          expanded: rowRoot.selected
-          contentHeight: cardLoader.active && cardLoader.item ? cardLoader.item.implicitHeight : 0
+          expanded: rowRoot.selected && rowRoot.modelData.detail.length > 0
+          contentHeight: cardLoader.active && cardLoader.item
+            ? cardLoader.item.implicitHeight : 0
           motionEnabled: root.motionEnabled
           fadeDuration: root.fadeDuration
           expandDuration: root.expandDuration
+
+          Component {
+            id: detailCardComponent
+
+            DetailCard {
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.top: parent.top
+              vm: rowRoot.modelData
+              palette: root.palette
+              nowMs: root.nowMs
+            }
+          }
 
           Loader {
             id: cardLoader
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            active: rowRoot.selected || detailReveal.height > 0
-            sourceComponent: root.detailComponent
-            onLoaded: {
-              item.vm = Qt.binding(function() { return rowRoot.modelData })
-              item.palette = Qt.binding(function() { return root.palette })
-              item.nowMs = Qt.binding(function() { return root.nowMs })
-              item.historical = Qt.binding(function() { return rowRoot.modelData.historical })
-            }
+            active: rowRoot.modelData.detail.length > 0
+              && (rowRoot.selected || detailReveal.height > 0)
+            sourceComponent: detailCardComponent
           }
         }
       }

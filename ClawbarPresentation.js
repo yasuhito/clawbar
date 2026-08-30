@@ -173,6 +173,90 @@ function showNodeStatusLabel(state, historical) {
   return historical || state !== "healthy"
 }
 
+function detailEntry(label, value, spoken, critical) {
+  return { label: label, value: value, spoken: spoken || "", critical: critical === true }
+}
+
+function detailValue(entry, nowMilliseconds) {
+  return typeof entry.value === "function" ? entry.value(nowMilliseconds) : entry.value
+}
+
+function detailText(entry, nowMilliseconds) {
+  var value = String(detailValue(entry, nowMilliseconds) || "")
+  if (!entry.label) return value
+  if (!value) return entry.label
+  return entry.label + (entry.label === "Last known" ? " · " : " ") + value
+}
+
+function fullTimeText(label, value) {
+  var full = absoluteLocalTime(value)
+  return full ? label + " " + full : ""
+}
+
+function historicalDetail(value) {
+  return detailEntry("Last known", function(nowMilliseconds) {
+    return relativeTime(value, nowMilliseconds)
+  }, fullTimeText("Last known", value))
+}
+
+function nodeDetail(item, historical, observedAt) {
+  var detail = []
+  if (historical) detail.push(historicalDetail(observedAt))
+  var metadata = nodeMetadataLabel(item)
+  detail.push(detailEntry("", metadata, metadata))
+  if (compactAbsoluteLocalTime(item.lastSeenAt))
+    detail.push(detailEntry("Last seen", function(nowMilliseconds) {
+      return compactAbsoluteLocalTime(item.lastSeenAt, nowMilliseconds)
+    }, fullTimeText("Last seen", item.lastSeenAt)))
+  else
+    detail.push(detailEntry("", "No observation timestamp", "No observation timestamp"))
+  if (compactAbsoluteLocalTime(observedAt))
+    detail.push(detailEntry("Observed", function(nowMilliseconds) {
+      return compactAbsoluteLocalTime(observedAt, nowMilliseconds)
+    }, fullTimeText("Observed", observedAt)))
+  return detail
+}
+
+function agentDetail(item, historical, observedAt) {
+  var result = item.taskResult || {}
+  var failed = result.state === "failed"
+  var resultValue = !result.state || result.state === "none"
+    ? "None" : result.state === "succeeded" ? "Succeeded" : "Failed"
+  var detail = []
+  if (historical) detail.push(historicalDetail(observedAt))
+  detail.push(detailEntry("Task result", resultValue, "Task result " + resultValue, failed))
+  if (compactAbsoluteLocalTime(result.completedAt))
+    detail.push(detailEntry("Completed", function(nowMilliseconds) {
+      return compactAbsoluteLocalTime(result.completedAt, nowMilliseconds)
+    }, fullTimeText("Completed", result.completedAt)))
+  else
+    detail.push(detailEntry("", "No completion timestamp", "No completion timestamp"))
+  if (compactAbsoluteLocalTime(observedAt))
+    detail.push(detailEntry("Observed", function(nowMilliseconds) {
+      return compactAbsoluteLocalTime(observedAt, nowMilliseconds)
+    }, fullTimeText("Observed", observedAt)))
+  return detail
+}
+
+function automationDetail(item, historical) {
+  var detail = []
+  if (historical) detail.push(historicalDetail(item.lastRunAt))
+  var status = automationKindLabel(item.kind) + " · " + automationStatusLabel(item)
+  detail.push(detailEntry("", status, status))
+  if (compactAbsoluteLocalTime(item.nextRunAt))
+    detail.push(detailEntry("Next run", function(nowMilliseconds) {
+      return compactAbsoluteLocalTime(item.nextRunAt, nowMilliseconds)
+    }, fullTimeText("Next run", item.nextRunAt)))
+  if (compactAbsoluteLocalTime(item.lastRunAt))
+    detail.push(detailEntry("Last run", function(nowMilliseconds) {
+      return compactAbsoluteLocalTime(item.lastRunAt, nowMilliseconds)
+    }, fullTimeText("Last run", item.lastRunAt)))
+  if (!compactAbsoluteLocalTime(item.nextRunAt)
+      && !compactAbsoluteLocalTime(item.lastRunAt) && item.lastResult === "none")
+    detail.push(detailEntry("", "No run timestamps", "No run timestamps"))
+  return detail
+}
+
 // Operational Row view-models: presentation facts computed once, tested here,
 // consumed uniformly by RowSection.qml regardless of kind.
 
@@ -180,7 +264,6 @@ function candidateViewModel(item) {
   return {
     kind: "candidate",
     key: String(item.key || ""),
-    item: item,
     name: String(item.name || ""),
     dot: null,
     titleBold: true,
@@ -194,7 +277,7 @@ function candidateViewModel(item) {
     subCritical: false,
     accessibleDescription: "Gateway candidate",
     historical: false,
-    observedAt: ""
+    detail: []
   }
 }
 
@@ -205,21 +288,21 @@ function nodeViewModel(item, historical, observedAt) {
   return {
     kind: "node",
     key: String(item.key || ""),
-    item: item,
     name: String(item.name || ""),
     dot: { shape: signal.shape, tone: signal.tone },
     titleBold: !offline,
     titleMuted: offline,
     statusLabel: label,
     showStatusLabel: showNodeStatusLabel(item.state, historical),
-    statusStyle: null,
+    statusStyle: "signal",
     statusCapRatio: null,
     hasSub: false,
     subText: function() { return "" },
     subCritical: false,
     accessibleDescription: label,
     historical: historical,
-    observedAt: observedAt
+    observedAt: observedAt,
+    detail: nodeDetail(item, historical, observedAt)
   }
 }
 
@@ -229,14 +312,13 @@ function agentViewModel(item, historical, observedAt) {
   return {
     kind: "agent",
     key: String(item.key || "agent:" + item.name),
-    item: item,
     name: String(item.name || ""),
     dot: SIGNAL_PRESENTATIONS.registered_agent,
     titleBold: true,
     titleMuted: false,
     statusLabel: "",
     showStatusLabel: false,
-    statusStyle: null,
+    statusStyle: "signal",
     statusCapRatio: null,
     hasSub: true,
     subText: function(nowMilliseconds) {
@@ -245,7 +327,8 @@ function agentViewModel(item, historical, observedAt) {
     subCritical: failed,
     accessibleDescription: "Registered Agent",
     historical: historical,
-    observedAt: observedAt
+    observedAt: observedAt,
+    detail: agentDetail(item, historical, observedAt)
   }
 }
 
@@ -257,26 +340,25 @@ function automationViewModel(item, historical, observedAt) {
   return {
     kind: "automation",
     key: item.id ? "automation:" + item.id : "",
-    item: item,
     name: String(item.name || ""),
     dot: { shape: signal.shape, tone: signal.tone },
     titleBold: !!item.enabled,
     titleMuted: disabled,
     statusLabel: historical ? "Last known" : automationCompactStatusLabel(item),
     showStatusLabel: showAutomationStatusLabel(item, historical),
-    statusStyle: null,
+    statusStyle: "signal",
     statusCapRatio: 0.42,
     hasSub: true,
     subText: function(nowMilliseconds) {
-      if (!historical)
-        return automationTimingLabel(item, nowMilliseconds)
+      if (!historical) return automationTimingLabel(item, nowMilliseconds)
       var last = relativeTime(item.lastRunAt, nowMilliseconds)
       return last ? "Last " + last : "No runs yet"
     },
     subCritical: false,
     accessibleDescription: historical ? "Last known" : automationStatusLabel(item),
     historical: historical,
-    observedAt: observedAt
+    observedAt: observedAt,
+    detail: automationDetail(item, historical)
   }
 }
 
@@ -308,6 +390,12 @@ function panelSections(data) {
       })
     }
   ]
+}
+
+function panelTimeCaption(model, nowMilliseconds) {
+  var value = model.historical ? model.observedAt : model.generatedAt
+  var age = relativeTime(value, nowMilliseconds)
+  return model.historical && age ? "Last known " + age : age
 }
 
 function sectionRows(sections, kind) {
@@ -411,7 +499,9 @@ if (typeof module !== "undefined") {
     configurationGuidance: configurationGuidance,
     nodeMetadataLabel: nodeMetadataLabel,
     showNodeStatusLabel: showNodeStatusLabel,
+    detailText: detailText,
     panelSections: panelSections,
+    panelTimeCaption: panelTimeCaption,
     sectionRows: sectionRows,
     sectionKeys: sectionKeys,
     keyKind: keyKind,
