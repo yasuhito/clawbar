@@ -177,7 +177,7 @@ Item {
             sourceComponent: root.detailComponent
             onLoaded: {
               item.vm = Qt.binding(function() { return rowRoot.modelData })
-              item.palette = root.palette
+              item.palette = Qt.binding(function() { return root.palette })
               item.nowMs = Qt.binding(function() { return root.nowMs })
               item.historical = Qt.binding(function() { return rowRoot.modelData.historical })
             }
