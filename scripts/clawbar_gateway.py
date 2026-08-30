@@ -13,16 +13,17 @@ from urllib.parse import urlsplit
 if __package__:
     from .clawbar_commands import CollectionDeadlineExceeded, GatewayCommandSurface
     from .clawbar_metadata import opaque_candidate_key
-    from .clawbar_snapshot import atomic_write_snapshot, last_known_metadata, load_snapshot, snapshot_envelope
+    from .clawbar_snapshot import SnapshotBuilder, atomic_write_snapshot, read_json_document
 else:
     from clawbar_commands import CollectionDeadlineExceeded, GatewayCommandSurface
     from clawbar_metadata import opaque_candidate_key
-    from clawbar_snapshot import atomic_write_snapshot, last_known_metadata, load_snapshot, snapshot_envelope
+    from clawbar_snapshot import SnapshotBuilder, atomic_write_snapshot, read_json_document
 
 GATEWAY_PORT = 18789
 SETUP_GUIDANCE = "Choose a Tailscale device to verify as your OpenClaw Gateway."
 NO_TAILSCALE_GUIDANCE = "Connect Tailscale on this device, then refresh to find Gateway candidates."
 KEY_SECRET_ERROR = "Clawbar cannot derive private Gateway Candidate Keys. Repair its local key secret."
+CANDIDATE_STATE_SCHEMA_VERSION = 1
 
 
 @dataclass(frozen=True)
@@ -159,112 +160,36 @@ def discover_tailscale_candidates(
 
 
 
-def retained_setup_candidates(previous: dict[str, Any] | None) -> list[dict[str, str]]:
-    setup = previous.get("setup") if previous else None
-    candidates = setup.get("candidates") if isinstance(setup, dict) else None
-    if not isinstance(candidates, list):
-        return []
-    return [
-        {"key": candidate["key"], "name": candidate["name"]}
-        for candidate in candidates
-        if (
-            isinstance(candidate, dict)
-            and isinstance(candidate.get("key"), str)
-            and isinstance(candidate.get("name"), str)
-        )
-    ]
-
-
-def setup_section(candidates: list[dict[str, str]], error: str | None = None) -> dict[str, Any]:
-    setup: dict[str, Any] = {
-        "candidates": candidates,
-        "guidance": SETUP_GUIDANCE if candidates else NO_TAILSCALE_GUIDANCE,
-    }
-    if error:
-        setup["error"] = error
-    return setup
-
-
-def build_setup_snapshot(
-    previous: dict[str, Any] | None,
-    refresh_interval: int,
-    schema_version: int,
-    setup: dict[str, Any],
-    failure_kind: str | None = None,
-) -> dict[str, Any]:
-    snapshot = snapshot_envelope(
-        schema_version,
-        refresh_interval,
-        "unresolved",
-        "setup_required",
-        None,
-        0,
-    )
-    snapshot["fleet"] = {"available": False, "nodes": []}
-    snapshot["agents"] = {"available": False, "items": []}
-    snapshot["automations"] = {"available": False, "items": []}
-    snapshot["bar"] = {"count": 0, "severity": "warning"}
-    snapshot["setup"] = setup
-    if failure_kind:
-        snapshot["failureKind"] = failure_kind
-    retained = last_known_metadata(previous)
-    if retained is not None:
-        snapshot["lastKnown"] = retained
-    return snapshot
-
-
 def setup_retry_snapshot(
-    previous: dict[str, Any] | None,
-    refresh_interval: int,
-    schema_version: int,
+    builder: SnapshotBuilder,
     failure_kind: str,
     error: str,
 ) -> dict[str, Any]:
-    return build_setup_snapshot(
-        previous,
-        refresh_interval,
-        schema_version,
-        setup_section(retained_setup_candidates(previous), error),
-        failure_kind,
-    )
+    return builder.setup(None, SETUP_GUIDANCE, error, failure_kind)
 
 
 def setup_required_snapshot(
     snapshot_path: Path,
-    previous: dict[str, Any] | None,
-    refresh_interval: int,
+    builder: SnapshotBuilder,
     deadline_at: float,
-    schema_version: int,
     candidate_key_secret: bytes | None,
     commands: GatewayCommandSurface,
 ) -> dict[str, Any]:
     if candidate_key_secret is None:
-        setup = setup_section(retained_setup_candidates(previous), KEY_SECRET_ERROR)
-        setup["guidance"] = KEY_SECRET_ERROR
-        return build_setup_snapshot(previous, refresh_interval, schema_version, setup)
+        return builder.setup(None, KEY_SECRET_ERROR, KEY_SECRET_ERROR)
     candidates = discover_tailscale_candidates(commands, deadline_at)
     keyed_candidates = [
         (opaque_candidate_key(device_id, candidate_key_secret), name, url)
         for device_id, name, url in candidates
     ]
-    public_candidates = [
-        {"key": key, "name": name}
-        for key, name, _ in keyed_candidates
-    ]
-    candidate_targets = {
-        key: {"url": url}
-        for key, _, url in keyed_candidates
-    }
+    public_candidates = [{"key": key, "name": name} for key, name, _ in keyed_candidates]
+    candidate_targets = {key: {"url": url} for key, _, url in keyed_candidates}
     atomic_write_snapshot(
         candidate_state_path(snapshot_path),
-        {"schemaVersion": schema_version, "candidates": candidate_targets},
+        {"schemaVersion": CANDIDATE_STATE_SCHEMA_VERSION, "candidates": candidate_targets},
     )
-    return build_setup_snapshot(
-        previous,
-        refresh_interval,
-        schema_version,
-        setup_section(public_candidates),
-    )
+    guidance = SETUP_GUIDANCE if public_candidates else NO_TAILSCALE_GUIDANCE
+    return builder.setup(public_candidates, guidance)
 
 
 def discover_node_host(commands: GatewayCommandSurface, deadline_at: float) -> GatewayTarget | None:
@@ -280,9 +205,11 @@ def discover_node_host(commands: GatewayCommandSurface, deadline_at: float) -> G
 
 
 
-def selected_candidate(snapshot_path: Path, key: str, schema_version: int) -> GatewayTarget | None:
-    state = load_snapshot(candidate_state_path(snapshot_path), schema_version)
-    candidates = state.get("candidates") if state else None
+def selected_candidate(snapshot_path: Path, key: str) -> GatewayTarget | None:
+    state = read_json_document(candidate_state_path(snapshot_path))
+    if state is None or state.get("schemaVersion") != CANDIDATE_STATE_SCHEMA_VERSION:
+        return None
+    candidates = state.get("candidates")
     candidate = candidates.get(key) if isinstance(candidates, dict) else None
     url = candidate.get("url") if isinstance(candidate, dict) else None
     if not isinstance(url, str):

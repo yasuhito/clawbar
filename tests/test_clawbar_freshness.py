@@ -57,7 +57,15 @@ class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
         second = self.collect(FakeCommandSurface.lost())
 
         self.assertEqual(first.snapshot["gateway"], {"state": "no_data"})
+        self.assertEqual(
+            first.snapshot["bar"],
+            {"kind": "none", "count": 0, "severity": "warning"},
+        )
         self.assertEqual(second.snapshot["gateway"], {"state": "no_data"})
+        self.assertEqual(
+            second.snapshot["bar"],
+            {"kind": "none", "count": 0, "severity": "warning"},
+        )
         self.assertEqual(second.snapshot["consecutiveFailures"], 2)
         self.assertNotIn("lastKnown", second.snapshot)
 
@@ -84,6 +92,22 @@ class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
 
         self.assertEqual(failed.snapshot["gateway"], {"state": "unstable"})
         self.assertEqual(failed.snapshot["lastKnown"]["fleet"], healthy.snapshot["fleet"])
+
+    def test_degraded_agents_retain_complete_last_known_metadata(self) -> None:
+        healthy = self.collect(FakeCommandSurface.healthy())
+
+        degraded = self.collect(
+            FakeCommandSurface.healthy(agents_list=CollectionDeadlineExceeded())
+        )
+
+        self.assertEqual(degraded.snapshot["gateway"], {"state": "degraded"})
+        self.assertEqual(degraded.snapshot["agents"], {"available": False, "items": []})
+        self.assertEqual(degraded.snapshot["lastKnown"]["fleet"], healthy.snapshot["fleet"])
+        self.assertEqual(degraded.snapshot["lastKnown"]["agents"], healthy.snapshot["agents"])
+        self.assertEqual(
+            degraded.snapshot["lastKnown"]["automations"],
+            healthy.snapshot["automations"],
+        )
 
     def test_repeated_reads_observe_only_complete_atomic_snapshots(self) -> None:
         stop = threading.Event()

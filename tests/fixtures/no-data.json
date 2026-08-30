@@ -1,0 +1,29 @@
+{
+  "agents": {
+    "available": false,
+    "items": []
+  },
+  "automations": {
+    "available": false,
+    "items": []
+  },
+  "bar": {
+    "count": 0,
+    "kind": "none",
+    "severity": "warning"
+  },
+  "consecutiveFailures": 1,
+  "failureKind": "command_failed",
+  "fleet": {
+    "available": false,
+    "nodes": []
+  },
+  "gateway": {
+    "state": "no_data"
+  },
+  "generatedAt": "2026-08-24T17:44:00.000Z",
+  "lastSuccessAt": null,
+  "refreshIntervalSeconds": 30,
+  "resolutionSource": "unresolved",
+  "schemaVersion": 1
+}

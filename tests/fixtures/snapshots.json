@@ -1,0 +1,983 @@
+{
+  "automation-failure": {
+    "agents": {
+      "available": true,
+      "items": []
+    },
+    "automations": {
+      "available": true,
+      "items": [
+        {
+          "consecutiveFailures": 3,
+          "enabled": true,
+          "id": "demo-morning",
+          "kind": "cron",
+          "lastResult": "error",
+          "lastRunAt": "2026-08-24T17:40:00.000Z",
+          "name": "Morning review",
+          "nextRunAt": "2026-08-24T17:59:00.000Z"
+        },
+        {
+          "consecutiveFailures": 0,
+          "enabled": false,
+          "id": "demo-archive",
+          "kind": "cron",
+          "lastResult": "ok",
+          "lastRunAt": "2026-08-24T17:40:00.000Z",
+          "name": "Weekly archive",
+          "nextRunAt": null
+        }
+      ]
+    },
+    "bar": {
+      "count": 1,
+      "kind": "attention",
+      "severity": "critical"
+    },
+    "consecutiveFailures": 0,
+    "demoScenario": "automation-failure",
+    "fleet": {
+      "available": true,
+      "nodes": [
+        {
+          "key": "node:demo-local",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Local",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        },
+        {
+          "key": "node:demo-studio",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Studio",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        },
+        {
+          "key": "node:demo-archive",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Archive",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        }
+      ]
+    },
+    "gateway": {
+      "state": "healthy"
+    },
+    "generatedAt": "2026-08-24T17:44:00.000Z",
+    "lastSuccessAt": "2026-08-24T17:44:00.000Z",
+    "refreshIntervalSeconds": 30,
+    "resolutionSource": "local",
+    "schemaVersion": 1
+  },
+  "configuration-error": {
+    "agents": {
+      "available": false,
+      "items": []
+    },
+    "automations": {
+      "available": false,
+      "items": []
+    },
+    "bar": {
+      "count": 1,
+      "kind": "attention",
+      "severity": "critical"
+    },
+    "consecutiveFailures": 0,
+    "demoScenario": "configuration-error",
+    "failureKind": "unsupported_json",
+    "fleet": {
+      "available": false,
+      "nodes": []
+    },
+    "gateway": {
+      "state": "configuration_error"
+    },
+    "generatedAt": "2026-08-24T17:44:00.000Z",
+    "lastSuccessAt": null,
+    "refreshIntervalSeconds": 30,
+    "resolutionSource": "configured_remote",
+    "schemaVersion": 1
+  },
+  "degraded-gateway": {
+    "agents": {
+      "available": true,
+      "items": []
+    },
+    "automations": {
+      "available": false,
+      "items": [],
+      "reason": "unavailable"
+    },
+    "bar": {
+      "count": 1,
+      "kind": "attention",
+      "severity": "warning"
+    },
+    "consecutiveFailures": 0,
+    "demoScenario": "degraded-gateway",
+    "fleet": {
+      "available": true,
+      "nodes": [
+        {
+          "key": "node:demo-local",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Local",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        },
+        {
+          "key": "node:demo-studio",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Studio",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        },
+        {
+          "key": "node:demo-archive",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Archive",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        }
+      ]
+    },
+    "gateway": {
+      "state": "degraded"
+    },
+    "generatedAt": "2026-08-24T17:44:00.000Z",
+    "lastKnown": {
+      "agents": {
+        "available": true,
+        "items": []
+      },
+      "automations": {
+        "available": true,
+        "items": [
+          {
+            "consecutiveFailures": 0,
+            "enabled": true,
+            "id": "demo-morning",
+            "kind": "cron",
+            "lastResult": "ok",
+            "lastRunAt": "2026-08-24T17:40:00.000Z",
+            "name": "Morning review",
+            "nextRunAt": "2026-08-24T17:59:00.000Z"
+          },
+          {
+            "consecutiveFailures": 0,
+            "enabled": false,
+            "id": "demo-archive",
+            "kind": "cron",
+            "lastResult": "ok",
+            "lastRunAt": "2026-08-24T17:40:00.000Z",
+            "name": "Weekly archive",
+            "nextRunAt": null
+          }
+        ]
+      },
+      "fleet": {
+        "available": true,
+        "nodes": [
+          {
+            "key": "node:demo-local",
+            "lastSeenAt": "2026-08-24T17:44:00.000Z",
+            "model": "Fictional workstation",
+            "name": "Local",
+            "platform": "Linux",
+            "state": "healthy",
+            "version": "2026.7.1-2"
+          },
+          {
+            "key": "node:demo-studio",
+            "lastSeenAt": "2026-08-24T17:44:00.000Z",
+            "model": "Fictional workstation",
+            "name": "Studio",
+            "platform": "Linux",
+            "state": "healthy",
+            "version": "2026.7.1-2"
+          },
+          {
+            "key": "node:demo-archive",
+            "lastSeenAt": "2026-08-24T17:44:00.000Z",
+            "model": "Fictional workstation",
+            "name": "Archive",
+            "platform": "Linux",
+            "state": "healthy",
+            "version": "2026.7.1-2"
+          }
+        ]
+      },
+      "gateway": {
+        "state": "healthy"
+      },
+      "observedAt": "2026-08-24T17:44:00.000Z"
+    },
+    "lastSuccessAt": "2026-08-24T17:44:00.000Z",
+    "refreshIntervalSeconds": 30,
+    "resolutionSource": "local",
+    "schemaVersion": 1
+  },
+  "empty-fleet": {
+    "agents": {
+      "available": true,
+      "items": []
+    },
+    "automations": {
+      "available": true,
+      "items": [
+        {
+          "consecutiveFailures": 0,
+          "enabled": true,
+          "id": "demo-morning",
+          "kind": "cron",
+          "lastResult": "ok",
+          "lastRunAt": "2026-08-24T17:40:00.000Z",
+          "name": "Morning review",
+          "nextRunAt": "2026-08-24T17:59:00.000Z"
+        },
+        {
+          "consecutiveFailures": 0,
+          "enabled": false,
+          "id": "demo-archive",
+          "kind": "cron",
+          "lastResult": "ok",
+          "lastRunAt": "2026-08-24T17:40:00.000Z",
+          "name": "Weekly archive",
+          "nextRunAt": null
+        }
+      ]
+    },
+    "bar": {
+      "count": 0,
+      "kind": "none",
+      "severity": "healthy"
+    },
+    "consecutiveFailures": 0,
+    "demoScenario": "empty-fleet",
+    "fleet": {
+      "available": true,
+      "nodes": []
+    },
+    "gateway": {
+      "state": "healthy"
+    },
+    "generatedAt": "2026-08-24T17:44:00.000Z",
+    "lastSuccessAt": "2026-08-24T17:44:00.000Z",
+    "refreshIntervalSeconds": 30,
+    "resolutionSource": "local",
+    "schemaVersion": 1
+  },
+  "grouped-incidents": {
+    "agents": {
+      "available": true,
+      "items": [
+        {
+          "key": "agent:demo-planner",
+          "model": "Fictional model",
+          "name": "Planner",
+          "taskResult": {
+            "completedAt": "2026-08-24T17:35:00.000Z",
+            "state": "failed"
+          }
+        },
+        {
+          "key": "agent:demo-builder",
+          "model": "Fictional model",
+          "name": "Builder",
+          "taskResult": {
+            "state": "none"
+          }
+        },
+        {
+          "key": "agent:demo-observer",
+          "name": "Observer",
+          "taskResult": {
+            "completedAt": "2026-08-24T17:40:00.000Z",
+            "state": "succeeded"
+          }
+        }
+      ]
+    },
+    "automations": {
+      "available": true,
+      "items": [
+        {
+          "consecutiveFailures": 3,
+          "enabled": true,
+          "id": "demo-morning",
+          "kind": "cron",
+          "lastResult": "error",
+          "lastRunAt": "2026-08-24T17:40:00.000Z",
+          "name": "Morning review",
+          "nextRunAt": "2026-08-24T17:59:00.000Z"
+        },
+        {
+          "consecutiveFailures": 2,
+          "enabled": true,
+          "id": "demo-nightly",
+          "kind": "cron",
+          "lastResult": "error",
+          "lastRunAt": "2026-08-24T17:40:00.000Z",
+          "name": "Nightly sync",
+          "nextRunAt": "2026-08-24T17:59:00.000Z"
+        },
+        {
+          "consecutiveFailures": 0,
+          "enabled": false,
+          "id": "demo-archive",
+          "kind": "cron",
+          "lastResult": "ok",
+          "lastRunAt": "2026-08-24T17:40:00.000Z",
+          "name": "Weekly archive",
+          "nextRunAt": null
+        }
+      ]
+    },
+    "bar": {
+      "count": 2,
+      "kind": "attention",
+      "severity": "critical"
+    },
+    "consecutiveFailures": 0,
+    "demoScenario": "grouped-incidents",
+    "fleet": {
+      "available": true,
+      "nodes": [
+        {
+          "key": "node:demo-local",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Local",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        },
+        {
+          "key": "node:demo-studio",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Studio",
+          "platform": "Linux",
+          "state": "offline",
+          "version": "2026.7.1-2"
+        },
+        {
+          "key": "node:demo-archive",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Archive",
+          "platform": "Linux",
+          "state": "offline",
+          "version": "2026.7.1-2"
+        }
+      ]
+    },
+    "gateway": {
+      "state": "healthy"
+    },
+    "generatedAt": "2026-08-24T17:44:00.000Z",
+    "lastSuccessAt": "2026-08-24T17:44:00.000Z",
+    "refreshIntervalSeconds": 30,
+    "resolutionSource": "local",
+    "schemaVersion": 1
+  },
+  "healthy": {
+    "agents": {
+      "available": true,
+      "items": []
+    },
+    "automations": {
+      "available": true,
+      "items": [
+        {
+          "consecutiveFailures": 0,
+          "enabled": true,
+          "id": "demo-morning",
+          "kind": "cron",
+          "lastResult": "ok",
+          "lastRunAt": "2026-08-24T17:40:00.000Z",
+          "name": "Morning review",
+          "nextRunAt": "2026-08-24T17:59:00.000Z"
+        },
+        {
+          "consecutiveFailures": 0,
+          "enabled": false,
+          "id": "demo-archive",
+          "kind": "cron",
+          "lastResult": "ok",
+          "lastRunAt": "2026-08-24T17:40:00.000Z",
+          "name": "Weekly archive",
+          "nextRunAt": null
+        }
+      ]
+    },
+    "bar": {
+      "count": 0,
+      "kind": "none",
+      "severity": "healthy"
+    },
+    "consecutiveFailures": 0,
+    "demoScenario": "healthy",
+    "fleet": {
+      "available": true,
+      "nodes": [
+        {
+          "key": "node:demo-local",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Local",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        },
+        {
+          "key": "node:demo-studio",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Studio",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        },
+        {
+          "key": "node:demo-archive",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Archive",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        }
+      ]
+    },
+    "gateway": {
+      "state": "healthy"
+    },
+    "generatedAt": "2026-08-24T17:44:00.000Z",
+    "lastSuccessAt": "2026-08-24T17:44:00.000Z",
+    "refreshIntervalSeconds": 30,
+    "resolutionSource": "local",
+    "schemaVersion": 1
+  },
+  "offline-gateway": {
+    "agents": {
+      "available": false,
+      "items": []
+    },
+    "automations": {
+      "available": false,
+      "items": []
+    },
+    "bar": {
+      "count": 1,
+      "kind": "attention",
+      "severity": "critical"
+    },
+    "consecutiveFailures": 2,
+    "demoScenario": "offline-gateway",
+    "failureKind": "command_failed",
+    "fleet": {
+      "available": false,
+      "nodes": []
+    },
+    "gateway": {
+      "state": "offline"
+    },
+    "generatedAt": "2026-08-24T17:44:00.000Z",
+    "lastKnown": {
+      "agents": {
+        "available": true,
+        "items": []
+      },
+      "automations": {
+        "available": true,
+        "items": [
+          {
+            "consecutiveFailures": 0,
+            "enabled": true,
+            "id": "demo-morning",
+            "kind": "cron",
+            "lastResult": "ok",
+            "lastRunAt": "2026-08-24T17:40:00.000Z",
+            "name": "Morning review",
+            "nextRunAt": "2026-08-24T17:59:00.000Z"
+          },
+          {
+            "consecutiveFailures": 0,
+            "enabled": false,
+            "id": "demo-archive",
+            "kind": "cron",
+            "lastResult": "ok",
+            "lastRunAt": "2026-08-24T17:40:00.000Z",
+            "name": "Weekly archive",
+            "nextRunAt": null
+          }
+        ]
+      },
+      "fleet": {
+        "available": true,
+        "nodes": [
+          {
+            "key": "node:demo-local",
+            "lastSeenAt": "2026-08-24T17:44:00.000Z",
+            "model": "Fictional workstation",
+            "name": "Local",
+            "platform": "Linux",
+            "state": "healthy",
+            "version": "2026.7.1-2"
+          },
+          {
+            "key": "node:demo-studio",
+            "lastSeenAt": "2026-08-24T17:44:00.000Z",
+            "model": "Fictional workstation",
+            "name": "Studio",
+            "platform": "Linux",
+            "state": "healthy",
+            "version": "2026.7.1-2"
+          },
+          {
+            "key": "node:demo-archive",
+            "lastSeenAt": "2026-08-24T17:44:00.000Z",
+            "model": "Fictional workstation",
+            "name": "Archive",
+            "platform": "Linux",
+            "state": "healthy",
+            "version": "2026.7.1-2"
+          }
+        ]
+      },
+      "gateway": {
+        "state": "healthy"
+      },
+      "observedAt": "2026-08-24T17:44:00.000Z"
+    },
+    "lastSuccessAt": "2026-08-24T17:44:00.000Z",
+    "refreshIntervalSeconds": 30,
+    "resolutionSource": "local",
+    "schemaVersion": 1
+  },
+  "recovery": {
+    "agents": {
+      "available": true,
+      "items": []
+    },
+    "automations": {
+      "available": true,
+      "items": [
+        {
+          "consecutiveFailures": 0,
+          "enabled": true,
+          "id": "demo-morning",
+          "kind": "cron",
+          "lastResult": "ok",
+          "lastRunAt": "2026-08-24T17:40:00.000Z",
+          "name": "Morning review",
+          "nextRunAt": "2026-08-24T17:59:00.000Z"
+        },
+        {
+          "consecutiveFailures": 0,
+          "enabled": true,
+          "id": "demo-nightly",
+          "kind": "cron",
+          "lastResult": "ok",
+          "lastRunAt": "2026-08-24T17:40:00.000Z",
+          "name": "Nightly sync",
+          "nextRunAt": "2026-08-24T17:59:00.000Z"
+        },
+        {
+          "consecutiveFailures": 0,
+          "enabled": false,
+          "id": "demo-archive",
+          "kind": "cron",
+          "lastResult": "ok",
+          "lastRunAt": "2026-08-24T17:40:00.000Z",
+          "name": "Weekly archive",
+          "nextRunAt": null
+        }
+      ]
+    },
+    "bar": {
+      "count": 0,
+      "kind": "none",
+      "severity": "healthy"
+    },
+    "consecutiveFailures": 0,
+    "demoScenario": "recovery",
+    "fleet": {
+      "available": true,
+      "nodes": [
+        {
+          "key": "node:demo-local",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Local",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        },
+        {
+          "key": "node:demo-studio",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Studio",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        },
+        {
+          "key": "node:demo-archive",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Archive",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        }
+      ]
+    },
+    "gateway": {
+      "state": "healthy"
+    },
+    "generatedAt": "2026-08-24T17:44:00.000Z",
+    "lastSuccessAt": "2026-08-24T17:44:00.000Z",
+    "refreshIntervalSeconds": 30,
+    "resolutionSource": "local",
+    "schemaVersion": 1
+  },
+  "registered-agents": {
+    "agents": {
+      "available": true,
+      "items": [
+        {
+          "key": "agent:demo-planner",
+          "model": "Fictional model",
+          "name": "Planner",
+          "taskResult": {
+            "completedAt": "2026-08-24T17:35:00.000Z",
+            "state": "failed"
+          }
+        },
+        {
+          "key": "agent:demo-builder",
+          "model": "Fictional model",
+          "name": "Builder",
+          "taskResult": {
+            "state": "none"
+          }
+        },
+        {
+          "key": "agent:demo-observer",
+          "name": "Observer",
+          "taskResult": {
+            "completedAt": "2026-08-24T17:40:00.000Z",
+            "state": "succeeded"
+          }
+        }
+      ]
+    },
+    "automations": {
+      "available": true,
+      "items": [
+        {
+          "consecutiveFailures": 0,
+          "enabled": true,
+          "id": "demo-morning",
+          "kind": "cron",
+          "lastResult": "ok",
+          "lastRunAt": "2026-08-24T17:40:00.000Z",
+          "name": "Morning review",
+          "nextRunAt": "2026-08-24T17:59:00.000Z"
+        },
+        {
+          "consecutiveFailures": 0,
+          "enabled": false,
+          "id": "demo-archive",
+          "kind": "cron",
+          "lastResult": "ok",
+          "lastRunAt": "2026-08-24T17:40:00.000Z",
+          "name": "Weekly archive",
+          "nextRunAt": null
+        }
+      ]
+    },
+    "bar": {
+      "count": 0,
+      "kind": "none",
+      "severity": "healthy"
+    },
+    "consecutiveFailures": 0,
+    "demoScenario": "registered-agents",
+    "fleet": {
+      "available": true,
+      "nodes": [
+        {
+          "key": "node:demo-local",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Local",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        },
+        {
+          "key": "node:demo-studio",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Studio",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        },
+        {
+          "key": "node:demo-archive",
+          "lastSeenAt": "2026-08-24T17:44:00.000Z",
+          "model": "Fictional workstation",
+          "name": "Archive",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        }
+      ]
+    },
+    "gateway": {
+      "state": "healthy"
+    },
+    "generatedAt": "2026-08-24T17:44:00.000Z",
+    "lastSuccessAt": "2026-08-24T17:44:00.000Z",
+    "refreshIntervalSeconds": 30,
+    "resolutionSource": "local",
+    "schemaVersion": 1
+  },
+  "setup-required": {
+    "agents": {
+      "available": false,
+      "items": []
+    },
+    "automations": {
+      "available": false,
+      "items": []
+    },
+    "bar": {
+      "count": 0,
+      "kind": "none",
+      "severity": "warning"
+    },
+    "consecutiveFailures": 0,
+    "demoScenario": "setup-required",
+    "fleet": {
+      "available": false,
+      "nodes": []
+    },
+    "gateway": {
+      "state": "setup_required"
+    },
+    "generatedAt": "2026-08-24T17:44:00.000Z",
+    "lastSuccessAt": null,
+    "refreshIntervalSeconds": 30,
+    "resolutionSource": "unresolved",
+    "schemaVersion": 1,
+    "setup": {
+      "candidates": [
+        {
+          "key": "candidate:65a84e5cbb06f1195fb3",
+          "name": "gateway-alpha"
+        },
+        {
+          "key": "candidate:9d487cbecf592db688fb",
+          "name": "gateway-beta"
+        }
+      ],
+      "guidance": "Choose a Tailscale device to verify as your OpenClaw Gateway."
+    }
+  },
+  "stale-snapshot": {
+    "agents": {
+      "available": true,
+      "items": []
+    },
+    "automations": {
+      "available": true,
+      "items": [
+        {
+          "consecutiveFailures": 0,
+          "enabled": true,
+          "id": "demo-morning",
+          "kind": "cron",
+          "lastResult": "ok",
+          "lastRunAt": "2026-08-24T17:37:59.000Z",
+          "name": "Morning review",
+          "nextRunAt": "2026-08-24T17:56:59.000Z"
+        },
+        {
+          "consecutiveFailures": 0,
+          "enabled": false,
+          "id": "demo-archive",
+          "kind": "cron",
+          "lastResult": "ok",
+          "lastRunAt": "2026-08-24T17:37:59.000Z",
+          "name": "Weekly archive",
+          "nextRunAt": null
+        }
+      ]
+    },
+    "bar": {
+      "count": 0,
+      "kind": "none",
+      "severity": "healthy"
+    },
+    "consecutiveFailures": 0,
+    "demoScenario": "stale-snapshot",
+    "fleet": {
+      "available": true,
+      "nodes": [
+        {
+          "key": "node:demo-local",
+          "lastSeenAt": "2026-08-24T17:41:59.000Z",
+          "model": "Fictional workstation",
+          "name": "Local",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        },
+        {
+          "key": "node:demo-studio",
+          "lastSeenAt": "2026-08-24T17:41:59.000Z",
+          "model": "Fictional workstation",
+          "name": "Studio",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        },
+        {
+          "key": "node:demo-archive",
+          "lastSeenAt": "2026-08-24T17:41:59.000Z",
+          "model": "Fictional workstation",
+          "name": "Archive",
+          "platform": "Linux",
+          "state": "healthy",
+          "version": "2026.7.1-2"
+        }
+      ]
+    },
+    "gateway": {
+      "state": "healthy"
+    },
+    "generatedAt": "2026-08-24T17:41:59.000Z",
+    "lastSuccessAt": "2026-08-24T17:41:59.000Z",
+    "refreshIntervalSeconds": 30,
+    "resolutionSource": "local",
+    "schemaVersion": 1
+  },
+  "unstable-gateway": {
+    "agents": {
+      "available": false,
+      "items": []
+    },
+    "automations": {
+      "available": false,
+      "items": []
+    },
+    "bar": {
+      "count": 1,
+      "kind": "attention",
+      "severity": "warning"
+    },
+    "consecutiveFailures": 1,
+    "demoScenario": "unstable-gateway",
+    "failureKind": "command_failed",
+    "fleet": {
+      "available": false,
+      "nodes": []
+    },
+    "gateway": {
+      "state": "unstable"
+    },
+    "generatedAt": "2026-08-24T17:44:00.000Z",
+    "lastKnown": {
+      "agents": {
+        "available": true,
+        "items": []
+      },
+      "automations": {
+        "available": true,
+        "items": [
+          {
+            "consecutiveFailures": 0,
+            "enabled": true,
+            "id": "demo-morning",
+            "kind": "cron",
+            "lastResult": "ok",
+            "lastRunAt": "2026-08-24T17:40:00.000Z",
+            "name": "Morning review",
+            "nextRunAt": "2026-08-24T17:59:00.000Z"
+          },
+          {
+            "consecutiveFailures": 0,
+            "enabled": false,
+            "id": "demo-archive",
+            "kind": "cron",
+            "lastResult": "ok",
+            "lastRunAt": "2026-08-24T17:40:00.000Z",
+            "name": "Weekly archive",
+            "nextRunAt": null
+          }
+        ]
+      },
+      "fleet": {
+        "available": true,
+        "nodes": [
+          {
+            "key": "node:demo-local",
+            "lastSeenAt": "2026-08-24T17:44:00.000Z",
+            "model": "Fictional workstation",
+            "name": "Local",
+            "platform": "Linux",
+            "state": "healthy",
+            "version": "2026.7.1-2"
+          },
+          {
+            "key": "node:demo-studio",
+            "lastSeenAt": "2026-08-24T17:44:00.000Z",
+            "model": "Fictional workstation",
+            "name": "Studio",
+            "platform": "Linux",
+            "state": "healthy",
+            "version": "2026.7.1-2"
+          },
+          {
+            "key": "node:demo-archive",
+            "lastSeenAt": "2026-08-24T17:44:00.000Z",
+            "model": "Fictional workstation",
+            "name": "Archive",
+            "platform": "Linux",
+            "state": "healthy",
+            "version": "2026.7.1-2"
+          }
+        ]
+      },
+      "gateway": {
+        "state": "healthy"
+      },
+      "observedAt": "2026-08-24T17:44:00.000Z"
+    },
+    "lastSuccessAt": "2026-08-24T17:44:00.000Z",
+    "refreshIntervalSeconds": 30,
+    "resolutionSource": "local",
+    "schemaVersion": 1
+  }
+}

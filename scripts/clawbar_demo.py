@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Publish fictional snapshots for Clawbar development and review."""
+"""Publish fictional Snapshots for Clawbar development and review."""
 
 from __future__ import annotations
 
 import argparse
-import copy
 import json
 import os
 import subprocess
@@ -15,12 +14,31 @@ from typing import Any, Sequence
 
 if __package__:
     from .clawbar_collect import default_snapshot_path
+    from .clawbar_gateway import SETUP_GUIDANCE
     from .clawbar_incidents import process_incident_transitions
-    from .clawbar_snapshot import atomic_write_snapshot
+    from .clawbar_snapshot import SnapshotBuilder, atomic_write_snapshot
 else:
     from clawbar_collect import default_snapshot_path
+    from clawbar_gateway import SETUP_GUIDANCE
     from clawbar_incidents import process_incident_transitions
-    from clawbar_snapshot import atomic_write_snapshot
+    from clawbar_snapshot import SnapshotBuilder, atomic_write_snapshot
+
+
+SCENARIOS = (
+    "setup-required",
+    "healthy",
+    "registered-agents",
+    "unstable-gateway",
+    "offline-gateway",
+    "degraded-gateway",
+    "configuration-error",
+    "automation-failure",
+    "stale-snapshot",
+    "empty-fleet",
+    "grouped-incidents",
+    "recovery",
+)
+FIXTURE_NOW = datetime(2026, 8, 24, 17, 44, tzinfo=timezone.utc)
 
 
 def demo_marker_path() -> Path:
@@ -55,39 +73,17 @@ def reset_demo_incidents() -> None:
         (state_directory / name).unlink(missing_ok=True)
 
 
-
 def reload_shell() -> None:
     if os.environ.get("CLAWBAR_DEMO_NO_RESCAN") == "1":
         return
     try:
-        subprocess.run(
-            ["omarchy-shell", "-q", "shell", "rescanPlugins"],
-            check=False,
-            timeout=2,
-        )
+        subprocess.run(["omarchy-shell", "-q", "shell", "rescanPlugins"], check=False, timeout=2)
     except (OSError, subprocess.TimeoutExpired):
         pass
 
-SCENARIOS = (
-    "setup-required",
-    "healthy",
-    "registered-agents",
-    "unstable-gateway",
-    "offline-gateway",
-    "degraded-gateway",
-    "configuration-error",
-    "automation-failure",
-    "stale-snapshot",
-    "empty-fleet",
-    "grouped-incidents",
-    "recovery",
-)
-
 
 def timestamp(now: datetime, *, seconds: int = 0) -> str:
-    return (
-        now + timedelta(seconds=seconds)
-    ).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return (now + timedelta(seconds=seconds)).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def node(key: str, name: str, state: str, observed_at: str) -> dict[str, Any]:
@@ -145,130 +141,110 @@ def registered_agents(now: datetime) -> list[dict[str, Any]]:
     ]
 
 
-def healthy_snapshot(now: datetime) -> dict[str, Any]:
-    generated_at = timestamp(now)
-    return {
-        "schemaVersion": 1,
-        "generatedAt": generated_at,
-        "refreshIntervalSeconds": 30,
-        "resolutionSource": "local",
-        "gateway": {"state": "healthy"},
-        "fleet": {
-            "available": True,
-            "nodes": [
-                node("local", "Local", "healthy", generated_at),
-                node("studio", "Studio", "healthy", generated_at),
-                node("archive", "Archive", "healthy", generated_at),
-            ],
-        },
-        "agents": {"available": True, "items": []},
-        "automations": {
-            "available": True,
-            "items": [
-                automation("morning", "Morning review", now),
-                automation("archive", "Weekly archive", now, enabled=False),
-            ],
-        },
-        "bar": {"kind": "none", "count": 0, "severity": "healthy"},
-        "lastSuccessAt": generated_at,
-        "consecutiveFailures": 0,
-    }
+def demo_metadata(now: datetime) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    observed_at = timestamp(now)
+    fleet = [
+        node("local", "Local", "healthy", observed_at),
+        node("studio", "Studio", "healthy", observed_at),
+        node("archive", "Archive", "healthy", observed_at),
+    ]
+    automations = [
+        automation("morning", "Morning review", now),
+        automation("archive", "Weekly archive", now, enabled=False),
+    ]
+    return fleet, [], automations
 
 
-def historical(snapshot: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "observedAt": snapshot["lastSuccessAt"],
-        "gateway": snapshot["gateway"],
-        "fleet": snapshot["fleet"],
-        "agents": snapshot["agents"],
-        "automations": snapshot["automations"],
-    }
+def current_demo(
+    scenario: str | None,
+    now: datetime,
+    *,
+    previous: dict[str, Any] | None = None,
+    fleet: list[dict[str, Any]] | None = None,
+    agents: list[dict[str, Any]] | None = None,
+    automations: list[dict[str, Any]] | None = None,
+    automation_failure: str | None = None,
+) -> dict[str, Any]:
+    default_fleet, default_agents, default_automations = demo_metadata(now)
+    return SnapshotBuilder(
+        previous,
+        30,
+        clock=lambda: timestamp(now),
+        demo_scenario=scenario,
+    ).current(
+        "local",
+        default_fleet if fleet is None else fleet,
+        default_agents if agents is None else agents,
+        default_automations if automations is None else automations,
+        automation_failure,
+        {},
+    )
 
 
 def snapshot_for(scenario: str, now: datetime) -> dict[str, Any]:
-    snapshot = healthy_snapshot(now)
+    healthy = current_demo(None, now)
+    fleet, agents, automations = demo_metadata(now)
+    builder = SnapshotBuilder(healthy, 30, clock=lambda: timestamp(now), demo_scenario=scenario)
+
     if scenario == "setup-required":
-        snapshot.update({
-            "resolutionSource": "unresolved",
-            "gateway": {"state": "setup_required"},
-            "fleet": {"available": False, "nodes": []},
-            "agents": {"available": False, "items": []},
-            "automations": {"available": False, "items": []},
-            "bar": {"kind": "attention", "count": 0, "severity": "warning"},
-            "lastSuccessAt": None,
-            "setup": {
-                "candidates": [
-                    {"key": "candidate:65a84e5cbb06f1195fb3", "name": "gateway-alpha"},
-                    {"key": "candidate:9d487cbecf592db688fb", "name": "gateway-beta"},
-                ],
-                "guidance": "Choose a Tailscale device to verify as your OpenClaw Gateway.",
-            },
-        })
-    elif scenario == "registered-agents":
-        snapshot["agents"]["items"] = registered_agents(now)
-    elif scenario in {"unstable-gateway", "offline-gateway"}:
-        previous = copy.deepcopy(snapshot)
-        state = "unstable" if scenario == "unstable-gateway" else "offline"
-        snapshot.update({
-            "gateway": {"state": state},
-            "fleet": {"available": False, "nodes": []},
-            "agents": {"available": False, "items": []},
-            "automations": {"available": False, "items": []},
-            "bar": {
-                "kind": "attention",
-                "count": 1,
-                "severity": "warning" if state == "unstable" else "critical",
-            },
-            "consecutiveFailures": 1 if state == "unstable" else 2,
-            "failureKind": "command_failed",
-            "lastKnown": historical(previous),
-        })
-    elif scenario == "degraded-gateway":
-        snapshot["gateway"] = {"state": "degraded"}
-        snapshot["automations"] = {"available": False, "items": [], "reason": "unavailable"}
-        snapshot["bar"] = {"kind": "attention", "count": 1, "severity": "warning"}
-    elif scenario == "configuration-error":
-        snapshot.update({
-            "resolutionSource": "configured_remote",
-            "gateway": {"state": "configuration_error"},
-            "fleet": {"available": False, "nodes": []},
-            "agents": {"available": False, "items": []},
-            "automations": {"available": False, "items": []},
-            "bar": {"kind": "attention", "count": 1, "severity": "critical"},
-            "failureKind": "unsupported_json",
-        })
-    elif scenario == "automation-failure":
-        snapshot["automations"]["items"][0] = automation(
-            "morning", "Morning review", now, result="error", failures=3
-        )
-        snapshot["bar"] = {"kind": "attention", "count": 1, "severity": "critical"}
-    elif scenario == "stale-snapshot":
+        candidates = [
+            {"key": "candidate:65a84e5cbb06f1195fb3", "name": "gateway-alpha"},
+            {"key": "candidate:9d487cbecf592db688fb", "name": "gateway-beta"},
+        ]
+        return SnapshotBuilder(
+            None,
+            30,
+            clock=lambda: timestamp(now),
+            demo_scenario=scenario,
+        ).setup(candidates, SETUP_GUIDANCE)
+    if scenario == "healthy":
+        return current_demo(scenario, now)
+    if scenario == "registered-agents":
+        return current_demo(scenario, now, agents=registered_agents(now))
+    if scenario == "unstable-gateway":
+        return builder.failure("command_failed")
+    if scenario == "offline-gateway":
+        unstable = SnapshotBuilder(healthy, 30, clock=lambda: timestamp(now)).failure("command_failed")
+        return SnapshotBuilder(
+            unstable,
+            30,
+            clock=lambda: timestamp(now),
+            demo_scenario=scenario,
+        ).failure("command_failed")
+    if scenario == "degraded-gateway":
+        return builder.current("local", fleet, agents, None, "unavailable", {})
+    if scenario == "configuration-error":
+        return SnapshotBuilder(
+            None,
+            30,
+            clock=lambda: timestamp(now),
+            demo_scenario=scenario,
+        ).configuration_error("configured_remote", "unsupported_json")
+    if scenario == "automation-failure":
+        failing = [automation("morning", "Morning review", now, result="error", failures=3), automations[1]]
+        return builder.current("local", fleet, agents, failing, None, {})
+    if scenario == "stale-snapshot":
         stale_at = now - timedelta(seconds=121)
-        snapshot = healthy_snapshot(stale_at)
-    elif scenario == "empty-fleet":
-        snapshot["fleet"] = {"available": True, "nodes": []}
-    elif scenario == "grouped-incidents":
-        snapshot["agents"]["items"] = registered_agents(now)
-        observed_at = snapshot["generatedAt"]
-        snapshot["fleet"]["nodes"][1] = node("studio", "Studio", "offline", observed_at)
-        snapshot["fleet"]["nodes"][2] = node("archive", "Archive", "offline", observed_at)
-        snapshot["automations"]["items"][0] = automation(
-            "morning", "Morning review", now, result="error", failures=3
-        )
-        snapshot["automations"]["items"].insert(
-            1,
+        return current_demo(scenario, stale_at)
+    if scenario == "empty-fleet":
+        return builder.current("local", [], agents, automations, None, {})
+    if scenario == "grouped-incidents":
+        fleet[1] = node("studio", "Studio", "offline", timestamp(now))
+        fleet[2] = node("archive", "Archive", "offline", timestamp(now))
+        failing = [
+            automation("morning", "Morning review", now, result="error", failures=3),
             automation("nightly", "Nightly sync", now, result="error", failures=2),
-        )
-        snapshot["bar"] = {"kind": "attention", "count": 2, "severity": "critical"}
-    elif scenario == "recovery":
-        snapshot["automations"]["items"].insert(
-            1,
-            automation("nightly", "Nightly sync", now),
-        )
-    elif scenario != "healthy":
-        raise ValueError(f"Unknown scenario: {scenario}")
-    snapshot["demoScenario"] = scenario
-    return snapshot
+            automations[1],
+        ]
+        return builder.current("local", fleet, registered_agents(now), failing, None, {})
+    if scenario == "recovery":
+        recovered = [automations[0], automation("nightly", "Nightly sync", now), automations[1]]
+        return builder.current("local", fleet, agents, recovered, None, {})
+    raise ValueError(f"Unknown scenario: {scenario}")
+
+
+def fixture_snapshots() -> dict[str, dict[str, Any]]:
+    return {scenario: snapshot_for(scenario, FIXTURE_NOW) for scenario in SCENARIOS}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -277,25 +253,29 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--snapshot", type=Path, help="override the XDG state snapshot path")
     parser.add_argument("--resume", action="store_true", help="resume normal scheduled collection")
     parser.add_argument("--list-scenarios", action="store_true", help="list available fictional scenarios")
+    parser.add_argument("--fixtures", action="store_true", help="print all scenarios using a fixed clock")
     return parser
+
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     arguments = parser.parse_args(argv)
+    actions = sum(bool(value) for value in (arguments.scenario, arguments.resume, arguments.list_scenarios, arguments.fixtures))
+    if actions != 1:
+        parser.error("choose exactly one scenario, --resume, --list-scenarios, or --fixtures")
+    if arguments.fixtures:
+        json.dump(fixture_snapshots(), sys.stdout, indent=2, sort_keys=True)
+        sys.stdout.write("\n")
+        return 0
     if arguments.list_scenarios:
-        if arguments.scenario or arguments.resume:
-            parser.error("--list-scenarios does not accept another action")
         print("\n".join(SCENARIOS))
         return 0
     if arguments.resume:
-        if arguments.scenario:
-            parser.error("--resume does not accept a scenario")
         set_demo_active(False)
         reset_demo_incidents()
         reload_shell()
         return 0
-    if not arguments.scenario:
-        parser.error("a scenario is required unless --resume or --list-scenarios is used")
+
     set_demo_active(True)
     reload_shell()
     snapshot = snapshot_for(arguments.scenario, datetime.now(timezone.utc))

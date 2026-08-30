@@ -58,7 +58,7 @@ The vocabulary used across these documents. When a document uses one of these te
 
 **Current metadata.** Operational Metadata from a successful collection that has not crossed its stale boundary. It can establish current health, Attention Items, and Incidents.
 
-**Last Known Metadata.** Operational Metadata retained from the latest successful collection after current collection can no longer establish live health. It is shown with reduced emphasis, a `Last known` label, and an observation time. It never establishes a current Incident or contributes its old item count.
+**Last Known Metadata.** Operational Metadata retained from the latest Gateway collection in which every section was available, falling back to the latest successful collection when no complete collection is available. It is shown with reduced emphasis, a `Last known` label, and an observation time. It never establishes a current Incident or contributes its old item count.
 
 **Healthy Gateway.** A Gateway whose core status and requested metadata are current and available. A healthy Gateway may still coexist with Automation Failures, so the panel header and bar can show critical Incident severity while Gateway reachability remains healthy.
 

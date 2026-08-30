@@ -78,7 +78,7 @@ Historical rows do not retain the old current Incident count. An old Offline Gat
 
 ## Last Known Metadata
 
-Last Known Metadata preserves diagnostic context without claiming current health. It comes from the last successful collection when available; older compatible snapshots may use their own retained metadata.
+Last Known Metadata preserves diagnostic context without claiming current health. It prefers the most recent Gateway collection in which every section was available, falling back to the last successful collection; older compatible snapshots may use their own retained metadata.
 
 Historical rows show `Last known`, reduced opacity, and a relative observation time. They cannot establish current Incidents or current Fleet counts. Their own recorded state, such as an Offline Node or failed Automation, remains visible as history rather than as a current alert.
 
