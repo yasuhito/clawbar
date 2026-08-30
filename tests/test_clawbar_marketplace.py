@@ -190,6 +190,7 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("expanded: rowRoot.selected", section)
         self.assertIn("Accessible.ignored: !expanded", reveal)
         self.assertEqual(section.count("DetailCard {"), 1)
+        self.assertIn("sourceComponent: detailCardComponent", section)
         self.assertIn("signal selectionGeometryChanged()", section)
         self.assertIn("onSelectionGeometryChanged", panel)
 
@@ -201,6 +202,20 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("vm: rowRoot.modelData", section)
         self.assertIn("palette: root.palette", section)
         self.assertIn("nowMs: root.nowMs", section)
+
+    def test_operational_row_detail_loader_skips_collapsed_and_empty_rows(self) -> None:
+        section = (ROOT / "RowSection.qml").read_text(encoding="utf-8")
+
+        self.assertIn("Loader {", section)
+        self.assertIn(
+            "active: rowRoot.modelData.detail.length > 0",
+            section,
+        )
+        self.assertIn("&& (rowRoot.selected || detailReveal.height > 0)", section)
+        self.assertIn(
+            "contentHeight: cardLoader.active && cardLoader.item",
+            section,
+        )
 
     def test_automation_selection_has_no_run_history_action(self) -> None:
         sources = "\n".join(
@@ -260,8 +275,9 @@ class MarketplaceContractTest(unittest.TestCase):
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
         section = (ROOT / "RowSection.qml").read_text(encoding="utf-8")
 
-        # One DetailCard instantiates inside every Operational Row delegate.
+        # A single shared DetailCard component is loaded only for the open row.
         self.assertEqual(section.count("DetailCard {"), 1)
+        self.assertIn("sourceComponent: detailCardComponent", section)
         self.assertNotIn("DetailCard {", panel)
         self.assertEqual(
             sorted(path.name for path in ROOT.glob("*DetailCard.qml")),

@@ -161,19 +161,33 @@ Item {
           id: detailReveal
           width: parent.width
           expanded: rowRoot.selected && rowRoot.modelData.detail.length > 0
-          contentHeight: detailCard.implicitHeight
+          contentHeight: cardLoader.active && cardLoader.item
+            ? cardLoader.item.implicitHeight : 0
           motionEnabled: root.motionEnabled
           fadeDuration: root.fadeDuration
           expandDuration: root.expandDuration
 
-          DetailCard {
-            id: detailCard
+          Component {
+            id: detailCardComponent
+
+            DetailCard {
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.top: parent.top
+              vm: rowRoot.modelData
+              palette: root.palette
+              nowMs: root.nowMs
+            }
+          }
+
+          Loader {
+            id: cardLoader
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            vm: rowRoot.modelData
-            palette: root.palette
-            nowMs: root.nowMs
+            active: rowRoot.modelData.detail.length > 0
+              && (rowRoot.selected || detailReveal.height > 0)
+            sourceComponent: detailCardComponent
           }
         }
       }
