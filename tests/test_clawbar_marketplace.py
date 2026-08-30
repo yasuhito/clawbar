@@ -194,6 +194,13 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("signal selectionGeometryChanged()", section)
         self.assertIn("onSelectionGeometryChanged", panel)
 
+    def test_open_operational_row_detail_properties_remain_bound(self) -> None:
+        section = (ROOT / "RowSection.qml").read_text(encoding="utf-8")
+        on_loaded = section.split("onLoaded: {", 1)[1].split("\n            }", 1)[0]
+
+        self.assertEqual(len(re.findall(r"^\s*item\.\w+\s*=", on_loaded, re.MULTILINE)), 4)
+        self.assertEqual(re.findall(r"item\.(\w+) = Qt\.binding", on_loaded), ["vm", "palette", "nowMs", "historical"])
+
     def test_automation_selection_has_no_run_history_action(self) -> None:
         sources = "\n".join(
             (ROOT / path).read_text(encoding="utf-8")
