@@ -1,15 +1,15 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
-import "ClawbarSnapshot.js" as Snapshot
 import "ClawbarPresentation.js" as Presentation
+import "ClawbarPanelModel.js" as PanelModel
 import "ClawbarColor.js" as ColorKit
 
 KeyboardPanel {
   id: root
 
-  required property var snapshot
-  required property string state
+  required property var panelModel
+  required property var gatewaySignal
   property double nowMs: Date.now()
   property string summary: ""
   property string selectedKey: ""
@@ -19,17 +19,11 @@ KeyboardPanel {
   signal refreshRequested()
   signal candidateVerificationRequested(string candidateKey)
 
-  readonly property var metadata: Snapshot.metadataSnapshot(snapshot, state)
-  readonly property var sectionData: Snapshot.sectionData(snapshot, state)
-  readonly property bool historical: sectionData.historical
-  readonly property string observedAt: sectionData.observedAt
-  readonly property var nodes: sectionData.nodes
-  readonly property var agents: sectionData.agents
-  readonly property var automations: sectionData.automations
-  readonly property var candidates: sectionData.candidates
-  readonly property bool setupVisible: candidates.length > 0 || state === "setup_required"
-    || (state === "configuration_error" && snapshot && snapshot.setup)
-  readonly property bool configurationErrorVisible: state === "configuration_error"
+  readonly property var sections: panelModel.sections
+  readonly property var candidateSection: PanelModel.sectionForKind(sections, "candidate")
+  readonly property var fleetSection: PanelModel.sectionForKind(sections, "node")
+  readonly property var agentsSection: PanelModel.sectionForKind(sections, "agent")
+  readonly property var automationsSection: PanelModel.sectionForKind(sections, "automation")
   readonly property int selectedIndex: Presentation.indexForKey(selectionKeys, selectedKey)
   readonly property string selectedKind: Presentation.keyKind(sections, selectedKey)
   readonly property color foreground: bar ? bar.foreground : Color.foreground
@@ -45,7 +39,6 @@ KeyboardPanel {
   required property color healthy
   required property color warning
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
-  readonly property var gatewaySignal: Presentation.panelSignal(snapshot, state)
 
   // One palette object carries every color the Operational Rows need; the
   // panel derives it once so sections never re-thread theme colors.
@@ -60,7 +53,6 @@ KeyboardPanel {
     selectedSurface: String(selectedSurface),
     fontFamily: fontFamily
   })
-  readonly property var sections: Presentation.panelSections(sectionData)
   readonly property var selectionKeys: Presentation.sectionKeys(sections)
 
   /* ───────────────────────────────────────────────────────
@@ -176,9 +168,7 @@ KeyboardPanel {
       palette: root.palette
       gatewaySignal: root.gatewaySignal
       summary: root.summary
-      timeCaption: root.historical
-        ? "Last known " + Presentation.relativeTime(root.observedAt, root.nowMs)
-        : root.snapshot ? Presentation.relativeTime(root.snapshot.generatedAt, root.nowMs) : ""
+      timeCaption: Presentation.panelTimeCaption(root.panelModel, root.nowMs)
     }
 
     Flickable {
@@ -205,9 +195,9 @@ KeyboardPanel {
 
         Text {
           textFormat: Text.PlainText
-          visible: root.setupVisible
+          visible: root.panelModel.setup.visible
           width: parent.width
-          text: "GATEWAY SETUP REQUIRED"
+          text: root.panelModel.setup.heading
           color: root.accent
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
@@ -216,11 +206,9 @@ KeyboardPanel {
 
         Text {
           textFormat: Text.PlainText
-          visible: root.setupVisible
+          visible: root.panelModel.setup.visible
           width: parent.width
-          text: root.snapshot && root.snapshot.setup
-            ? String(root.snapshot.setup.guidance || "")
-            : "Connect Tailscale on this device, then refresh to find Gateway candidates."
+          text: root.panelModel.setup.guidance
           color: root.foreground
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
@@ -229,11 +217,10 @@ KeyboardPanel {
 
         Text {
           textFormat: Text.PlainText
-          visible: root.setupVisible && root.snapshot && root.snapshot.setup
-            && !!root.snapshot.setup.error
+          visible: root.panelModel.setup.visible && !!root.panelModel.setup.error
           width: parent.width
-          text: visible ? String(root.snapshot.setup.error) : ""
-          color: root.state === "configuration_error" ? root.urgent : root.accent
+          text: visible ? root.panelModel.setup.error : ""
+          color: root.panelModel.setup.errorCritical ? root.urgent : root.accent
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
           font.bold: true
@@ -242,9 +229,9 @@ KeyboardPanel {
 
         Text {
           textFormat: Text.PlainText
-          visible: root.configurationErrorVisible && !root.setupVisible
+          visible: root.panelModel.setup.configurationGuidanceVisible
           width: parent.width
-          text: Presentation.configurationGuidance(root.state)
+          text: root.panelModel.setup.configurationGuidance
           color: root.foreground
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
@@ -254,32 +241,30 @@ KeyboardPanel {
         RowSection {
           id: candidateRows
           width: parent.width
-          rows: Presentation.sectionRows(root.sections, "candidate")
+          visible: root.candidateSection.visible
+          rows: root.candidateSection.rows
           palette: root.palette
           selectedKey: root.selectedKey
           nowMs: root.nowMs
-          historical: root.historical
           motionEnabled: root.detailMotionEnabled
           fadeDuration: root.detailFadeDuration
           expandDuration: root.detailExpandDuration
-          detailComponent: null
           interactive: !root.verifyingCandidate
           activeActionLabel: root.verifyingCandidate ? "Verifying…" : ""
           edgeInsetUnits: 9
           onRowActivated: function(vm) {
             if (!vm.key) return
             root.selectRow(vm)
-            if (!root.verifyingCandidate)
-              root.candidateVerificationRequested(vm.key)
+            if (!root.verifyingCandidate) root.candidateVerificationRequested(vm.key)
           }
           onSelectionGeometryChanged: Qt.callLater(root.ensureSelectionVisible)
         }
 
         Text {
           textFormat: Text.PlainText
-          visible: !root.setupVisible && !root.configurationErrorVisible
+          visible: root.fleetSection.visible
           width: parent.width
-          text: "FLEET"
+          text: root.fleetSection.heading
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
@@ -288,11 +273,9 @@ KeyboardPanel {
 
         Text {
           textFormat: Text.PlainText
-          visible: root.state === "degraded" && root.snapshot
-            && root.snapshot.fleet && !root.snapshot.fleet.available
+          visible: root.fleetSection.visible && !!root.fleetSection.unavailableText
           width: parent.width
-          text: Presentation.metadataUnavailableText(root.snapshot && root.snapshot.fleet)
-            || "Node metadata unavailable"
+          text: root.fleetSection.unavailableText
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
@@ -300,47 +283,37 @@ KeyboardPanel {
 
         Text {
           textFormat: Text.PlainText
-          visible: root.metadata && root.metadata.fleet
-            && root.metadata.fleet.available && root.nodes.length === 0
+          visible: root.fleetSection.visible && !!root.fleetSection.emptyText
           width: parent.width
-          text: "Empty Fleet"
+          text: root.fleetSection.emptyText
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
-        }
-
-        Component {
-          id: nodeDetailDelegate
-          NodeDetailCard {}
         }
 
         RowSection {
           id: nodeRows
           width: parent.width
-          rows: Presentation.sectionRows(root.sections, "node")
+          visible: root.fleetSection.visible
+          rows: root.fleetSection.rows
           palette: root.palette
           selectedKey: root.selectedKey
           nowMs: root.nowMs
-          historical: root.historical
           motionEnabled: root.detailMotionEnabled
           fadeDuration: root.detailFadeDuration
           expandDuration: root.detailExpandDuration
-          detailComponent: nodeDetailDelegate
           onRowActivated: function(vm) {
-            if (!vm.key) return
-            root.selectRow(vm)
+            if (vm.key) root.selectRow(vm)
           }
           onSelectionGeometryChanged: Qt.callLater(root.ensureSelectionVisible)
         }
 
         Text {
           textFormat: Text.PlainText
-          visible: !root.setupVisible && !root.configurationErrorVisible
-            && (root.agents.length > 0 || (root.state === "degraded" && root.snapshot
-              && root.snapshot.agents && !root.snapshot.agents.available))
+          visible: root.agentsSection.visible
           width: parent.width
           topPadding: Style.space(8)
-          text: "AGENTS"
+          text: root.agentsSection.heading
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
@@ -349,46 +322,37 @@ KeyboardPanel {
 
         Text {
           textFormat: Text.PlainText
-          visible: root.state === "degraded" && root.snapshot
-            && root.snapshot.agents && !root.snapshot.agents.available
+          visible: root.agentsSection.visible && !!root.agentsSection.unavailableText
           width: parent.width
-          text: Presentation.metadataUnavailableText(root.snapshot && root.snapshot.agents)
-            || "Agent and Task metadata unavailable"
+          text: root.agentsSection.unavailableText
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
-        }
-
-        Component {
-          id: agentDetailDelegate
-          AgentDetailCard {}
         }
 
         RowSection {
           id: agentRows
           width: parent.width
-          rows: Presentation.sectionRows(root.sections, "agent")
+          visible: root.agentsSection.visible
+          rows: root.agentsSection.rows
           palette: root.palette
           selectedKey: root.selectedKey
           nowMs: root.nowMs
-          historical: root.historical
           motionEnabled: root.detailMotionEnabled
           fadeDuration: root.detailFadeDuration
           expandDuration: root.detailExpandDuration
-          detailComponent: agentDetailDelegate
           onRowActivated: function(vm) {
-            if (!vm.key) return
-            root.selectRow(vm)
+            if (vm.key) root.selectRow(vm)
           }
           onSelectionGeometryChanged: Qt.callLater(root.ensureSelectionVisible)
         }
 
         Text {
           textFormat: Text.PlainText
-          visible: !root.setupVisible && !root.configurationErrorVisible
+          visible: root.automationsSection.visible
           width: parent.width
           topPadding: Style.space(8)
-          text: "AUTOMATIONS"
+          text: root.automationsSection.heading
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.caption
@@ -397,14 +361,9 @@ KeyboardPanel {
 
         Text {
           textFormat: Text.PlainText
-          visible: !root.setupVisible && !root.configurationErrorVisible
-            && root.state === "degraded" && root.snapshot
-            && root.snapshot.automations && !root.snapshot.automations.available
+          visible: root.automationsSection.visible && !!root.automationsSection.unavailableText
           width: parent.width
-          text: root.snapshot && root.snapshot.automations
-            && root.snapshot.automations.reason === "more_than_500"
-              ? "Unavailable — more than 500 Automations"
-              : "Unavailable"
+          text: root.automationsSection.unavailableText
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
@@ -412,38 +371,28 @@ KeyboardPanel {
 
         Text {
           textFormat: Text.PlainText
-          visible: !root.setupVisible && !root.configurationErrorVisible
-            && !!root.metadata && root.metadata.automations
-            && root.metadata.automations.available && root.automations.length === 0
+          visible: root.automationsSection.visible && !!root.automationsSection.emptyText
           width: parent.width
-          text: "No Automations"
+          text: root.automationsSection.emptyText
           color: root.dim
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
         }
 
-        Component {
-          id: automationDetailDelegate
-          AutomationDetailCard {}
-        }
-
         RowSection {
           id: automationRows
           width: parent.width
-          visible: !root.setupVisible && !root.configurationErrorVisible
-          rows: Presentation.sectionRows(root.sections, "automation")
+          visible: root.automationsSection.visible
+          rows: root.automationsSection.rows
           palette: root.palette
           selectedKey: root.selectedKey
           nowMs: root.nowMs
-          historical: root.historical
           motionEnabled: root.detailMotionEnabled
           fadeDuration: root.detailFadeDuration
           expandDuration: root.detailExpandDuration
-          detailComponent: automationDetailDelegate
           dotInsetUnits: 8
           onRowActivated: function(vm) {
-            if (!vm.key) return
-            root.selectRow(vm)
+            if (vm.key) root.selectRow(vm)
           }
           onSelectionGeometryChanged: Qt.callLater(root.ensureSelectionVisible)
         }

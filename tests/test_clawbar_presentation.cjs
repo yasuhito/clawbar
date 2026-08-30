@@ -2,6 +2,7 @@ const test = require("node:test")
 const assert = require("node:assert/strict")
 const Snapshot = require("../ClawbarSnapshot.js")
 const Presentation = require("../ClawbarPresentation.js")
+const PanelModel = require("../ClawbarPanelModel.js")
 const snapshotFixtures = require("./fixtures/snapshots.json")
 
 function healthySnapshot(generatedAt, refreshIntervalSeconds = 30) {
@@ -10,6 +11,10 @@ function healthySnapshot(generatedAt, refreshIntervalSeconds = 30) {
   snapshot.lastSuccessAt = generatedAt
   snapshot.refreshIntervalSeconds = refreshIntervalSeconds
   return snapshot
+}
+
+function detailTexts(row, nowMilliseconds) {
+  return row.detail.map(entry => Presentation.detailText(entry, nowMilliseconds))
 }
 
 function operationalSnapshot() {
@@ -68,7 +73,7 @@ test("panel rows preserve Gateway order and keyboard focus wraps", () => {
   const sections = Presentation.panelSections(Snapshot.sectionData(snapshot, "healthy"))
   const keys = Presentation.sectionKeys(sections)
 
-  const kinds = sections.flatMap(s => s.rows).map(row => `${row.kind}:${row.item.name}`)
+  const kinds = sections.flatMap(s => s.rows).map(row => `${row.kind}:${row.name}`)
   assert.deepEqual(kinds, [
     "node:Local",
     "node:studio-ops",
@@ -123,7 +128,7 @@ test("registered Agents expose Task Result without claiming current Activity", (
   assert.equal(Presentation.taskResultLabel(snapshot.agents.items[2].taskResult, 100000), "Task: None")
   const observerRow = Presentation.panelSections(Snapshot.sectionData(snapshot, "healthy"))
     .flatMap(s => s.rows)
-    .find(row => row.item.name === "observer")
+    .find(row => row.name === "observer")
   assert.equal(observerRow.key, "agent:observer")
   assert.match(observerRow.subText(100000 + 9 * 60000), /^Task: Succeeded · 9m$/)
 })
@@ -160,6 +165,118 @@ test("Node metadata label keeps available Operational Metadata", () => {
   )
   assert.equal(Presentation.nodeMetadataLabel({ platform: "linux" }), "linux")
   assert.equal(Presentation.nodeMetadataLabel({}), "No additional Operational Metadata")
+})
+
+test("Operational Row view-models own Node detail text and spoken timestamps", () => {
+  const observedAt = new Date(2026, 7, 24, 17, 44).toISOString()
+  const sections = Presentation.panelSections({
+    historical: true,
+    observedAt,
+    candidates: [],
+    nodes: [{
+      key: "node:a",
+      name: "alpha",
+      state: "healthy",
+      platform: "linux",
+      model: "studio",
+      version: "2026.8",
+      lastSeenAt: new Date(2026, 7, 24, 17, 40).toISOString()
+    }],
+    agents: [],
+    automations: []
+  })
+  const row = Presentation.sectionRows(sections, "node")[0]
+
+  assert.deepEqual(detailTexts(row, new Date(2026, 7, 24, 17, 45).getTime()), [
+    "Last known · 1m",
+    "linux · studio · 2026.8",
+    "Last seen Aug 24, 17:40",
+    "Observed Aug 24, 17:44"
+  ])
+  assert.match(row.detail[2].spoken, /^Last seen /)
+  assert.match(row.detail[3].spoken, /^Observed /)
+  assert.equal(Object.hasOwn(row, "item"), false)
+})
+
+test("Operational Row view-models own Registered Agent Task Result detail", () => {
+  const completedAt = new Date(2026, 7, 24, 17, 40).toISOString()
+  const observedAt = new Date(2026, 7, 24, 17, 44).toISOString()
+  const row = Presentation.sectionRows(Presentation.panelSections({
+    historical: false,
+    observedAt,
+    candidates: [],
+    nodes: [],
+    agents: [{
+      key: "agent:planner",
+      name: "planner",
+      taskResult: { state: "failed", completedAt }
+    }],
+    automations: []
+  }), "agent")[0]
+
+  assert.deepEqual(detailTexts(row, new Date(2026, 7, 24, 17, 45).getTime()), [
+    "Task result Failed",
+    "Completed Aug 24, 17:40",
+    "Observed Aug 24, 17:44"
+  ])
+  assert.equal(row.detail[0].critical, true)
+  assert.match(row.detail[1].spoken, /^Completed /)
+  assert.equal(Object.hasOwn(row, "item"), false)
+})
+
+test("Operational Row view-models own Automation Next and Last detail", () => {
+  const row = Presentation.sectionRows(Presentation.panelSections({
+    historical: false,
+    observedAt: new Date(2026, 7, 24, 17, 44).toISOString(),
+    candidates: [],
+    nodes: [],
+    agents: [],
+    automations: [{
+      id: "cron-1",
+      name: "Morning review",
+      enabled: true,
+      kind: "cron",
+      lastResult: "error",
+      consecutiveFailures: 2,
+      nextRunAt: new Date(2026, 7, 25, 8, 0).toISOString(),
+      lastRunAt: new Date(2026, 7, 24, 8, 0).toISOString()
+    }]
+  }), "automation")[0]
+
+  assert.deepEqual(detailTexts(row, new Date(2026, 7, 24, 17, 45).getTime()), [
+    "Scheduled · Automation Failure · 2 consecutive failures",
+    "Next run Aug 25, 08:00",
+    "Last run Aug 24, 08:00"
+  ])
+  assert.match(row.detail[1].spoken, /^Next run /)
+  assert.match(row.detail[2].spoken, /^Last run /)
+  assert.equal(Object.hasOwn(row, "item"), false)
+})
+
+test("panel model owns section headings, visibility, and unavailable text", () => {
+  const snapshot = operationalSnapshot()
+  snapshot.gateway.state = "degraded"
+  snapshot.fleet = { available: false, reason: "output_exceeded_limit", nodes: [] }
+  snapshot.agents = { available: false, items: [] }
+  snapshot.automations = { available: false, reason: "more_than_500", items: [] }
+
+  const data = Snapshot.sectionData(snapshot, "degraded")
+  const model = PanelModel.create(data, Presentation.panelSections(data))
+  const fleet = PanelModel.sectionForKind(model.sections, "node")
+  const agents = PanelModel.sectionForKind(model.sections, "agent")
+  const automations = PanelModel.sectionForKind(model.sections, "automation")
+
+  assert.equal(model.setup.visible, false)
+  assert.deepEqual(
+    [fleet.heading, agents.heading, automations.heading],
+    ["FLEET", "AGENTS", "AUTOMATIONS"]
+  )
+  assert.equal(fleet.visible, true)
+  assert.equal(fleet.unavailableText, "Unavailable — metadata response exceeded the collection limit")
+  assert.equal(agents.visible, true)
+  assert.equal(agents.unavailableText, "Agent and Task metadata unavailable")
+  assert.equal(automations.visible, true)
+  assert.equal(automations.unavailableText, "Unavailable — more than 500 Automations")
 })
 
 test("Automations follow Agents and retain selection by stable hidden id", () => {
@@ -408,7 +525,7 @@ test("panelSections orders candidate, node, agent and automation rows", () => {
   const [candidates, nodes, agents, automations] = sections
   assert.deepEqual(candidates.rows.map(row => row.key), [])
   assert.deepEqual(nodes.rows.map(row => row.key), ["node:a", "node:b"])
-  assert.equal([...nodes.rows, ...agents.rows, ...automations.rows].every(row => row.statusStyle === null), true)
+  assert.equal([...nodes.rows, ...agents.rows, ...automations.rows].every(row => row.statusStyle === "signal"), true)
 
   const alpha = nodes.rows[0]
   assert.equal(alpha.showStatusLabel, false)
@@ -480,7 +597,7 @@ test("stale snapshots mark every operational row as Last known", () => {
   const nodes = Presentation.panelSections(Snapshot.sectionData(snapshot, "stale")).find(s => s.kind === "node")
   const row = nodes.rows[0]
   assert.equal(row.historical, true)
-  assert.equal(row.observedAt, observedAt)
+  assert.equal(Presentation.detailText(row.detail[0], Date.parse(observedAt) + 60000), "Last known · 1m")
   assert.equal(row.statusLabel, "Last known")
   assert.equal(row.accessibleDescription, "Last known")
   assert.equal(row.dot.tone, "muted")

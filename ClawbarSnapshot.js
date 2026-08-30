@@ -72,12 +72,34 @@ function setupCandidates(snapshot, state) {
   return setup && Array.isArray(setup.candidates) ? setup.candidates : []
 }
 
-// Everything the Operational Row view-models need, extracted in one call so
-// Presentation.panelSections(data) stays free of cross-file imports.
+// Everything the Operational Panel view-model needs, extracted in one call.
+// Clawbar.qml owns the Snapshot boundary; lower QML receives only the resulting
+// panel model.
 function sectionData(snapshot, state) {
+  var metadata = metadataSnapshot(snapshot, state)
+  var setup = snapshot && snapshot.setup
   return {
+    state: state,
+    generatedAt: snapshot ? String(snapshot.generatedAt || "") : "",
     historical: historicalState(state),
     observedAt: observationTime(snapshot, state),
+    setup: setup ? {
+      present: true,
+      guidance: String(setup.guidance || ""),
+      error: String(setup.error || "")
+    } : { present: false, guidance: "", error: "" },
+    fleet: metadata && metadata.fleet ? {
+      available: metadata.fleet.available === true,
+      reason: String(metadata.fleet.reason || "")
+    } : null,
+    agentsSection: metadata && metadata.agents ? {
+      available: metadata.agents.available === true,
+      reason: String(metadata.agents.reason || "")
+    } : null,
+    automationsSection: metadata && metadata.automations ? {
+      available: metadata.automations.available === true,
+      reason: String(metadata.automations.reason || "")
+    } : null,
     candidates: setupCandidates(snapshot, state),
     nodes: fleetNodes(snapshot, state),
     agents: agents(snapshot, state),

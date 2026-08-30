@@ -5,6 +5,7 @@ import qs.Commons
 import qs.Ui
 import "ClawbarSnapshot.js" as Snapshot
 import "ClawbarPresentation.js" as Presentation
+import "ClawbarPanelModel.js" as PanelModel
 import "ClawbarColor.js" as ColorKit
 
 BarWidget {
@@ -50,6 +51,11 @@ BarWidget {
   )
   readonly property string panelSummary: developerDemo
     ? "Developer demo · " + refreshPanelSummary : refreshPanelSummary
+  readonly property var operationalSectionData: Snapshot.sectionData(lastSnapshot, state)
+  readonly property var operationalPanelModel: PanelModel.create(
+    operationalSectionData, Presentation.panelSections(operationalSectionData)
+  )
+  readonly property var gatewaySignal: Presentation.panelSignal(lastSnapshot, state)
   readonly property var barSignal: Presentation.signalPresentation(
     barSeverity === "critical" ? "failed" : barSeverity === "warning" ? "waiting" : "healthy"
   )
@@ -249,8 +255,8 @@ BarWidget {
     owner: root
     bar: root.bar
     open: root.opened
-    snapshot: root.lastSnapshot
-    state: root.state
+    panelModel: root.operationalPanelModel
+    gatewaySignal: root.gatewaySignal
     nowMs: root.nowMs
     summary: root.panelSummary
     verifyingCandidate: root.collectorService ? root.collectorService.verifyingCandidate : false
