@@ -408,6 +408,7 @@ test("panelSections orders candidate, node, agent and automation rows", () => {
   const [candidates, nodes, agents, automations] = sections
   assert.deepEqual(candidates.rows.map(row => row.key), [])
   assert.deepEqual(nodes.rows.map(row => row.key), ["node:a", "node:b"])
+  assert.equal([...nodes.rows, ...agents.rows, ...automations.rows].every(row => row.statusStyle === null), true)
 
   const alpha = nodes.rows[0]
   assert.equal(alpha.showStatusLabel, false)
@@ -462,6 +463,7 @@ test("setup candidate rows expose verify actions without dots", () => {
   assert.equal(row.name, "mac-studio")
   assert.equal(row.showStatusLabel, true)
   assert.equal(row.statusLabel, "Verify")
+  assert.equal(row.statusStyle, "action")
   assert.equal(row.historical, false)
 })
 

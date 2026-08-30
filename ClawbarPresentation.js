@@ -187,6 +187,7 @@ function candidateViewModel(item) {
     titleMuted: false,
     statusLabel: "Verify",
     showStatusLabel: true,
+    statusStyle: "action",
     statusCapRatio: null,
     hasSub: false,
     subText: function() { return "" },
@@ -211,6 +212,7 @@ function nodeViewModel(item, historical, observedAt) {
     titleMuted: offline,
     statusLabel: label,
     showStatusLabel: showNodeStatusLabel(item.state, historical),
+    statusStyle: null,
     statusCapRatio: null,
     hasSub: false,
     subText: function() { return "" },
@@ -234,6 +236,7 @@ function agentViewModel(item, historical, observedAt) {
     titleMuted: false,
     statusLabel: "",
     showStatusLabel: false,
+    statusStyle: null,
     statusCapRatio: null,
     hasSub: true,
     subText: function(nowMilliseconds) {
@@ -261,6 +264,7 @@ function automationViewModel(item, historical, observedAt) {
     titleMuted: disabled,
     statusLabel: historical ? "Last known" : automationCompactStatusLabel(item),
     showStatusLabel: showAutomationStatusLabel(item, historical),
+    statusStyle: null,
     statusCapRatio: 0.42,
     hasSub: true,
     subText: function(nowMilliseconds) {
