@@ -321,7 +321,12 @@ def decode_status_or_fail(
     except json.JSONDecodeError:
         if candidate_key:
             setup = (None, SETUP_GUIDANCE, CANDIDATE_UNSUPPORTED_GUIDANCE)
-            snapshot = builder.configuration_error(None, "malformed_json", setup)
+            source = configuration_error_source(
+                previous,
+                {},
+                target.source if target else None,
+            )
+            snapshot = builder.configuration_error(source, "malformed_json", setup)
             return publish(snapshot_path, ExitCode.MALFORMED_JSON, snapshot)
         return publish_failure(
             snapshot_path,

@@ -14,9 +14,15 @@ from unittest import mock
 from datetime import datetime
 from pathlib import Path
 
-from scripts import clawbar_collect, clawbar_commands, clawbar_gateway, clawbar_metadata, clawbar_snapshot
+from scripts import (
+    clawbar_collect,
+    clawbar_commands,
+    clawbar_gateway,
+    clawbar_metadata,
+    clawbar_snapshot,
+    clawbar_target_state,
+)
 from scripts.clawbar_commands import CollectionDeadlineExceeded, CommandOutputExceeded, SubprocessCommandSurface
-from scripts.clawbar_snapshot import SCHEMA_VERSION
 from tests.collector_fixture import CollectorFixture
 from tests.fake_commands import (
     LOCAL_GATEWAY_URL,
@@ -648,7 +654,7 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         self.state_directory.mkdir(parents=True)
         clawbar_gateway.candidate_state_path(self.snapshot_path).write_text(
             json.dumps({
-                "schemaVersion": SCHEMA_VERSION,
+                "schemaVersion": clawbar_gateway.CANDIDATE_STATE_SCHEMA_VERSION,
                 "candidates": {candidate_key: {"url": ALPHA_URL}},
             }),
             encoding="utf-8",
@@ -665,7 +671,11 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
     def test_a_verified_fallback_is_dialed_once_when_automatic_resolution_is_missing(self) -> None:
         self.state_directory.mkdir(parents=True)
         (self.state_directory / "gateway-verified-target.json").write_text(
-            json.dumps({"schemaVersion": SCHEMA_VERSION, "source": "tailscale", "url": ALPHA_URL}),
+            json.dumps({
+                "schemaVersion": clawbar_target_state.VERIFIED_TARGET_SCHEMA_VERSION,
+                "source": "tailscale",
+                "url": ALPHA_URL,
+            }),
             encoding="utf-8",
         )
         commands = FakeCommandSurface.healthy(
@@ -893,7 +903,7 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         candidate_key = "candidate:test"
         (self.state_directory / "gateway-candidates.json").write_text(
             json.dumps({
-                "schemaVersion": SCHEMA_VERSION,
+                "schemaVersion": clawbar_gateway.CANDIDATE_STATE_SCHEMA_VERSION,
                 "candidates": {candidate_key: {"url": "wss://gateway-alpha.example.ts.net:18789"}},
             }),
             encoding="utf-8",
@@ -929,6 +939,25 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         serialized = json.dumps(missing.snapshot) + json.dumps(unsupported.snapshot)
         self.assertNotIn("PRIVATE-", serialized)
         self.assertNotIn("example.ts.net", serialized)
+
+    def test_malformed_candidate_response_retains_previous_resolution_source(self) -> None:
+        setup = self.collect(setup_required(TAILSCALE_ALPHA))
+        candidate_key = setup.snapshot["setup"]["candidates"][0]["key"]
+        verified = self.collect(
+            FakeCommandSurface.healthy(gateway_status=echo_dialed_url()),
+            candidate_key=candidate_key,
+        )
+
+        malformed = self.collect(
+            FakeCommandSurface.healthy(gateway_status=text("{not-json")),
+            candidate_key=candidate_key,
+        )
+
+        self.assertEqual(verified.snapshot["resolutionSource"], "tailscale")
+        self.assertEqual(malformed.exit_code, clawbar_collect.ExitCode.MALFORMED_JSON)
+        self.assertEqual(malformed.snapshot["gateway"], {"state": "configuration_error"})
+        self.assertEqual(malformed.snapshot["resolutionSource"], "tailscale")
+        self.assertEqual(malformed.snapshot["failureKind"], "malformed_json")
 
     def test_keeps_setup_required_when_candidate_verification_fails(self) -> None:
         setup = self.collect(setup_required(TAILSCALE_ALPHA))
