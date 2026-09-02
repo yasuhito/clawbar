@@ -14,12 +14,12 @@ from pathlib import Path
 from typing import Any
 
 if __package__:
-    from .clawbar_collect import default_snapshot_path
+    from .clawbar_cli import default_snapshot_path
     from .clawbar_gateway import SETUP_GUIDANCE
     from .clawbar_incidents import process_incident_transitions
     from .clawbar_snapshot import SnapshotBuilder, atomic_write_snapshot
 else:
-    from clawbar_collect import default_snapshot_path
+    from clawbar_cli import default_snapshot_path
     from clawbar_gateway import SETUP_GUIDANCE
     from clawbar_incidents import process_incident_transitions
     from clawbar_snapshot import SnapshotBuilder, atomic_write_snapshot

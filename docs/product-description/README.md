@@ -191,5 +191,9 @@ The source of truth is the Clawbar implementation in this repository, outside `d
 - `ClawbarColor.js`: contrast-adjusted color math and the palette object.
 - `scripts/clawbar_collect.py` and the other `scripts/clawbar_*.py` modules: Gateway resolution, bounded metadata collection, privacy reduction, snapshot publication, and Incident transitions.
 - `tests/test_clawbar_logic.cjs`: executable specification for the QML-facing presentation model.
-- `tests/test_clawbar_collect.py`, `tests/test_clawbar_freshness.py`, `tests/test_clawbar_incidents.py`, and `tests/test_clawbar_automation.py`: executable specifications for collection, freshness, privacy, state transitions, notifications, and Automation behavior.
+- `tests/test_clawbar_collection.py`: executable specifications for Gateway response decoding, collection deadlines, and Degraded Gateway results.
+- `tests/test_clawbar_gateway_target.py`: executable specifications for Gateway Target resolution and Tailscale fallback candidates.
+- `tests/test_clawbar_operational_metadata.py`: executable specifications for Fleet and Registered Agent reduction at the Operational Metadata and Private Content boundary.
+- `tests/test_clawbar_process.py`: executable specifications for the collector process, Gateway Command Surface adapter, and CLI entry point.
+- `tests/test_clawbar_freshness.py`, `tests/test_clawbar_incidents.py`, and `tests/test_clawbar_automation.py`: executable specifications for freshness, state transitions, notifications, and Automation behavior.
 - `scripts/clawbar_demo.py`: fictional state generator used only for observation in the running product.

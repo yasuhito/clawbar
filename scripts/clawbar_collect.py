@@ -3,12 +3,10 @@
 
 from __future__ import annotations
 
-import argparse
 import json
-import os
 import sys
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
@@ -22,7 +20,6 @@ if __package__:
         CommandOutputExceeded,
         CommandResult,
         GatewayCommandSurface,
-        SubprocessCommandSurface,
     )
     from .clawbar_gateway import (
         SETUP_GUIDANCE,
@@ -43,7 +40,6 @@ if __package__:
     from .clawbar_snapshot import (
         SnapshotBuilder,
         atomic_write_snapshot,
-        read_bounded_regular_file,
         read_json_document,
     )
     from .clawbar_target_state import GatewayTargetState
@@ -55,7 +51,6 @@ else:
         CommandOutputExceeded,
         CommandResult,
         GatewayCommandSurface,
-        SubprocessCommandSurface,
     )
     from clawbar_gateway import (
         SETUP_GUIDANCE,
@@ -76,7 +71,6 @@ else:
     from clawbar_snapshot import (
         SnapshotBuilder,
         atomic_write_snapshot,
-        read_bounded_regular_file,
         read_json_document,
     )
     from clawbar_target_state import GatewayTargetState
@@ -114,23 +108,6 @@ CANDIDATE_UNSUPPORTED_GUIDANCE = (
 )
 
 
-def default_snapshot_path() -> Path:
-    state_home = os.environ.get("XDG_STATE_HOME")
-    base = Path(state_home) if state_home else Path.home() / ".local" / "state"
-    return base / "clawbar" / "snapshot.json"
-
-
-def developer_demo_active() -> bool:
-    runtime_directory = os.environ.get("XDG_RUNTIME_DIR")
-    if not runtime_directory:
-        return False
-    try:
-        marker = Path(runtime_directory) / "clawbar" / "demo-active"
-        return read_bounded_regular_file(marker, 16).decode("utf-8").strip() == "1"
-    except (OSError, UnicodeDecodeError):
-        return False
-
-
 def validate_refresh_interval(value: object) -> int:
     if isinstance(value, bool):
         raise ValueError  # noqa: TRY004 -- 呼び出し側は不正値を一律 ValueError で受ける
@@ -147,15 +124,6 @@ def validate_refresh_interval(value: object) -> int:
     return interval
 
 
-def parse_refresh_interval(value: str) -> int:
-    try:
-        return validate_refresh_interval(value)
-    except ValueError as error:
-        raise argparse.ArgumentTypeError(
-            "refresh interval must be an integer from 15 through 300 seconds"
-        ) from error
-
-
 def load_previous_snapshot(path: Path) -> dict[str, Any] | None:
     snapshot = read_json_document(path)
     if (
@@ -164,15 +132,6 @@ def load_previous_snapshot(path: Path) -> dict[str, Any] | None:
     ):
         return None
     return snapshot
-
-
-def print_bounded_text_file(path: Path) -> ExitCode:
-    try:
-        content = read_bounded_regular_file(path).decode("utf-8")
-    except (FileNotFoundError, OSError, UnicodeDecodeError):
-        return ExitCode.COMMAND_FAILED
-    sys.stdout.write(content)
-    return ExitCode.OK
 
 
 def configuration_error_source(
@@ -528,62 +487,11 @@ def collect_gateway(
     return publish_current(snapshot_path, snapshot, target)
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description=f"{__doc__} The whole collection exits within {int(COLLECTION_DEADLINE_SECONDS)} seconds."
-    )
-    parser.add_argument(
-        "--read-cache",
-        action="store_true",
-        help="print the bounded regular snapshot cache without collecting",
-    )
-    parser.add_argument(
-        "--read-theme-colors",
-        type=Path,
-        metavar="PATH",
-        help="print one bounded regular UTF-8 theme colors file without collecting",
-    )
-    parser.add_argument(
-        "--refresh-interval",
-        default=DEFAULT_REFRESH_INTERVAL_SECONDS,
-        type=parse_refresh_interval,
-        metavar="SECONDS",
-    )
-    parser.add_argument(
-        "--verify-candidate",
-        metavar="CANDIDATE_KEY",
-        help="verify one enumerated Tailscale candidate and collect from it",
-    )
-    return parser
-
-
-def main(argv: Sequence[str] | None = None) -> int:
-    arguments = build_parser().parse_args(argv)
-    snapshot_path = default_snapshot_path()
-    if arguments.read_theme_colors is not None:
-        return int(print_bounded_text_file(arguments.read_theme_colors))
-    if arguments.read_cache:
-        snapshot = load_previous_snapshot(snapshot_path)
-        if snapshot is None:
-            return int(ExitCode.COMMAND_FAILED)
-        json.dump(snapshot, sys.stdout, separators=(",", ":"), sort_keys=True)
-        sys.stdout.write("\n")
-        return int(ExitCode.OK)
-    if developer_demo_active():
-        snapshot = load_previous_snapshot(snapshot_path)
-        if snapshot is not None:
-            json.dump(snapshot, sys.stdout, separators=(",", ":"), sort_keys=True)
-            sys.stdout.write("\n")
-        return int(ExitCode.OK)
-    result = collect_gateway(
-        snapshot_path,
-        arguments.refresh_interval,
-        commands=SubprocessCommandSurface(),
-        candidate_key=arguments.verify_candidate,
-    )
-    json.dump(result.snapshot, sys.stdout, separators=(",", ":"), sort_keys=True)
-    sys.stdout.write("\n")
-    return int(result.exit_code)
+if __package__:
+    from .clawbar_cli import main
+else:
+    sys.modules.setdefault("clawbar_collect", sys.modules[__name__])
+    from clawbar_cli import main
 
 
 if __name__ == "__main__":
