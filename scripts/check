@@ -3,6 +3,20 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+echo "== Ruff lint =="
+uvx ruff@0.16.5 check .
+
+echo "== Ruff format =="
+uvx ruff@0.16.5 format --check .
+
+echo "== QML lint =="
+if command -v qmllint > /dev/null; then
+  qmllint ./*.qml
+else
+  # CI には Quickshell の QML モジュールが無く import を解決できないため、ローカル実行時だけ確認する
+  echo "qmllint が無いためスキップする"
+fi
+
 echo "== Python unit tests =="
 python3 -m unittest discover -s tests -t .
 
