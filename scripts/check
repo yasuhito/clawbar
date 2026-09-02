@@ -47,6 +47,12 @@ else
   echo "qmlformat が無いためスキップする"
 fi
 
+echo "== JavaScript lint =="
+npx --yes eslint@10.9.1 .
+
+echo "== Shell lint =="
+shellcheck scripts/check docs/agents/automations/*.sh
+
 echo "== Python unit tests =="
 python3 -m unittest discover -s tests -t .
 
