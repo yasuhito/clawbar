@@ -24,7 +24,6 @@ AUTOMATION_KINDS = frozenset({"at", "every", "cron", "on-exit"})
 AUTOMATION_RESULTS = frozenset({"ok", "error", "skipped"})
 
 
-
 def load_local_key_secret() -> bytes:
     """Return the local secret used to pseudonymize private identifiers."""
     runtime_home = os.environ.get("XDG_RUNTIME_DIR")
@@ -44,7 +43,11 @@ def load_local_key_secret() -> bytes:
         try:
             descriptor = os.open(
                 secret_path,
-                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | getattr(os, "O_NOFOLLOW", 0),
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_EXCL
+                | os.O_CLOEXEC
+                | getattr(os, "O_NOFOLLOW", 0),
                 0o600,
             )
         except FileExistsError:
@@ -75,7 +78,11 @@ def timestamp_from_milliseconds(value: object) -> str | None:
     if not milliseconds:
         return None
     try:
-        return datetime.fromtimestamp(milliseconds / 1000, timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        return (
+            datetime.fromtimestamp(milliseconds / 1000, timezone.utc)
+            .isoformat(timespec="milliseconds")
+            .replace("+00:00", "Z")
+        )
     except (OverflowError, OSError, ValueError):
         return None
 
@@ -163,7 +170,9 @@ def freshest_node_registrations(
     return [selected[identity][1] for identity in order[:100]]
 
 
-def sanitize_fleet(payload: object, node_key_secret: bytes | None) -> list[dict[str, Any]] | None:
+def sanitize_fleet(
+    payload: object, node_key_secret: bytes | None
+) -> list[dict[str, Any]] | None:
     if not isinstance(payload, dict) or not isinstance(payload.get("nodes"), list):
         return None
     if not payload["nodes"]:
@@ -181,7 +190,11 @@ def sanitize_fleet(payload: object, node_key_secret: bytes | None) -> list[dict[
             "name": name,
             "state": "healthy" if raw.get("connected") is True else "offline",
         }
-        for source_key, output_key in (("platform", "platform"), ("modelIdentifier", "model"), ("version", "version")):
+        for source_key, output_key in (
+            ("platform", "platform"),
+            ("modelIdentifier", "model"),
+            ("version", "version"),
+        ):
             value = bounded_text(raw.get(source_key))
             if value:
                 node[output_key] = value
@@ -200,12 +213,22 @@ def task_timestamp(task: dict[str, Any]) -> float:
     return 0
 
 
-def sanitize_agents(agent_payload: object, task_payload: object) -> list[dict[str, Any]] | None:
-    if not isinstance(agent_payload, dict) or not isinstance(agent_payload.get("agents"), list):
+def sanitize_agents(
+    agent_payload: object, task_payload: object
+) -> list[dict[str, Any]] | None:
+    if not isinstance(agent_payload, dict) or not isinstance(
+        agent_payload.get("agents"), list
+    ):
         return None
-    if not isinstance(task_payload, dict) or not isinstance(task_payload.get("tasks"), list):
+    if not isinstance(task_payload, dict) or not isinstance(
+        task_payload.get("tasks"), list
+    ):
         return None
-    tasks = [task for task in task_payload["tasks"][:MAX_METADATA_ITEMS] if isinstance(task, dict)]
+    tasks = [
+        task
+        for task in task_payload["tasks"][:MAX_METADATA_ITEMS]
+        if isinstance(task, dict)
+    ]
     agents = []
     for raw in agent_payload["agents"][:100]:
         if not isinstance(raw, dict):
@@ -219,13 +242,22 @@ def sanitize_agents(agent_payload: object, task_payload: object) -> list[dict[st
             reverse=True,
         )
         completed = next(
-            (task for task in own_tasks if task.get("status") in {"completed", "failed", "timed_out", "cancelled"}),
+            (
+                task
+                for task in own_tasks
+                if task.get("status")
+                in {"completed", "failed", "timed_out", "cancelled"}
+            ),
             None,
         )
         result: dict[str, Any] = {"state": "none"}
         if completed is not None:
-            result["state"] = "succeeded" if completed.get("status") == "completed" else "failed"
-            completed_at = timestamp_from_milliseconds(completed.get("endedAt") or completed.get("updatedAt"))
+            result["state"] = (
+                "succeeded" if completed.get("status") == "completed" else "failed"
+            )
+            completed_at = timestamp_from_milliseconds(
+                completed.get("endedAt") or completed.get("updatedAt")
+            )
             if completed_at:
                 result["completedAt"] = completed_at
         agent = {
@@ -239,11 +271,18 @@ def sanitize_agents(agent_payload: object, task_payload: object) -> list[dict[st
         agents.append(agent)
     return agents
 
-def sanitize_automations(payload: object) -> tuple[list[dict[str, Any]] | None, str | None]:
+
+def sanitize_automations(
+    payload: object,
+) -> tuple[list[dict[str, Any]] | None, str | None]:
     if not isinstance(payload, dict) or not isinstance(payload.get("jobs"), list):
         return None, "unavailable"
     total = payload.get("total")
-    if isinstance(total, int) and not isinstance(total, bool) and total > MAX_AUTOMATIONS:
+    if (
+        isinstance(total, int)
+        and not isinstance(total, bool)
+        and total > MAX_AUTOMATIONS
+    ):
         return None, "more_than_500"
     raw_jobs = payload["jobs"]
     if len(raw_jobs) > MAX_AUTOMATIONS:
@@ -255,7 +294,11 @@ def sanitize_automations(payload: object) -> tuple[list[dict[str, Any]] | None, 
         if not isinstance(raw, dict):
             return None, "unavailable"
         automation_id = raw.get("id")
-        if not isinstance(automation_id, str) or not automation_id or len(automation_id) > 512:
+        if (
+            not isinstance(automation_id, str)
+            or not automation_id
+            or len(automation_id) > 512
+        ):
             return None, "unavailable"
         if automation_id in seen_ids:
             return None, "unavailable"
@@ -279,30 +322,35 @@ def sanitize_automations(payload: object) -> tuple[list[dict[str, Any]] | None, 
         ):
             consecutive_failures = 0
 
-        automations.append({
-            "id": automation_id,
-            "name": bounded_text(raw.get("name"), "Unnamed Automation"),
-            "enabled": raw.get("enabled") is True,
-            "kind": kind,
-            "nextRunAt": timestamp_from_milliseconds(state.get("nextRunAtMs")),
-            "lastRunAt": timestamp_from_milliseconds(state.get("lastRunAtMs")),
-            "lastResult": result,
-            "consecutiveFailures": consecutive_failures,
-        })
+        automations.append(
+            {
+                "id": automation_id,
+                "name": bounded_text(raw.get("name"), "Unnamed Automation"),
+                "enabled": raw.get("enabled") is True,
+                "kind": kind,
+                "nextRunAt": timestamp_from_milliseconds(state.get("nextRunAtMs")),
+                "lastRunAt": timestamp_from_milliseconds(state.get("lastRunAtMs")),
+                "lastResult": result,
+                "consecutiveFailures": consecutive_failures,
+            }
+        )
 
     def sort_key(automation: dict[str, Any]) -> tuple[object, ...]:
         if automation["enabled"] and automation["lastResult"] == "error":
             return (0, automation["name"].casefold(), automation["id"])
         if automation["enabled"] and automation["nextRunAt"] is not None:
-            return (1, automation["nextRunAt"], automation["name"].casefold(), automation["id"])
+            return (
+                1,
+                automation["nextRunAt"],
+                automation["name"].casefold(),
+                automation["id"],
+            )
         if automation["enabled"]:
             return (2, automation["name"].casefold(), automation["id"])
         return (3, automation["name"].casefold(), automation["id"])
 
     automations.sort(key=sort_key)
     return automations, None
-
-
 
 
 def sanitize_metadata(
@@ -327,5 +375,3 @@ def sanitize_metadata(
 
 
 OUTPUT_EXCEEDED_LIMIT = "output_exceeded_limit"
-
-

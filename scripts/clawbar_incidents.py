@@ -91,7 +91,10 @@ def reconcile_incidents(
                 continue
             incident_key = f"automation:{automation_id}"
             observed_automations.add(incident_key)
-            if automation.get("enabled") is True and automation.get("lastResult") == "error":
+            if (
+                automation.get("enabled") is True
+                and automation.get("lastResult") == "error"
+            ):
                 start(incident_key, label, "Automation Failure")
             elif automation.get("enabled") is True:
                 recover(incident_key, label)
@@ -105,13 +108,16 @@ def reconcile_incidents(
     return state, starts, recoveries
 
 
-def notification_arguments(changes: list[dict[str, str]], *, recovered: bool) -> list[str]:
+def notification_arguments(
+    changes: list[dict[str, str]], *, recovered: bool
+) -> list[str]:
     count = len(changes)
     noun = "Incident" if count == 1 else "Incidents"
     action = "resolved" if recovered else "detected"
     urgency = "normal" if recovered else "critical"
     body_parts = [
-        f"{change['label']}: {change['state']}" for change in changes[:MAX_NOTIFICATION_DETAILS]
+        f"{change['label']}: {change['state']}"
+        for change in changes[:MAX_NOTIFICATION_DETAILS]
     ]
     if count > MAX_NOTIFICATION_DETAILS:
         body_parts.append(f"+{count - MAX_NOTIFICATION_DETAILS} more")
@@ -146,11 +152,16 @@ def process_incident_transitions(snapshot: dict[str, Any]) -> None:
         return
     try:
         state_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        lock_descriptor = os.open(state_path.with_suffix(".lock"), os.O_RDWR | os.O_CREAT, 0o600)
+        lock_descriptor = os.open(
+            state_path.with_suffix(".lock"), os.O_RDWR | os.O_CREAT, 0o600
+        )
         with os.fdopen(lock_descriptor, "r+") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
             previous = read_json_document(state_path)
-            if previous and previous.get("schemaVersion") != INCIDENT_STATE_SCHEMA_VERSION:
+            if (
+                previous
+                and previous.get("schemaVersion") != INCIDENT_STATE_SCHEMA_VERSION
+            ):
                 previous = None
             state, starts, recoveries = reconcile_incidents(snapshot, previous)
             atomic_write_snapshot(state_path, state)

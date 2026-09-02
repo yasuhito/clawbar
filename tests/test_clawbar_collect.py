@@ -10,9 +10,9 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest import mock
 from datetime import datetime
 from pathlib import Path
+from unittest import mock
 
 from scripts import (
     clawbar_collect,
@@ -22,7 +22,11 @@ from scripts import (
     clawbar_snapshot,
     clawbar_target_state,
 )
-from scripts.clawbar_commands import CollectionDeadlineExceeded, CommandOutputExceeded, SubprocessCommandSurface
+from scripts.clawbar_commands import (
+    CollectionDeadlineExceeded,
+    CommandOutputExceeded,
+    SubprocessCommandSurface,
+)
 from tests.collector_fixture import CollectorFixture
 from tests.fake_commands import (
     LOCAL_GATEWAY_URL,
@@ -52,9 +56,14 @@ TAILSCALE_ALPHA = {
 }
 
 
-def setup_required(tailscale_status: dict[str, object] | None = None) -> FakeCommandSurface:
+def setup_required(
+    tailscale_status: dict[str, object] | None = None,
+) -> FakeCommandSurface:
     """No local Gateway, no node host; Tailscale answers ``tailscale_status`` when given."""
-    answers = {"gateway_status": gateway_unresolved(), "node_status": node_not_hosting()}
+    answers = {
+        "gateway_status": gateway_unresolved(),
+        "node_status": node_not_hosting(),
+    }
     if tailscale_status is not None:
         answers["tailscale_status"] = ok(tailscale_status)
     return FakeCommandSurface(**answers)
@@ -63,7 +72,10 @@ def setup_required(tailscale_status: dict[str, object] | None = None) -> FakeCom
 def node_host_gateway(**answers) -> FakeCommandSurface:
     """The local ``gateway status`` fails, the device hosts a Gateway, and dialing it succeeds."""
     return FakeCommandSurface.healthy(
-        gateway_status=[failed(9, "connection broken", "invalid token"), echo_dialed_url()],
+        gateway_status=[
+            failed(9, "connection broken", "invalid token"),
+            echo_dialed_url(),
+        ],
         node_status=node_hosting(),
         **answers,
     )
@@ -78,9 +90,9 @@ class MetadataTests(unittest.TestCase):
                 side_effect=[FileNotFoundError, b""],
             ),
             mock.patch.object(os, "open", side_effect=FileExistsError),
+            self.assertRaisesRegex(OSError, "Invalid Clawbar local key secret"),
         ):
-            with self.assertRaisesRegex(OSError, "Invalid Clawbar local key secret"):
-                clawbar_metadata.load_local_key_secret()
+            clawbar_metadata.load_local_key_secret()
 
     def test_secret_reader_rejects_symbolic_links(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -91,9 +103,11 @@ class MetadataTests(unittest.TestCase):
             target.write_bytes(b"x" * 32)
             (secret_directory / "node-key-secret").symlink_to(target)
 
-            with mock.patch.dict(os.environ, {"XDG_RUNTIME_DIR": str(root)}):
-                with self.assertRaises(OSError):
-                    clawbar_metadata.load_local_key_secret()
+            with (
+                mock.patch.dict(os.environ, {"XDG_RUNTIME_DIR": str(root)}),
+                self.assertRaises(OSError),
+            ):
+                clawbar_metadata.load_local_key_secret()
 
 
 class BoundedInputTests(unittest.TestCase):
@@ -158,11 +172,15 @@ class SubprocessCommandSurfaceTests(unittest.TestCase):
 
     echo = (sys.executable, "-c", "import sys; print(' '.join(sys.argv[1:]))")
 
-    def test_openclaw_questions_carry_a_bounded_timeout_and_the_target_url(self) -> None:
+    def test_openclaw_questions_carry_a_bounded_timeout_and_the_target_url(
+        self,
+    ) -> None:
         surface = SubprocessCommandSurface(openclaw=self.echo)
         deadline_at = time.monotonic() + 2
 
-        status = surface.gateway_status(deadline_at, "wss://example.test").stdout.split()
+        status = surface.gateway_status(
+            deadline_at, "wss://example.test"
+        ).stdout.split()
         nodes = surface.nodes_status(deadline_at, None).stdout.split()
         node = surface.node_status(deadline_at).stdout.split()
 
@@ -179,11 +197,16 @@ class SubprocessCommandSurfaceTests(unittest.TestCase):
         deadline_at = time.monotonic() + 2
 
         tasks = surface.tasks_list(deadline_at, None).stdout
-        cron = surface.cron_list(deadline_at, None, {"offset": 0, "limit": 200, "includeDisabled": True}).stdout
+        cron = surface.cron_list(
+            deadline_at, None, {"offset": 0, "limit": 200, "includeDisabled": True}
+        ).stdout
         agents = surface.agents_list(deadline_at, None).stdout
 
         self.assertIn('gateway call tasks.list --params {"limit":500} --json', tasks)
-        self.assertIn('gateway call cron.list --params {"includeDisabled":true,"limit":200,"offset":0} --json', cron)
+        self.assertIn(
+            'gateway call cron.list --params {"includeDisabled":true,"limit":200,"offset":0} --json',
+            cron,
+        )
         self.assertIn("gateway call agents.list --params {} --json", agents)
 
     def test_tailscale_status_uses_its_own_executable(self) -> None:
@@ -203,7 +226,9 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
     def test_executable_forced_termination_stops_running_gateway_command(self) -> None:
         self._assert_executable_termination_stops_running_gateway_command("kill")
 
-    def _assert_executable_termination_stops_running_gateway_command(self, method: str) -> None:
+    def _assert_executable_termination_stops_running_gateway_command(
+        self, method: str
+    ) -> None:
         pid_path = self.root / "gateway-command.pid"
         child_pid: int | None = None
         collector: subprocess.Popen[str] | None = None
@@ -230,7 +255,10 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
                 collector.wait(timeout=2)
 
                 stopped_deadline = time.monotonic() + 1
-                while self._process_exists(child_pid) and time.monotonic() < stopped_deadline:
+                while (
+                    self._process_exists(child_pid)
+                    and time.monotonic() < stopped_deadline
+                ):
                     time.sleep(0.01)
                 self.assertFalse(
                     self._process_exists(child_pid),
@@ -258,7 +286,10 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
             status = Path(f"/proc/{pid}/status").read_text(encoding="utf-8")
         except FileNotFoundError:
             return "gone"
-        return next((line for line in status.splitlines() if line.startswith("State:")), "unknown")
+        return next(
+            (line for line in status.splitlines() if line.startswith("State:")),
+            "unknown",
+        )
 
     def test_executable_bounds_gateway_command_output(self) -> None:
         started_at = time.monotonic()
@@ -266,7 +297,9 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
             "local",
             timeout=2,
             environment_overrides={
-                "FAKE_GATEWAY_OUTPUT_BYTES": str(clawbar_commands.MAX_COMMAND_STREAM_BYTES + 1),
+                "FAKE_GATEWAY_OUTPUT_BYTES": str(
+                    clawbar_commands.MAX_COMMAND_STREAM_BYTES + 1
+                ),
             },
         )
 
@@ -274,7 +307,9 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(json.loads(result.stdout)["failureKind"], "command_failed")
         self.assertLess(time.monotonic() - started_at, 2)
 
-    def test_executable_enforces_default_twelve_second_whole_collection_deadline(self) -> None:
+    def test_executable_enforces_default_twelve_second_whole_collection_deadline(
+        self,
+    ) -> None:
         started_at = time.monotonic()
         with self.fake_environment(FAKE_SCENARIO="node_host", FAKE_NODE_DELAY="30"):
             environment = os.environ.copy()
@@ -295,7 +330,9 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
             )
         elapsed = time.monotonic() - started_at
 
-        self.assertEqual(result.returncode, clawbar_collect.ExitCode.COMMAND_TIMEOUT, result.stderr)
+        self.assertEqual(
+            result.returncode, clawbar_collect.ExitCode.COMMAND_TIMEOUT, result.stderr
+        )
         self.assertGreaterEqual(elapsed, 10.5)
         self.assertLess(elapsed, 12.25)
         self.assertEqual(json.loads(result.stdout)["failureKind"], "timeout")
@@ -326,7 +363,9 @@ class CollectorEntryPointTests(CollectorFixture, unittest.TestCase):
             collector_arguments=["--read-theme-colors", str(colors_path)],
         )
 
-        self.assertEqual(fifo_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(
+            fifo_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED
+        )
         self.assertEqual(fifo_result.stdout, "")
 
         colors_path.unlink()
@@ -340,7 +379,9 @@ class CollectorEntryPointTests(CollectorFixture, unittest.TestCase):
             collector_arguments=["--read-theme-colors", str(colors_path)],
         )
 
-        self.assertEqual(link_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(
+            link_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED
+        )
         self.assertEqual(link_result.stdout, "")
 
         colors_path.unlink()
@@ -353,7 +394,9 @@ class CollectorEntryPointTests(CollectorFixture, unittest.TestCase):
             collector_arguments=["--read-theme-colors", str(colors_path)],
         )
 
-        self.assertEqual(oversized_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(
+            oversized_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED
+        )
         self.assertEqual(oversized_result.stdout, "")
 
     def test_read_cache_prints_a_valid_regular_snapshot(self) -> None:
@@ -386,7 +429,9 @@ class CollectorEntryPointTests(CollectorFixture, unittest.TestCase):
             collector_arguments=["--read-cache"],
         )
 
-        self.assertEqual(fifo_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(
+            fifo_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED
+        )
         self.assertEqual(fifo_result.stdout, "")
 
         snapshot_path.unlink()
@@ -400,7 +445,9 @@ class CollectorEntryPointTests(CollectorFixture, unittest.TestCase):
             collector_arguments=["--read-cache"],
         )
 
-        self.assertEqual(link_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(
+            link_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED
+        )
         self.assertEqual(link_result.stdout, "")
         self.assertIn("sentinel", outside.read_text(encoding="utf-8"))
 
@@ -439,21 +486,32 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         self.assertNotIn("not persisted", serialized)
 
     def test_malformed_json_has_distinct_exit_code(self) -> None:
-        result = self.collect(FakeCommandSurface.healthy(gateway_status=text("{not-json")))
+        result = self.collect(
+            FakeCommandSurface.healthy(gateway_status=text("{not-json"))
+        )
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.MALFORMED_JSON)
         self.assertEqual(self.read_snapshot()["failureKind"], "malformed_json")
 
-    def test_misleading_text_never_overrides_structured_status_or_exit_code(self) -> None:
+    def test_misleading_text_never_overrides_structured_status_or_exit_code(
+        self,
+    ) -> None:
         healthy = self.collect(
             FakeCommandSurface.healthy(
-                gateway_status=ok({"rpc": {"ok": True, "url": LOCAL_GATEWAY_URL}}, stderr="invalid token and connection broken"),
+                gateway_status=ok(
+                    {"rpc": {"ok": True, "url": LOCAL_GATEWAY_URL}},
+                    stderr="invalid token and connection broken",
+                ),
             )
         )
-        failed_result = self.collect(FakeCommandSurface.lost(stdout="connection broken"))
+        failed_result = self.collect(
+            FakeCommandSurface.lost(stdout="connection broken")
+        )
 
         self.assertEqual(healthy.exit_code, clawbar_collect.ExitCode.OK)
-        self.assertEqual(failed_result.exit_code, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(
+            failed_result.exit_code, clawbar_collect.ExitCode.COMMAND_FAILED
+        )
         serialized = json.dumps(failed_result.snapshot)
         self.assertNotIn("invalid token", serialized)
         self.assertNotIn("connection broken", serialized)
@@ -465,10 +523,14 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(self.read_snapshot()["gateway"], {"state": "no_data"})
 
     def test_reachable_unsupported_json_is_configuration_error(self) -> None:
-        result = self.collect(FakeCommandSurface.healthy(gateway_status=ok({"rpc": {"ok": True}})))
+        result = self.collect(
+            FakeCommandSurface.healthy(gateway_status=ok({"rpc": {"ok": True}}))
+        )
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.UNSUPPORTED_JSON)
-        self.assertEqual(self.read_snapshot()["gateway"], {"state": "configuration_error"})
+        self.assertEqual(
+            self.read_snapshot()["gateway"], {"state": "configuration_error"}
+        )
 
     def test_success_timestamps_follow_gateway_validation(self) -> None:
         started_at = time.time()
@@ -479,9 +541,13 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
 
         result = self.collect(FakeCommandSurface.healthy(gateway_status=slow_gateway))
 
-        generated_at = datetime.fromisoformat(result.snapshot["generatedAt"].replace("Z", "+00:00")).timestamp()
+        generated_at = datetime.fromisoformat(
+            result.snapshot["generatedAt"].replace("Z", "+00:00")
+        ).timestamp()
         self.assertGreaterEqual(generated_at, started_at + 0.15)
-        self.assertEqual(result.snapshot["lastSuccessAt"], result.snapshot["generatedAt"])
+        self.assertEqual(
+            result.snapshot["lastSuccessAt"], result.snapshot["generatedAt"]
+        )
 
     def test_atomic_replacement_preserves_last_success_metadata(self) -> None:
         original = {
@@ -497,18 +563,27 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         self.snapshot_path.write_text(json.dumps(original), encoding="utf-8")
         original_inode = self.snapshot_path.stat().st_ino
 
-        result = self.collect(FakeCommandSurface.healthy(gateway_status=text("invalid")))
+        result = self.collect(
+            FakeCommandSurface.healthy(gateway_status=text("invalid"))
+        )
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.MALFORMED_JSON)
         snapshot = self.read_snapshot()
         self.assertEqual(snapshot["lastSuccessAt"], original["lastSuccessAt"])
         self.assertEqual(snapshot["resolutionSource"], "node_host")
         self.assertNotEqual(self.snapshot_path.stat().st_ino, original_inode)
-        self.assertEqual(list(self.snapshot_path.parent.glob("snapshot.json.*.tmp")), [])
+        self.assertEqual(
+            list(self.snapshot_path.parent.glob("snapshot.json.*.tmp")), []
+        )
 
     def test_misleading_success_stderr_and_nonzero_streams_are_ignored(self) -> None:
         healthy = self.collect(
-            FakeCommandSurface.healthy(gateway_status=ok({"rpc": {"ok": True, "url": LOCAL_GATEWAY_URL}}, stderr="invalid token and connection broken"))
+            FakeCommandSurface.healthy(
+                gateway_status=ok(
+                    {"rpc": {"ok": True, "url": LOCAL_GATEWAY_URL}},
+                    stderr="invalid token and connection broken",
+                )
+            )
         )
         failed_result = self.collect(
             FakeCommandSurface.lost(stdout="connection broken"),
@@ -517,7 +592,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
 
         self.assertEqual(healthy.exit_code, clawbar_collect.ExitCode.OK)
         self.assertEqual(healthy.snapshot["gateway"], {"state": "healthy"})
-        self.assertEqual(failed_result.exit_code, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(
+            failed_result.exit_code, clawbar_collect.ExitCode.COMMAND_FAILED
+        )
         self.assertEqual(failed_result.snapshot["gateway"], {"state": "no_data"})
         serialized = json.dumps(failed_result.snapshot)
         self.assertNotIn("invalid token", serialized)
@@ -527,7 +604,10 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
 
     def test_deadline_is_shared_across_node_resolution_and_gateway_probe(self) -> None:
         commands = FakeCommandSurface(
-            gateway_status=[failed(9, "connection broken", "invalid token"), CollectionDeadlineExceeded()],
+            gateway_status=[
+                failed(9, "connection broken", "invalid token"),
+                CollectionDeadlineExceeded(),
+            ],
             node_status=node_hosting(),
         )
 
@@ -535,7 +615,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.COMMAND_TIMEOUT)
         self.assertEqual(self.read_snapshot()["failureKind"], "timeout")
-        self.assertEqual(commands.questions(), ["gateway_status", "node_status", "gateway_status"])
+        self.assertEqual(
+            commands.questions(), ["gateway_status", "node_status", "gateway_status"]
+        )
         self.assertEqual(len(set(commands.deadlines)), 1)
 
     def test_metadata_timeout_degrades_without_gateway_loss(self) -> None:
@@ -561,7 +643,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(result.snapshot["agents"], {"available": False, "items": []})
 
     def test_oversize_agents_surface_marks_section_reason(self) -> None:
-        result = self.collect(FakeCommandSurface.healthy(agents_list=CommandOutputExceeded()))
+        result = self.collect(
+            FakeCommandSurface.healthy(agents_list=CommandOutputExceeded())
+        )
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
         self.assertEqual(result.snapshot["gateway"], {"state": "degraded"})
@@ -573,7 +657,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         )
 
     def test_oversize_task_surface_marks_agents_section_reason(self) -> None:
-        result = self.collect(FakeCommandSurface.healthy(tasks_list=CommandOutputExceeded()))
+        result = self.collect(
+            FakeCommandSurface.healthy(tasks_list=CommandOutputExceeded())
+        )
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
         self.assertEqual(result.snapshot["gateway"], {"state": "degraded"})
@@ -584,7 +670,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         )
 
     def test_oversize_nodes_surface_marks_fleet_section_reason(self) -> None:
-        result = self.collect(FakeCommandSurface.healthy(nodes_status=CommandOutputExceeded()))
+        result = self.collect(
+            FakeCommandSurface.healthy(nodes_status=CommandOutputExceeded())
+        )
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
         self.assertEqual(result.snapshot["gateway"], {"state": "degraded"})
@@ -604,7 +692,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         }
         for scenario, commands in scenarios.items():
             with self.subTest(scenario=scenario):
-                result = self.collect(commands, snapshot_path=self.root / scenario / "snapshot.json")
+                result = self.collect(
+                    commands, snapshot_path=self.root / scenario / "snapshot.json"
+                )
 
                 self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
                 self.assertEqual(result.snapshot["resolutionSource"], scenario)
@@ -612,13 +702,20 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
                 probes = commands.asked("gateway_status")
                 self.assertIsNone(probes[0]["url"])
                 if scenario == "node_host":
-                    self.assertEqual(commands.questions()[:3], ["gateway_status", "node_status", "gateway_status"])
+                    self.assertEqual(
+                        commands.questions()[:3],
+                        ["gateway_status", "node_status", "gateway_status"],
+                    )
                     self.assertEqual(probes[1]["url"], NODE_HOST_URL)
-                    self.assertNotIn("node-gateway.example.test", json.dumps(result.snapshot))
+                    self.assertNotIn(
+                        "node-gateway.example.test", json.dumps(result.snapshot)
+                    )
                     metadata = commands.questions()[3:]
                 else:
                     metadata = commands.questions()[1:]
-                self.assertEqual(metadata, ["nodes_status", "agents_list", "tasks_list", "cron_list"])
+                self.assertEqual(
+                    metadata, ["nodes_status", "agents_list", "tasks_list", "cron_list"]
+                )
                 self.assertEqual(
                     commands.asked("cron_list")[0]["params"],
                     {"includeDisabled": True, "limit": 200, "offset": 0},
@@ -627,7 +724,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
     def test_never_persists_a_gateway_url_with_credentials(self) -> None:
         private_url = "wss://operator:PRIVATE-TOKEN@gateway.example.test:18789"
 
-        result = self.collect(FakeCommandSurface.healthy(gateway_status=gateway_ok(private_url)))
+        result = self.collect(
+            FakeCommandSurface.healthy(gateway_status=gateway_ok(private_url))
+        )
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
         self.assertEqual(result.snapshot["resolutionSource"], "configured_remote")
@@ -644,7 +743,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
 
         failed_result = self.collect(commands)
 
-        self.assertEqual(failed_result.exit_code, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(
+            failed_result.exit_code, clawbar_collect.ExitCode.COMMAND_FAILED
+        )
         self.assertEqual(failed_result.snapshot["gateway"], {"state": "unstable"})
         self.assertEqual(failed_result.snapshot["resolutionSource"], "node_host")
         self.assertEqual(commands.asked("tailscale_status"), [])
@@ -653,10 +754,12 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         candidate_key = "candidate:test"
         self.state_directory.mkdir(parents=True)
         clawbar_gateway.candidate_state_path(self.snapshot_path).write_text(
-            json.dumps({
-                "schemaVersion": clawbar_gateway.CANDIDATE_STATE_SCHEMA_VERSION,
-                "candidates": {candidate_key: {"url": ALPHA_URL}},
-            }),
+            json.dumps(
+                {
+                    "schemaVersion": clawbar_gateway.CANDIDATE_STATE_SCHEMA_VERSION,
+                    "candidates": {candidate_key: {"url": ALPHA_URL}},
+                }
+            ),
             encoding="utf-8",
         )
         commands = FakeCommandSurface.healthy(gateway_status=echo_dialed_url())
@@ -668,14 +771,18 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(commands.asked("gateway_status"), [{"url": ALPHA_URL}])
         self.assertNotIn("node_status", commands.questions())
 
-    def test_a_verified_fallback_is_dialed_once_when_automatic_resolution_is_missing(self) -> None:
+    def test_a_verified_fallback_is_dialed_once_when_automatic_resolution_is_missing(
+        self,
+    ) -> None:
         self.state_directory.mkdir(parents=True)
         (self.state_directory / "gateway-verified-target.json").write_text(
-            json.dumps({
-                "schemaVersion": clawbar_target_state.VERIFIED_TARGET_SCHEMA_VERSION,
-                "source": "tailscale",
-                "url": ALPHA_URL,
-            }),
+            json.dumps(
+                {
+                    "schemaVersion": clawbar_target_state.VERIFIED_TARGET_SCHEMA_VERSION,
+                    "source": "tailscale",
+                    "url": ALPHA_URL,
+                }
+            ),
             encoding="utf-8",
         )
         commands = FakeCommandSurface.healthy(
@@ -688,12 +795,16 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
         self.assertEqual(result.snapshot["gateway"], {"state": "healthy"})
         self.assertEqual(result.snapshot["resolutionSource"], "tailscale")
-        self.assertEqual(commands.asked("gateway_status"), [{"url": None}, {"url": ALPHA_URL}])
+        self.assertEqual(
+            commands.asked("gateway_status"), [{"url": None}, {"url": ALPHA_URL}]
+        )
         self.assertEqual(commands.asked("tailscale_status"), [])
 
     # ---- Gateway Setup Required and Tailscale candidates ----
 
-    def test_lists_tailscale_candidates_only_when_gateway_setup_is_required(self) -> None:
+    def test_lists_tailscale_candidates_only_when_gateway_setup_is_required(
+        self,
+    ) -> None:
         tailscale_status = {
             "Self": {"ID": "PRIVATE-SELF", "HostName": "local-device", "Online": True},
             "Peer": {
@@ -722,7 +833,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(snapshot["gateway"], {"state": "setup_required"})
         self.assertEqual(snapshot["resolutionSource"], "unresolved")
         candidates = snapshot["setup"]["candidates"]
-        self.assertEqual([candidate["name"] for candidate in candidates], ["gateway-alpha"])
+        self.assertEqual(
+            [candidate["name"] for candidate in candidates], ["gateway-alpha"]
+        )
         self.assertRegex(candidates[0]["key"], r"^candidate:[0-9a-f]{20}$")
         self.assertEqual(
             snapshot["setup"]["guidance"],
@@ -738,7 +851,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         self.assertNotIn("100.64.0.10", serialized)
         self.assertEqual(commands.questions()[-1], "tailscale_status")
 
-    def test_tailscale_candidate_keys_survive_reorder_and_distinguish_devices(self) -> None:
+    def test_tailscale_candidate_keys_survive_reorder_and_distinguish_devices(
+        self,
+    ) -> None:
         first_status = {
             "Peer": {
                 "nodekey:PRIVATE-A": {
@@ -776,13 +891,19 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         reordered = self.collect(setup_required(reordered_status))
 
         first_by_name = {
-            candidate["name"]: candidate["key"] for candidate in first.snapshot["setup"]["candidates"]
+            candidate["name"]: candidate["key"]
+            for candidate in first.snapshot["setup"]["candidates"]
         }
         reordered_by_name = {
-            candidate["name"]: candidate["key"] for candidate in reordered.snapshot["setup"]["candidates"]
+            candidate["name"]: candidate["key"]
+            for candidate in reordered.snapshot["setup"]["candidates"]
         }
-        self.assertEqual(first_by_name["gateway-alpha"], reordered_by_name["gateway-zulu"])
-        self.assertEqual(first_by_name["gateway-beta"], reordered_by_name["gateway-aardvark"])
+        self.assertEqual(
+            first_by_name["gateway-alpha"], reordered_by_name["gateway-zulu"]
+        )
+        self.assertEqual(
+            first_by_name["gateway-beta"], reordered_by_name["gateway-aardvark"]
+        )
         self.assertEqual(len(set(first_by_name.values())), 2)
         serialized = json.dumps(first.snapshot) + json.dumps(reordered.snapshot)
         for private_value in ("PRIVATE-A", "PRIVATE-B", "example.ts.net", "100.64."):
@@ -826,16 +947,22 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         )
         self.assertEqual(self.read_notifications(), [])
 
-    def test_preserves_dialed_tailscale_fallback_across_automatic_resolution(self) -> None:
+    def test_preserves_dialed_tailscale_fallback_across_automatic_resolution(
+        self,
+    ) -> None:
         setup_commands = setup_required(TAILSCALE_ALPHA)
         setup = self.collect(setup_commands)
         self.assertEqual(setup.exit_code, clawbar_collect.ExitCode.OK)
         candidate_key = setup.snapshot["setup"]["candidates"][0]["key"]
 
         legacy_current_target_path = self.state_directory / "gateway-target.json"
-        legacy_current_target_path.write_text('{"url":"ws://legacy.example.test"}', encoding="utf-8")
+        legacy_current_target_path.write_text(
+            '{"url":"ws://legacy.example.test"}', encoding="utf-8"
+        )
 
-        verifier = FakeCommandSurface.healthy(gateway_status=echo_dialed_url(LOCAL_GATEWAY_URL))
+        verifier = FakeCommandSurface.healthy(
+            gateway_status=echo_dialed_url(LOCAL_GATEWAY_URL)
+        )
         verified = self.collect(verifier, candidate_key=candidate_key)
         self.assertEqual(verified.exit_code, clawbar_collect.ExitCode.OK)
         verified_target_path = self.state_directory / "gateway-verified-target.json"
@@ -864,11 +991,16 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
             self.assertEqual(result.snapshot["gateway"], {"state": "healthy"})
             self.assertEqual(result.snapshot["resolutionSource"], "tailscale")
             self.assertNotIn("example.ts.net", json.dumps(result.snapshot))
-        self.assertEqual(failed_result.exit_code, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(
+            failed_result.exit_code, clawbar_collect.ExitCode.COMMAND_FAILED
+        )
         self.assertEqual(failed_result.snapshot["gateway"], {"state": "unstable"})
         self.assertEqual(failed_result.snapshot["resolutionSource"], "tailscale")
         every_commands = (setup_commands, verifier, automatic_commands, reuser, failer)
-        self.assertEqual(sum(len(commands.asked("tailscale_status")) for commands in every_commands), 1)
+        self.assertEqual(
+            sum(len(commands.asked("tailscale_status")) for commands in every_commands),
+            1,
+        )
         candidate_probes = [
             probe["url"]
             for commands in every_commands
@@ -883,29 +1015,41 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
 
         verified = self.collect(
             FakeCommandSurface.healthy(
-                gateway_status=echo_dialed_url("wss://operator:PRIVATE-TOKEN@gateway.example.test:18789"),
+                gateway_status=echo_dialed_url(
+                    "wss://operator:PRIVATE-TOKEN@gateway.example.test:18789"
+                ),
             ),
             candidate_key=candidate_key,
         )
 
         self.assertEqual(verified.exit_code, clawbar_collect.ExitCode.OK)
         verified_state = json.loads(
-            (self.state_directory / "gateway-verified-target.json").read_text(encoding="utf-8")
+            (self.state_directory / "gateway-verified-target.json").read_text(
+                encoding="utf-8"
+            )
         )
         self.assertEqual(verified_state["url"], ALPHA_URL)
         self.assertFalse((self.state_directory / "gateway-target.json").exists())
         self.assertNotIn("PRIVATE-TOKEN", json.dumps(verified.snapshot))
 
-    def test_failed_verified_fallback_write_keeps_previous_snapshot_published(self) -> None:
+    def test_failed_verified_fallback_write_keeps_previous_snapshot_published(
+        self,
+    ) -> None:
         initial = self.collect(FakeCommandSurface.healthy())
         self.assertEqual(initial.exit_code, clawbar_collect.ExitCode.OK)
 
         candidate_key = "candidate:test"
         (self.state_directory / "gateway-candidates.json").write_text(
-            json.dumps({
-                "schemaVersion": clawbar_gateway.CANDIDATE_STATE_SCHEMA_VERSION,
-                "candidates": {candidate_key: {"url": "wss://gateway-alpha.example.ts.net:18789"}},
-            }),
+            json.dumps(
+                {
+                    "schemaVersion": clawbar_gateway.CANDIDATE_STATE_SCHEMA_VERSION,
+                    "candidates": {
+                        candidate_key: {
+                            "url": "wss://gateway-alpha.example.ts.net:18789"
+                        }
+                    },
+                }
+            ),
             encoding="utf-8",
         )
         (self.state_directory / "gateway-verified-target.json").mkdir()
@@ -930,8 +1074,12 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
 
         self.assertEqual(missing.exit_code, clawbar_collect.ExitCode.OK)
         self.assertEqual(missing.snapshot["gateway"], {"state": "setup_required"})
-        self.assertEqual(unsupported.exit_code, clawbar_collect.ExitCode.UNSUPPORTED_JSON)
-        self.assertEqual(unsupported.snapshot["gateway"], {"state": "configuration_error"})
+        self.assertEqual(
+            unsupported.exit_code, clawbar_collect.ExitCode.UNSUPPORTED_JSON
+        )
+        self.assertEqual(
+            unsupported.snapshot["gateway"], {"state": "configuration_error"}
+        )
         self.assertEqual(
             unsupported.snapshot["setup"]["error"],
             "The selected device does not provide a supported OpenClaw Gateway.",
@@ -940,7 +1088,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         self.assertNotIn("PRIVATE-", serialized)
         self.assertNotIn("example.ts.net", serialized)
 
-    def test_malformed_candidate_response_retains_previous_resolution_source(self) -> None:
+    def test_malformed_candidate_response_retains_previous_resolution_source(
+        self,
+    ) -> None:
         setup = self.collect(setup_required(TAILSCALE_ALPHA))
         candidate_key = setup.snapshot["setup"]["candidates"][0]["key"]
         verified = self.collect(
@@ -955,7 +1105,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
 
         self.assertEqual(verified.snapshot["resolutionSource"], "tailscale")
         self.assertEqual(malformed.exit_code, clawbar_collect.ExitCode.MALFORMED_JSON)
-        self.assertEqual(malformed.snapshot["gateway"], {"state": "configuration_error"})
+        self.assertEqual(
+            malformed.snapshot["gateway"], {"state": "configuration_error"}
+        )
         self.assertEqual(malformed.snapshot["resolutionSource"], "tailscale")
         self.assertEqual(malformed.snapshot["failureKind"], "malformed_json")
 
@@ -1028,7 +1180,11 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
                     "nodeId": "PRIVATE-HOST",
                     "ip": "PRIVATE-IP",
                 },
-                {"nodeId": "PRIVATE-HOST-2", "displayName": "studio-ops", "connected": True},
+                {
+                    "nodeId": "PRIVATE-HOST-2",
+                    "displayName": "studio-ops",
+                    "connected": True,
+                },
             ]
         }
         agents = {
@@ -1068,12 +1224,17 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         }
 
         result = self.collect(
-            FakeCommandSurface.healthy(nodes_status=ok(nodes), agents_list=ok(agents), tasks_list=ok(tasks))
+            FakeCommandSurface.healthy(
+                nodes_status=ok(nodes), agents_list=ok(agents), tasks_list=ok(tasks)
+            )
         )
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
         snapshot = result.snapshot
-        self.assertEqual([node["name"] for node in snapshot["fleet"]["nodes"]], ["Local", "studio-ops"])
+        self.assertEqual(
+            [node["name"] for node in snapshot["fleet"]["nodes"]],
+            ["Local", "studio-ops"],
+        )
         node_keys = [node["key"] for node in snapshot["fleet"]["nodes"]]
         self.assertEqual(len(set(node_keys)), 2)
         self.assertTrue(all(key.startswith("node:") for key in node_keys))
@@ -1091,7 +1252,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         for sentinel in private_sentinels:
             self.assertNotIn(sentinel, serialized)
 
-    def test_same_named_node_registrations_collapse_to_freshest_connected_node(self) -> None:
+    def test_same_named_node_registrations_collapse_to_freshest_connected_node(
+        self,
+    ) -> None:
         first_nodes = {
             "nodes": [
                 {
@@ -1147,7 +1310,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
 
         first = self.collect(FakeCommandSurface.healthy(nodes_status=ok(first_nodes)))
         second = self.collect(FakeCommandSurface.healthy(nodes_status=ok(second_nodes)))
-        replacement = self.collect(FakeCommandSurface.healthy(nodes_status=ok(replacement_nodes)))
+        replacement = self.collect(
+            FakeCommandSurface.healthy(nodes_status=ok(replacement_nodes))
+        )
         first_fleet = first.snapshot["fleet"]["nodes"]
         second_fleet = second.snapshot["fleet"]["nodes"]
         replacement_fleet = replacement.snapshot["fleet"]["nodes"]
@@ -1170,7 +1335,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         studio = next(node for node in first_fleet if node["name"] == "Studio")
         self.assertEqual(studio["platform"], "macOS 27.0")
 
-    def test_fresh_registration_after_first_hundred_duplicates_is_retained(self) -> None:
+    def test_fresh_registration_after_first_hundred_duplicates_is_retained(
+        self,
+    ) -> None:
         nodes = [
             {
                 "nodeId": f"PRIVATE-NODE-{index}",
@@ -1189,7 +1356,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
             }
         )
 
-        result = self.collect(FakeCommandSurface.healthy(nodes_status=ok({"nodes": nodes})))
+        result = self.collect(
+            FakeCommandSurface.healthy(nodes_status=ok({"nodes": nodes}))
+        )
         fleet = result.snapshot["fleet"]["nodes"]
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
@@ -1198,11 +1367,26 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(fleet[0]["version"], "current")
 
     def test_node_keys_stay_stable_without_runtime_directory(self) -> None:
-        nodes = {"nodes": [{"nodeId": "PRIVATE-NODE", "displayName": "Local", "connected": True}]}
-        environment = {"XDG_RUNTIME_DIR": "", "XDG_STATE_HOME": str(self.root / "state")}
+        nodes = {
+            "nodes": [
+                {"nodeId": "PRIVATE-NODE", "displayName": "Local", "connected": True}
+            ]
+        }
+        environment = {
+            "XDG_RUNTIME_DIR": "",
+            "XDG_STATE_HOME": str(self.root / "state"),
+        }
 
-        first = self.collect(FakeCommandSurface.healthy(nodes_status=ok(nodes)), secret=None, **environment)
-        second = self.collect(FakeCommandSurface.healthy(nodes_status=ok(nodes)), secret=None, **environment)
+        first = self.collect(
+            FakeCommandSurface.healthy(nodes_status=ok(nodes)),
+            secret=None,
+            **environment,
+        )
+        second = self.collect(
+            FakeCommandSurface.healthy(nodes_status=ok(nodes)),
+            secret=None,
+            **environment,
+        )
 
         first_node = first.snapshot["fleet"]["nodes"][0]
         second_node = second.snapshot["fleet"]["nodes"][0]
@@ -1216,9 +1400,15 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         secret_path = self.root / "runtime" / "clawbar" / "node-key-secret"
         secret_path.parent.mkdir(parents=True)
         secret_path.write_bytes(b"invalid")
-        nodes = {"nodes": [{"nodeId": "PRIVATE-NODE", "displayName": "Local", "connected": True}]}
+        nodes = {
+            "nodes": [
+                {"nodeId": "PRIVATE-NODE", "displayName": "Local", "connected": True}
+            ]
+        }
 
-        result = self.collect(FakeCommandSurface.healthy(nodes_status=ok(nodes)), secret=None)
+        result = self.collect(
+            FakeCommandSurface.healthy(nodes_status=ok(nodes)), secret=None
+        )
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
         self.assertEqual(result.snapshot["gateway"], {"state": "degraded"})
@@ -1240,8 +1430,12 @@ class RefreshIntervalTests(unittest.TestCase):
         parser = clawbar_collect.build_parser()
 
         self.assertEqual(parser.parse_args([]).refresh_interval, 30)
-        self.assertEqual(parser.parse_args(["--refresh-interval", "15"]).refresh_interval, 15)
-        self.assertEqual(parser.parse_args(["--refresh-interval", "300"]).refresh_interval, 300)
+        self.assertEqual(
+            parser.parse_args(["--refresh-interval", "15"]).refresh_interval, 15
+        )
+        self.assertEqual(
+            parser.parse_args(["--refresh-interval", "300"]).refresh_interval, 300
+        )
         self.assertIn("12 seconds", parser.format_help())
 
     def test_rejects_values_outside_bounds(self) -> None:

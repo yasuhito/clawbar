@@ -8,7 +8,6 @@ from pathlib import Path
 
 from scripts.clawbar_snapshot import SnapshotBuilder
 
-
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "fixtures" / "snapshots.json"
 NO_DATA_FIXTURE = ROOT / "tests" / "fixtures" / "no-data.json"

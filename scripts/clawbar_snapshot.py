@@ -7,10 +7,11 @@ import json
 import os
 import stat
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 if __package__:
     from .clawbar_bounds import MAX_COLLECTION_BYTES
@@ -36,7 +37,11 @@ MAX_STATE_FILE_BYTES = MAX_COLLECTION_BYTES
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return (
+        datetime.now(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z")
+    )
 
 
 def _unavailable_sections() -> dict[str, dict[str, Any]]:
@@ -47,7 +52,9 @@ def _unavailable_sections() -> dict[str, dict[str, Any]]:
     }
 
 
-def _bar(gateway_state: str, automation_items: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def _bar(
+    gateway_state: str, automation_items: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
     automation_failures = sum(
         item.get("enabled") is True and item.get("lastResult") == "error"
         for item in (automation_items or [])
@@ -66,7 +73,11 @@ def _bar(gateway_state: str, automation_items: list[dict[str, Any]] | None = Non
         count, severity = 0, "warning"
     else:
         raise ValueError(f"Unsupported Gateway state: {gateway_state}")
-    return {"kind": "attention" if count else "none", "count": count, "severity": severity}
+    return {
+        "kind": "attention" if count else "none",
+        "count": count,
+        "severity": severity,
+    }
 
 
 def _last_known_metadata(previous: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -83,8 +94,13 @@ def _last_known_metadata(previous: dict[str, Any] | None) -> dict[str, Any] | No
     ):
         return copy.deepcopy(retained)
     observed_at = previous.get("lastSuccessAt")
-    sections = {name: previous.get(name) for name in ("gateway", "fleet", "agents", "automations")}
-    if not isinstance(observed_at, str) or not all(isinstance(value, dict) for value in sections.values()):
+    sections = {
+        name: previous.get(name)
+        for name in ("gateway", "fleet", "agents", "automations")
+    }
+    if not isinstance(observed_at, str) or not all(
+        isinstance(value, dict) for value in sections.values()
+    ):
         return None
     return {"observedAt": observed_at, **copy.deepcopy(sections)}
 
@@ -93,7 +109,10 @@ def _complete_last_known(previous: dict[str, Any] | None) -> dict[str, Any] | No
     retained = _last_known_metadata(previous)
     if retained is None:
         return None
-    if all(retained[section].get("available") is True for section in ("fleet", "agents", "automations")):
+    if all(
+        retained[section].get("available") is True
+        for section in ("fleet", "agents", "automations")
+    ):
         return retained
     return None
 
@@ -130,11 +149,17 @@ class SnapshotBuilder:
             "schemaVersion": SCHEMA_VERSION,
             "generatedAt": self.clock(),
             "refreshIntervalSeconds": self.refresh_interval,
-            "resolutionSource": source if source in RESOLUTION_SOURCES else "unresolved",
+            "resolutionSource": source
+            if source in RESOLUTION_SOURCES
+            else "unresolved",
             "gateway": {"state": gateway_state},
             "lastSuccessAt": last_success_at,
             "consecutiveFailures": consecutive_failures,
-            **({"demoScenario": self.demo_scenario} if self.demo_scenario is not None else {}),
+            **(
+                {"demoScenario": self.demo_scenario}
+                if self.demo_scenario is not None
+                else {}
+            ),
         }
 
     def current(
@@ -150,10 +175,16 @@ class SnapshotBuilder:
         state = "degraded" if degraded else "healthy"
         generated_at = self.clock()
         failures = metadata_failures or {}
-        fleet_section: dict[str, Any] = {"available": fleet is not None, "nodes": fleet or []}
+        fleet_section: dict[str, Any] = {
+            "available": fleet is not None,
+            "nodes": fleet or [],
+        }
         if fleet is None and failures.get("fleet"):
             fleet_section["reason"] = failures["fleet"]
-        agents_section: dict[str, Any] = {"available": agents is not None, "items": agents or []}
+        agents_section: dict[str, Any] = {
+            "available": agents is not None,
+            "items": agents or [],
+        }
         agents_failure = failures.get("agents") or failures.get("tasks")
         if agents is None and agents_failure:
             agents_section["reason"] = agents_failure
@@ -169,7 +200,9 @@ class SnapshotBuilder:
             "schemaVersion": SCHEMA_VERSION,
             "generatedAt": generated_at,
             "refreshIntervalSeconds": self.refresh_interval,
-            "resolutionSource": source if source in RESOLUTION_SOURCES else "unresolved",
+            "resolutionSource": source
+            if source in RESOLUTION_SOURCES
+            else "unresolved",
             "gateway": {"state": state},
             "fleet": fleet_section,
             "agents": agents_section,
@@ -177,20 +210,30 @@ class SnapshotBuilder:
             "bar": _bar(state, automation_items),
             "lastSuccessAt": generated_at,
             "consecutiveFailures": 0,
-            **({"demoScenario": self.demo_scenario} if self.demo_scenario is not None else {}),
+            **(
+                {"demoScenario": self.demo_scenario}
+                if self.demo_scenario is not None
+                else {}
+            ),
             **({"lastKnown": retained} if retained is not None else {}),
         }
 
     def failure(self, failure_kind: str) -> dict[str, Any]:
         _require_failure_kind(failure_kind)
-        previous_failures = self.previous.get("consecutiveFailures", 0) if self.previous else 0
+        previous_failures = (
+            self.previous.get("consecutiveFailures", 0) if self.previous else 0
+        )
         failures = previous_failures + 1 if isinstance(previous_failures, int) else 1
         retained = _last_known_metadata(self.previous)
         previous_success = self.previous.get("lastSuccessAt") if self.previous else None
         last_success = retained.get("observedAt") if retained else previous_success
         if not isinstance(last_success, str):
             last_success = None
-        state = "no_data" if last_success is None else ("offline" if failures >= 2 else "unstable")
+        state = (
+            "no_data"
+            if last_success is None
+            else ("offline" if failures >= 2 else "unstable")
+        )
         source = self.previous.get("resolutionSource") if self.previous else None
         return {
             **self._envelope(source, state, last_success, failures),
@@ -209,7 +252,11 @@ class SnapshotBuilder:
     ) -> dict[str, Any]:
         if failure_kind is not None:
             _require_failure_kind(failure_kind)
-        public_candidates = copy.deepcopy(candidates) if candidates is not None else _retained_setup_candidates(self.previous)
+        public_candidates = (
+            copy.deepcopy(candidates)
+            if candidates is not None
+            else _retained_setup_candidates(self.previous)
+        )
         setup: dict[str, Any] = {"candidates": public_candidates, "guidance": guidance}
         if error is not None:
             setup["error"] = error
@@ -236,7 +283,11 @@ class SnapshotBuilder:
         setup_section = None
         if setup is not None:
             candidates, guidance, error = setup
-            public_candidates = candidates if candidates is not None else _retained_setup_candidates(self.previous)
+            public_candidates = (
+                candidates
+                if candidates is not None
+                else _retained_setup_candidates(self.previous)
+            )
             setup_section = {
                 "candidates": copy.deepcopy(public_candidates),
                 "guidance": guidance,
@@ -257,7 +308,9 @@ def _require_failure_kind(failure_kind: str) -> None:
         raise ValueError(f"Unsupported failure kind: {failure_kind}")
 
 
-def read_bounded_regular_file(path: Path, max_bytes: int = MAX_COLLECTION_BYTES) -> bytes:
+def read_bounded_regular_file(
+    path: Path, max_bytes: int = MAX_COLLECTION_BYTES
+) -> bytes:
     """Read one owner-controlled regular file without following its final link."""
     flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(path, flags)
@@ -269,7 +322,9 @@ def read_bounded_regular_file(path: Path, max_bytes: int = MAX_COLLECTION_BYTES)
             raise OSError(f"State file exceeds {max_bytes} bytes: {path}")
         content = bytearray()
         while len(content) <= max_bytes:
-            chunk = os.read(descriptor, min(READ_CHUNK_BYTES, max_bytes + 1 - len(content)))
+            chunk = os.read(
+                descriptor, min(READ_CHUNK_BYTES, max_bytes + 1 - len(content))
+            )
             if not chunk:
                 return bytes(content)
             content.extend(chunk)
@@ -289,7 +344,9 @@ def read_json_document(path: Path) -> dict[str, Any] | None:
 
 def atomic_write_snapshot(path: Path, snapshot: dict[str, Any]) -> None:
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    descriptor, temporary_name = tempfile.mkstemp(prefix=f"{path.name}.", suffix=".tmp", dir=path.parent)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f"{path.name}.", suffix=".tmp", dir=path.parent
+    )
     temporary_path = Path(temporary_name)
     try:
         os.fchmod(descriptor, 0o600)

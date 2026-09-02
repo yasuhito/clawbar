@@ -24,7 +24,11 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
                     "name": "Zebra disabled",
                     "enabled": False,
                     "schedule": {"kind": "cron", "expr": "* * * * *"},
-                    "state": {"lastRunAtMs": 7_000, "lastRunStatus": "error", "consecutiveErrors": 9},
+                    "state": {
+                        "lastRunAtMs": 7_000,
+                        "lastRunStatus": "error",
+                        "consecutiveErrors": 9,
+                    },
                 },
                 {
                     "id": "event-id",
@@ -45,16 +49,27 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
                     "name": "Successful",
                     "enabled": True,
                     "schedule": {"kind": "cron", "expr": "0 * * * *"},
-                    "state": {"nextRunAtMs": 3_000, "lastRunAtMs": 2_000, "lastRunStatus": "ok"},
+                    "state": {
+                        "nextRunAtMs": 3_000,
+                        "lastRunAtMs": 2_000,
+                        "lastRunStatus": "ok",
+                    },
                     "payload": {"message": "PRIVATE-PAYLOAD"},
-                    "delivery": {"to": "PRIVATE-DESTINATION", "account": "PRIVATE-ACCOUNT"},
+                    "delivery": {
+                        "to": "PRIVATE-DESTINATION",
+                        "account": "PRIVATE-ACCOUNT",
+                    },
                 },
                 {
                     "id": "skipped-id",
                     "name": "Skipped",
                     "enabled": True,
                     "schedule": {"kind": "every", "everyMs": 60_000},
-                    "state": {"nextRunAtMs": 2_000, "lastRunAtMs": 1_000, "lastRunStatus": "skipped"},
+                    "state": {
+                        "nextRunAtMs": 2_000,
+                        "lastRunAtMs": 1_000,
+                        "lastRunStatus": "skipped",
+                    },
                 },
                 {
                     "id": "new-id",
@@ -79,10 +94,16 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
                 },
             ]
         }
-        nodes = {"nodes": [{"nodeId": "offline-node", "displayName": "Offline", "connected": False}]}
+        nodes = {
+            "nodes": [
+                {"nodeId": "offline-node", "displayName": "Offline", "connected": False}
+            ]
+        }
 
         result = self.collect(
-            FakeCommandSurface.healthy(cron_list=ok(automations), nodes_status=ok(nodes))
+            FakeCommandSurface.healthy(
+                cron_list=ok(automations), nodes_status=ok(nodes)
+            )
         )
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
@@ -90,11 +111,28 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
         items = snapshot["automations"]["items"]
         self.assertEqual(
             [item["name"] for item in items],
-            ["Failed", "Never run", "Skipped", "Successful", "Completed once", "Event watcher", "Zebra disabled"],
+            [
+                "Failed",
+                "Never run",
+                "Skipped",
+                "Successful",
+                "Completed once",
+                "Event watcher",
+                "Zebra disabled",
+            ],
         )
         self.assertEqual(
             set(items[0]),
-            {"id", "name", "enabled", "kind", "nextRunAt", "lastRunAt", "lastResult", "consecutiveFailures"},
+            {
+                "id",
+                "name",
+                "enabled",
+                "kind",
+                "nextRunAt",
+                "lastRunAt",
+                "lastResult",
+                "consecutiveFailures",
+            },
         )
         self.assertEqual(items[0]["lastResult"], "error")
         self.assertEqual(items[0]["consecutiveFailures"], 3)
@@ -104,7 +142,9 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(items[5]["kind"], "on-exit")
         self.assertEqual(items[6]["enabled"], False)
         self.assertEqual(snapshot["gateway"], {"state": "healthy"})
-        self.assertEqual(snapshot["bar"], {"count": 1, "kind": "attention", "severity": "critical"})
+        self.assertEqual(
+            snapshot["bar"], {"count": 1, "kind": "attention", "severity": "critical"}
+        )
         published = json.dumps(snapshot)
         for sentinel in private_sentinels:
             self.assertNotIn(sentinel, published)
@@ -123,9 +163,24 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
             ]
         }
         scenarios = [
-            ("empty", ok({"jobs": []}), {"available": True, "items": []}, {"state": "healthy"}),
-            ("failed", failed(9), {"available": False, "items": [], "reason": "unavailable"}, {"state": "degraded"}),
-            ("too-many", ok(too_many), {"available": False, "items": [], "reason": "more_than_500"}, {"state": "degraded"}),
+            (
+                "empty",
+                ok({"jobs": []}),
+                {"available": True, "items": []},
+                {"state": "healthy"},
+            ),
+            (
+                "failed",
+                failed(9),
+                {"available": False, "items": [], "reason": "unavailable"},
+                {"state": "degraded"},
+            ),
+            (
+                "too-many",
+                ok(too_many),
+                {"available": False, "items": [], "reason": "more_than_500"},
+                {"state": "degraded"},
+            ),
         ]
         for name, cron_answer, expected_automations, expected_gateway in scenarios:
             with self.subTest(name=name):
@@ -157,10 +212,17 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
         ]
         pages = {
             0: {"jobs": jobs[:200], "total": 450, "hasMore": True, "nextOffset": 200},
-            200: {"jobs": jobs[200:400], "total": 450, "hasMore": True, "nextOffset": 400},
+            200: {
+                "jobs": jobs[200:400],
+                "total": 450,
+                "hasMore": True,
+                "nextOffset": 400,
+            },
             400: {"jobs": jobs[400:], "total": 450, "hasMore": False},
         }
-        commands = FakeCommandSurface.healthy(cron_list=lambda url, params: ok(pages[params["offset"]]))
+        commands = FakeCommandSurface.healthy(
+            cron_list=lambda url, params: ok(pages[params["offset"]])
+        )
 
         result = self.collect(commands)
 
@@ -183,7 +245,9 @@ class AutomationCollectorTests(CollectorFixture, unittest.TestCase):
 
         result = self.collect(commands)
 
-        self.assertEqual(result.snapshot["bar"], {"count": 0, "kind": "none", "severity": "healthy"})
+        self.assertEqual(
+            result.snapshot["bar"], {"count": 0, "kind": "none", "severity": "healthy"}
+        )
 
 
 if __name__ == "__main__":

@@ -8,9 +8,10 @@ import json
 import os
 import subprocess
 import sys
+from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 if __package__:
     from .clawbar_collect import default_snapshot_path
@@ -44,7 +45,9 @@ FIXTURE_NOW = datetime(2026, 8, 24, 17, 44, tzinfo=timezone.utc)
 def demo_marker_path() -> Path:
     runtime_directory = os.environ.get("XDG_RUNTIME_DIR")
     if not runtime_directory:
-        raise RuntimeError("XDG_RUNTIME_DIR is required for the developer demonstration")
+        raise RuntimeError(
+            "XDG_RUNTIME_DIR is required for the developer demonstration"
+        )
     return Path(runtime_directory) / "clawbar" / "demo-active"
 
 
@@ -77,13 +80,19 @@ def reload_shell() -> None:
     if os.environ.get("CLAWBAR_DEMO_NO_RESCAN") == "1":
         return
     try:
-        subprocess.run(["omarchy-shell", "-q", "shell", "rescanPlugins"], check=False, timeout=2)
+        subprocess.run(
+            ["omarchy-shell", "-q", "shell", "rescanPlugins"], check=False, timeout=2
+        )
     except (OSError, subprocess.TimeoutExpired):
         pass
 
 
 def timestamp(now: datetime, *, seconds: int = 0) -> str:
-    return (now + timedelta(seconds=seconds)).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return (
+        (now + timedelta(seconds=seconds))
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z")
+    )
 
 
 def node(key: str, name: str, state: str, observed_at: str) -> dict[str, Any]:
@@ -125,7 +134,10 @@ def registered_agents(now: datetime) -> list[dict[str, Any]]:
             "key": "agent:demo-planner",
             "name": "Planner",
             "model": "Fictional model",
-            "taskResult": {"state": "failed", "completedAt": timestamp(now, seconds=-540)},
+            "taskResult": {
+                "state": "failed",
+                "completedAt": timestamp(now, seconds=-540),
+            },
         },
         {
             "key": "agent:demo-builder",
@@ -136,12 +148,17 @@ def registered_agents(now: datetime) -> list[dict[str, Any]]:
         {
             "key": "agent:demo-observer",
             "name": "Observer",
-            "taskResult": {"state": "succeeded", "completedAt": timestamp(now, seconds=-240)},
+            "taskResult": {
+                "state": "succeeded",
+                "completedAt": timestamp(now, seconds=-240),
+            },
         },
     ]
 
 
-def demo_metadata(now: datetime) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+def demo_metadata(
+    now: datetime,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     observed_at = timestamp(now)
     fleet = [
         node("local", "Local", "healthy", observed_at),
@@ -184,7 +201,9 @@ def current_demo(
 def snapshot_for(scenario: str, now: datetime) -> dict[str, Any]:
     healthy = current_demo(None, now)
     fleet, agents, automations = demo_metadata(now)
-    builder = SnapshotBuilder(healthy, 30, clock=lambda: timestamp(now), demo_scenario=scenario)
+    builder = SnapshotBuilder(
+        healthy, 30, clock=lambda: timestamp(now), demo_scenario=scenario
+    )
 
     if scenario == "setup-required":
         candidates = [
@@ -204,7 +223,9 @@ def snapshot_for(scenario: str, now: datetime) -> dict[str, Any]:
     if scenario == "unstable-gateway":
         return builder.failure("command_failed")
     if scenario == "offline-gateway":
-        unstable = SnapshotBuilder(healthy, 30, clock=lambda: timestamp(now)).failure("command_failed")
+        unstable = SnapshotBuilder(healthy, 30, clock=lambda: timestamp(now)).failure(
+            "command_failed"
+        )
         return SnapshotBuilder(
             unstable,
             30,
@@ -221,7 +242,10 @@ def snapshot_for(scenario: str, now: datetime) -> dict[str, Any]:
             demo_scenario=scenario,
         ).configuration_error("configured_remote", "unsupported_json")
     if scenario == "automation-failure":
-        failing = [automation("morning", "Morning review", now, result="error", failures=3), automations[1]]
+        failing = [
+            automation("morning", "Morning review", now, result="error", failures=3),
+            automations[1],
+        ]
         return builder.current("local", fleet, agents, failing, None, {})
     if scenario == "stale-snapshot":
         stale_at = now - timedelta(seconds=121)
@@ -236,9 +260,15 @@ def snapshot_for(scenario: str, now: datetime) -> dict[str, Any]:
             automation("nightly", "Nightly sync", now, result="error", failures=2),
             automations[1],
         ]
-        return builder.current("local", fleet, registered_agents(now), failing, None, {})
+        return builder.current(
+            "local", fleet, registered_agents(now), failing, None, {}
+        )
     if scenario == "recovery":
-        recovered = [automations[0], automation("nightly", "Nightly sync", now), automations[1]]
+        recovered = [
+            automations[0],
+            automation("nightly", "Nightly sync", now),
+            automations[1],
+        ]
         return builder.current("local", fleet, agents, recovered, None, {})
     raise ValueError(f"Unknown scenario: {scenario}")
 
@@ -250,19 +280,41 @@ def fixture_snapshots() -> dict[str, dict[str, Any]]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("scenario", nargs="?", choices=SCENARIOS)
-    parser.add_argument("--snapshot", type=Path, help="override the XDG state snapshot path")
-    parser.add_argument("--resume", action="store_true", help="resume normal scheduled collection")
-    parser.add_argument("--list-scenarios", action="store_true", help="list available fictional scenarios")
-    parser.add_argument("--fixtures", action="store_true", help="print all scenarios using a fixed clock")
+    parser.add_argument(
+        "--snapshot", type=Path, help="override the XDG state snapshot path"
+    )
+    parser.add_argument(
+        "--resume", action="store_true", help="resume normal scheduled collection"
+    )
+    parser.add_argument(
+        "--list-scenarios",
+        action="store_true",
+        help="list available fictional scenarios",
+    )
+    parser.add_argument(
+        "--fixtures",
+        action="store_true",
+        help="print all scenarios using a fixed clock",
+    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     arguments = parser.parse_args(argv)
-    actions = sum(bool(value) for value in (arguments.scenario, arguments.resume, arguments.list_scenarios, arguments.fixtures))
+    actions = sum(
+        bool(value)
+        for value in (
+            arguments.scenario,
+            arguments.resume,
+            arguments.list_scenarios,
+            arguments.fixtures,
+        )
+    )
     if actions != 1:
-        parser.error("choose exactly one scenario, --resume, --list-scenarios, or --fixtures")
+        parser.error(
+            "choose exactly one scenario, --resume, --list-scenarios, or --fixtures"
+        )
     if arguments.fixtures:
         json.dump(fixture_snapshots(), sys.stdout, indent=2, sort_keys=True)
         sys.stdout.write("\n")

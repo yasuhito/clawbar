@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 if __package__:
     from .clawbar_bounds import MAX_METADATA_ITEMS
@@ -22,7 +22,11 @@ def collect_automation_surface(read_page: ReadPage) -> object | None:
         if not isinstance(payload, dict) or not isinstance(payload.get("jobs"), list):
             return None
         total = payload.get("total")
-        if isinstance(total, int) and not isinstance(total, bool) and total > MAX_METADATA_ITEMS:
+        if (
+            isinstance(total, int)
+            and not isinstance(total, bool)
+            and total > MAX_METADATA_ITEMS
+        ):
             return {"jobs": [], "total": total}
         jobs.extend(payload["jobs"])
         if len(jobs) > MAX_METADATA_ITEMS:
@@ -30,7 +34,11 @@ def collect_automation_surface(read_page: ReadPage) -> object | None:
         if payload.get("hasMore") is not True:
             return {"jobs": jobs, "total": total}
         next_offset = payload.get("nextOffset")
-        if not isinstance(next_offset, int) or isinstance(next_offset, bool) or next_offset <= offset:
+        if (
+            not isinstance(next_offset, int)
+            or isinstance(next_offset, bool)
+            or next_offset <= offset
+        ):
             return None
         if len(jobs) == MAX_METADATA_ITEMS:
             return {"jobs": [], "total": MAX_METADATA_ITEMS + 1}
