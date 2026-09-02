@@ -1,0 +1,6 @@
+[tool.ruff]
+target-version = "py313"
+
+[tool.ruff.lint.per-file-ignores]
+# スレッドで起きた失敗を収集して主スレッドで報告するため、Exception を広く受ける
+"tests/*" = ["BLE001"]

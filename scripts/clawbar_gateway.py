@@ -5,24 +5,37 @@ from __future__ import annotations
 import ipaddress
 import json
 import subprocess
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 from urllib.parse import urlsplit
 
 if __package__:
     from .clawbar_commands import CollectionDeadlineExceeded, GatewayCommandSurface
     from .clawbar_metadata import opaque_candidate_key
-    from .clawbar_snapshot import SnapshotBuilder, atomic_write_snapshot, read_json_document
+    from .clawbar_snapshot import (
+        SnapshotBuilder,
+        atomic_write_snapshot,
+        read_json_document,
+    )
 else:
     from clawbar_commands import CollectionDeadlineExceeded, GatewayCommandSurface
     from clawbar_metadata import opaque_candidate_key
-    from clawbar_snapshot import SnapshotBuilder, atomic_write_snapshot, read_json_document
+    from clawbar_snapshot import (
+        SnapshotBuilder,
+        atomic_write_snapshot,
+        read_json_document,
+    )
 
 GATEWAY_PORT = 18789
 SETUP_GUIDANCE = "Choose a Tailscale device to verify as your OpenClaw Gateway."
-NO_TAILSCALE_GUIDANCE = "Connect Tailscale on this device, then refresh to find Gateway candidates."
-KEY_SECRET_ERROR = "Clawbar cannot derive private Gateway Candidate Keys. Repair its local key secret."
+NO_TAILSCALE_GUIDANCE = (
+    "Connect Tailscale on this device, then refresh to find Gateway candidates."
+)
+KEY_SECRET_ERROR = (
+    "Clawbar cannot derive private Gateway Candidate Keys. Repair its local key secret."
+)
 CANDIDATE_STATE_SCHEMA_VERSION = 1
 
 
@@ -58,14 +71,23 @@ def node_host_target(status: object) -> GatewayTarget | None:
     if not isinstance(command, dict):
         return None
     arguments = command.get("programArguments")
-    if not isinstance(arguments, list) or not all(isinstance(value, str) for value in arguments):
+    if not isinstance(arguments, list) or not all(
+        isinstance(value, str) for value in arguments
+    ):
         return None
-    if not any(arguments[index : index + 2] == ["node", "run"] for index in range(len(arguments) - 1)):
+    if not any(
+        arguments[index : index + 2] == ["node", "run"]
+        for index in range(len(arguments) - 1)
+    ):
         return None
 
     host = command_option(arguments, "--host")
     port_text = command_option(arguments, "--port")
-    if host is None or port_text is None or any(character in host for character in "/@?#"):
+    if (
+        host is None
+        or port_text is None
+        or any(character in host for character in "/@?#")
+    ):
         return None
     try:
         port = int(port_text)
@@ -75,7 +97,9 @@ def node_host_target(status: object) -> GatewayTarget | None:
         return None
 
     context_path = command_option(arguments, "--context-path") or ""
-    if context_path and (not context_path.startswith("/") or "?" in context_path or "#" in context_path):
+    if context_path and (
+        not context_path.startswith("/") or "?" in context_path or "#" in context_path
+    ):
         return None
     try:
         parsed_ip = ipaddress.ip_address(host)
@@ -88,7 +112,9 @@ def node_host_target(status: object) -> GatewayTarget | None:
     return GatewayTarget(f"{scheme}://{url_host}:{port}{context_path}", "node_host")
 
 
-def resolution_source(status: dict[str, Any], source_hint: str | None = None) -> str | None:
+def resolution_source(
+    status: dict[str, Any], source_hint: str | None = None
+) -> str | None:
     rpc = status.get("rpc")
     if not isinstance(rpc, dict) or rpc.get("ok") is not True:
         return None
@@ -103,15 +129,17 @@ def resolution_source(status: dict[str, Any], source_hint: str | None = None) ->
     if hostname.lower() == "localhost":
         return "local"
     try:
-        return "local" if ipaddress.ip_address(hostname).is_loopback else "configured_remote"
+        return (
+            "local"
+            if ipaddress.ip_address(hostname).is_loopback
+            else "configured_remote"
+        )
     except ValueError:
         return "configured_remote"
 
 
 def candidate_state_path(snapshot_path: Path) -> Path:
     return snapshot_path.with_name("gateway-candidates.json")
-
-
 
 
 def tailscale_candidate(device: object) -> tuple[str, str, str] | None:
@@ -128,7 +156,11 @@ def tailscale_candidate(device: object) -> tuple[str, str, str] | None:
     if not host:
         addresses = device.get("TailscaleIPs")
         host = addresses[0] if isinstance(addresses, list) and addresses else ""
-    if not isinstance(host, str) or not host or any(character.isspace() for character in host):
+    if (
+        not isinstance(host, str)
+        or not host
+        or any(character.isspace() for character in host)
+    ):
         return None
     try:
         parsed_ip = ipaddress.ip_address(host)
@@ -154,10 +186,12 @@ def discover_tailscale_candidates(
     peers = status.get("Peer") if isinstance(status, dict) else None
     if not isinstance(peers, dict):
         return []
-    candidates = [candidate for device in peers.values() if (candidate := tailscale_candidate(device))]
+    candidates = [
+        candidate
+        for device in peers.values()
+        if (candidate := tailscale_candidate(device))
+    ]
     return sorted(candidates, key=lambda candidate: candidate[1].casefold())
-
-
 
 
 def setup_retry_snapshot(
@@ -182,17 +216,24 @@ def setup_required_snapshot(
         (opaque_candidate_key(device_id, candidate_key_secret), name, url)
         for device_id, name, url in candidates
     ]
-    public_candidates = [{"key": key, "name": name} for key, name, _ in keyed_candidates]
+    public_candidates = [
+        {"key": key, "name": name} for key, name, _ in keyed_candidates
+    ]
     candidate_targets = {key: {"url": url} for key, _, url in keyed_candidates}
     atomic_write_snapshot(
         candidate_state_path(snapshot_path),
-        {"schemaVersion": CANDIDATE_STATE_SCHEMA_VERSION, "candidates": candidate_targets},
+        {
+            "schemaVersion": CANDIDATE_STATE_SCHEMA_VERSION,
+            "candidates": candidate_targets,
+        },
     )
     guidance = SETUP_GUIDANCE if public_candidates else NO_TAILSCALE_GUIDANCE
     return builder.setup(public_candidates, guidance)
 
 
-def discover_node_host(commands: GatewayCommandSurface, deadline_at: float) -> GatewayTarget | None:
+def discover_node_host(
+    commands: GatewayCommandSurface, deadline_at: float
+) -> GatewayTarget | None:
     completed = commands.node_status(deadline_at)
     if completed.returncode != 0:
         return None
@@ -201,8 +242,6 @@ def discover_node_host(commands: GatewayCommandSurface, deadline_at: float) -> G
     except json.JSONDecodeError:
         return None
     return node_host_target(status)
-
-
 
 
 def selected_candidate(snapshot_path: Path, key: str) -> GatewayTarget | None:

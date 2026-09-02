@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_ID = "io.github.yasuhito.clawbar"
@@ -44,13 +42,17 @@ class MarketplaceContractTest(unittest.TestCase):
                     f"every Text control in {path.name} must reject rich-text interpretation",
                 )
 
-    def test_qml_reads_the_snapshot_through_the_bounded_collector_interface(self) -> None:
+    def test_qml_reads_the_snapshot_through_the_bounded_collector_interface(
+        self,
+    ) -> None:
         widget = (ROOT / "Clawbar.qml").read_text(encoding="utf-8")
 
         self.assertNotIn('command: ["cat", root.snapshotPath]', widget)
         self.assertIn('"--read-cache"', widget)
 
-    def test_qml_reads_theme_colors_through_the_bounded_collector_interface(self) -> None:
+    def test_qml_reads_theme_colors_through_the_bounded_collector_interface(
+        self,
+    ) -> None:
         widget = (ROOT / "Clawbar.qml").read_text(encoding="utf-8")
 
         self.assertNotIn("FileView", widget)
@@ -94,14 +96,16 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("origin.y: 11", mark)
         self.assertIn("property bool animated: false", mark)
         self.assertIn("loops: Animation.Infinite", mark)
-        self.assertIn('property: "jawAngle"; to: -26; duration: 96', mark)
-        self.assertIn('property: "jawAngle"; to: 4; duration: 144', mark)
-        self.assertIn("PauseAnimation { duration: 1392 }", mark)
+        self.assertIn('property: "jawAngle"\n      to: -26\n      duration: 96', mark)
+        self.assertIn('property: "jawAngle"\n      to: 4\n      duration: 144', mark)
+        self.assertIn("PauseAnimation {\n      duration: 1392\n    }", mark)
         self.assertIn("button.tooltipHovered", widget)
         self.assertIn("collectorService.collecting", widget)
         self.assertIn("readonly property bool collecting:", service)
 
-    def test_manual_refresh_feedback_is_distinct_from_scheduled_collection(self) -> None:
+    def test_manual_refresh_feedback_is_distinct_from_scheduled_collection(
+        self,
+    ) -> None:
         widget = (ROOT / "Clawbar.qml").read_text(encoding="utf-8")
         service = (ROOT / "ClawbarService.qml").read_text(encoding="utf-8")
 
@@ -113,7 +117,9 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("property bool collectorInteractive: false", service)
         self.assertIn("property bool refreshPendingInteractive: false", service)
         self.assertIn("readonly property bool interactiveRefreshing:", service)
-        self.assertIn("signal collectionFinished(bool interactive, bool succeeded)", service)
+        self.assertIn(
+            "signal collectionFinished(bool interactive, bool succeeded)", service
+        )
         self.assertIn("function requestCollection(interactive)", service)
         self.assertIn("root.requestCollection(false)", service)
         self.assertIn("root.startCollection(pendingInteractive)", service)
@@ -150,7 +156,9 @@ class MarketplaceContractTest(unittest.TestCase):
             panel,
         )
 
-    def test_scroll_indicator_reflects_scrollability_position_and_activity(self) -> None:
+    def test_scroll_indicator_reflects_scrollability_position_and_activity(
+        self,
+    ) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
 
         self.assertIn("id: scrollIndicator", panel)
@@ -168,7 +176,9 @@ class MarketplaceContractTest(unittest.TestCase):
             panel,
         )
         self.assertIn("id: scrollIndicatorActivity", panel)
-        self.assertIn("if (interactive) scrollIndicatorActivity.restart()", panel)
+        self.assertIn(
+            "if (interactive)\n          scrollIndicatorActivity.restart();", panel
+        )
         self.assertIn("Behavior on opacity", panel)
         self.assertIn("width: panelFlick.width - Style.space(8)", panel)
 
@@ -191,7 +201,7 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("Accessible.ignored: !expanded", reveal)
         self.assertEqual(section.count("DetailCard {"), 1)
         self.assertIn("sourceComponent: detailCardComponent", section)
-        self.assertIn("signal selectionGeometryChanged()", section)
+        self.assertIn("signal selectionGeometryChanged\n", section)
         self.assertIn("onSelectionGeometryChanged", panel)
 
     def test_operational_row_detail_uses_declarative_bindings(self) -> None:
@@ -228,7 +238,9 @@ class MarketplaceContractTest(unittest.TestCase):
             )
         )
 
-        collector = (ROOT / "scripts" / "clawbar_collect.py").read_text(encoding="utf-8")
+        collector = (ROOT / "scripts" / "clawbar_collect.py").read_text(
+            encoding="utf-8"
+        )
 
         self.assertNotIn("View run history", sources)
         self.assertNotIn("automationHistory", sources)
@@ -236,7 +248,9 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertNotIn("--automation-history", collector)
         self.assertNotIn("open_automation_history", collector)
 
-    def test_registered_agents_use_a_static_green_dot_without_activity_claims(self) -> None:
+    def test_registered_agents_use_a_static_green_dot_without_activity_claims(
+        self,
+    ) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
         presentation = (ROOT / "ClawbarPresentation.js").read_text(encoding="utf-8")
         detail = (ROOT / "DetailCard.qml").read_text(encoding="utf-8")
@@ -244,7 +258,10 @@ class MarketplaceContractTest(unittest.TestCase):
         # The static registered-agent dot is a view-model fact, rendered generically.
         self.assertIn("dot: SIGNAL_PRESENTATIONS.registered_agent", presentation)
         self.assertIn('accessibleDescription: "Registered Agent"', presentation)
-        self.assertIn("Accessible.description: modelData.accessibleDescription", (ROOT / "RowSection.qml").read_text(encoding="utf-8"))
+        self.assertIn(
+            "Accessible.description: modelData.accessibleDescription",
+            (ROOT / "RowSection.qml").read_text(encoding="utf-8"),
+        )
         self.assertNotIn("modelData.activity", panel)
         self.assertNotIn('text: "Activity "', detail)
 
@@ -253,7 +270,9 @@ class MarketplaceContractTest(unittest.TestCase):
         color = (ROOT / "ClawbarColor.js").read_text(encoding="utf-8")
         section = (ROOT / "RowSection.qml").read_text(encoding="utf-8")
 
-        self.assertIn("ColorKit.readableColor(rawDim, foreground, panelSurface, 4.5)", panel)
+        self.assertIn(
+            "ColorKit.readableColor(rawDim, foreground, panelSurface, 4.5)", panel
+        )
         self.assertIn("readonly property color selectedDim", panel)
         # Selected-row secondaries resolve through the palette against each surface.
         self.assertIn("selectedSignalColor: function(tone)", color)
@@ -271,7 +290,9 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("Accessible.description", section)
         self.assertIn("Accessible.name: modelData.name", section)
 
-    def test_selected_operational_rows_expand_details_inside_their_delegates(self) -> None:
+    def test_selected_operational_rows_expand_details_inside_their_delegates(
+        self,
+    ) -> None:
         panel = (ROOT / "ClawbarPanel.qml").read_text(encoding="utf-8")
         section = (ROOT / "RowSection.qml").read_text(encoding="utf-8")
 
@@ -320,7 +341,11 @@ class MarketplaceContractTest(unittest.TestCase):
                 }
             )
             listed = subprocess.run(
-                [sys.executable, str(ROOT / "scripts" / "clawbar_demo.py"), "--list-scenarios"],
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "clawbar_demo.py"),
+                    "--list-scenarios",
+                ],
                 cwd=ROOT,
                 env=environment,
                 check=True,
@@ -366,14 +391,18 @@ class MarketplaceContractTest(unittest.TestCase):
             registered.pop("demoScenario")
             self.assertNotEqual(healthy, registered)
             grouped = snapshots["grouped-incidents"]
-            self.assertEqual(grouped["bar"], {"kind": "attention", "count": 2, "severity": "critical"})
+            self.assertEqual(
+                grouped["bar"],
+                {"kind": "attention", "count": 2, "severity": "critical"},
+            )
             self.assertEqual(
                 [node["state"] for node in grouped["fleet"]["nodes"]],
                 ["healthy", "offline", "offline"],
             )
 
-
-    def test_demo_reproduces_grouped_incidents_and_recovery_without_private_content(self) -> None:
+    def test_demo_reproduces_grouped_incidents_and_recovery_without_private_content(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             bin_directory = root / "bin"
@@ -401,7 +430,11 @@ class MarketplaceContractTest(unittest.TestCase):
 
             for scenario in ("healthy", "grouped-incidents", "recovery"):
                 completed = subprocess.run(
-                    [sys.executable, str(ROOT / "scripts" / "clawbar_demo.py"), scenario],
+                    [
+                        sys.executable,
+                        str(ROOT / "scripts" / "clawbar_demo.py"),
+                        scenario,
+                    ],
                     cwd=ROOT,
                     env=environment,
                     check=True,
@@ -413,7 +446,9 @@ class MarketplaceContractTest(unittest.TestCase):
 
             self.assertTrue((root / "runtime" / "clawbar" / "demo-active").is_file())
             self.assertFalse((root / "runtime" / "clawbar" / "incidents.json").exists())
-            demo_incidents = root / "runtime" / "clawbar-demo" / "clawbar" / "incidents.json"
+            demo_incidents = (
+                root / "runtime" / "clawbar-demo" / "clawbar" / "incidents.json"
+            )
             self.assertTrue(demo_incidents.is_file())
             subprocess.run(
                 [sys.executable, str(ROOT / "scripts" / "clawbar_collect.py")],
@@ -423,7 +458,11 @@ class MarketplaceContractTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            preserved = json.loads((root / "state" / "clawbar" / "snapshot.json").read_text(encoding="utf-8"))
+            preserved = json.loads(
+                (root / "state" / "clawbar" / "snapshot.json").read_text(
+                    encoding="utf-8"
+                )
+            )
             self.assertEqual(preserved["demoScenario"], "recovery")
 
             subprocess.run(
@@ -433,7 +472,9 @@ class MarketplaceContractTest(unittest.TestCase):
                 check=True,
             )
             self.assertEqual(
-                (root / "runtime" / "clawbar" / "demo-active").read_text(encoding="utf-8"),
+                (root / "runtime" / "clawbar" / "demo-active").read_text(
+                    encoding="utf-8"
+                ),
                 "0\n",
             )
             self.assertFalse(demo_incidents.exists())
@@ -443,12 +484,18 @@ class MarketplaceContractTest(unittest.TestCase):
                 for line in notification_log.read_text(encoding="utf-8").splitlines()
             ]
             self.assertEqual(len(notifications), 2)
-            self.assertTrue(notifications[0][2].endswith("/assets/clawbar-incident.svg"))
+            self.assertTrue(
+                notifications[0][2].endswith("/assets/clawbar-incident.svg")
+            )
             self.assertEqual(notifications[0][3], "2 incidents detected")
-            self.assertTrue(notifications[1][2].endswith("/assets/clawbar-recovered.svg"))
+            self.assertTrue(
+                notifications[1][2].endswith("/assets/clawbar-recovered.svg")
+            )
             self.assertEqual(notifications[1][3], "2 incidents resolved")
 
-            serialized = (root / "state" / "clawbar" / "snapshot.json").read_text(encoding="utf-8")
+            serialized = (root / "state" / "clawbar" / "snapshot.json").read_text(
+                encoding="utf-8"
+            )
             for prohibited in (
                 "hostname",
                 "account",
@@ -499,11 +546,7 @@ class MarketplaceContractTest(unittest.TestCase):
             check=True,
             capture_output=True,
         ).stdout.split(b"\0")
-        tracked_paths = {
-            Path(path.decode("utf-8"))
-            for path in tracked
-            if path
-        }
+        tracked_paths = {Path(path.decode("utf-8")) for path in tracked if path}
 
         for path in tracked_paths:
             with self.subTest(path=path):

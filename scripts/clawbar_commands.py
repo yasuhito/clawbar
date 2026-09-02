@@ -17,8 +17,9 @@ import selectors
 import signal
 import subprocess
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Protocol, Sequence
+from typing import Protocol
 
 if __package__:
     from .clawbar_bounds import MAX_COLLECTION_BYTES, MAX_METADATA_ITEMS
@@ -57,7 +58,9 @@ class GatewayCommandSurface(Protocol):
     CommandOutputExceeded, or OSError; the collector maps those to snapshot states.
     """
 
-    def gateway_status(self, deadline_at: float, url: str | None = None) -> CommandResult: ...
+    def gateway_status(
+        self, deadline_at: float, url: str | None = None
+    ) -> CommandResult: ...
 
     def node_status(self, deadline_at: float) -> CommandResult: ...
 
@@ -67,7 +70,9 @@ class GatewayCommandSurface(Protocol):
 
     def tasks_list(self, deadline_at: float, url: str | None) -> CommandResult: ...
 
-    def cron_list(self, deadline_at: float, url: str | None, params: dict[str, object]) -> CommandResult: ...
+    def cron_list(
+        self, deadline_at: float, url: str | None, params: dict[str, object]
+    ) -> CommandResult: ...
 
     def tailscale_status(self, deadline_at: float) -> CommandResult: ...
 
@@ -79,8 +84,12 @@ class SubprocessCommandSurface:
     openclaw: Sequence[str] = OPENCLAW_COMMAND
     tailscale: Sequence[str] = TAILSCALE_COMMAND
 
-    def gateway_status(self, deadline_at: float, url: str | None = None) -> CommandResult:
-        return self._openclaw(deadline_at, ("gateway", "status", "--json", "--require-rpc"), url)
+    def gateway_status(
+        self, deadline_at: float, url: str | None = None
+    ) -> CommandResult:
+        return self._openclaw(
+            deadline_at, ("gateway", "status", "--json", "--require-rpc"), url
+        )
 
     def node_status(self, deadline_at: float) -> CommandResult:
         return run_command([*self.openclaw, "node", "status", "--json"], deadline_at)
@@ -90,28 +99,41 @@ class SubprocessCommandSurface:
 
     def agents_list(self, deadline_at: float, url: str | None) -> CommandResult:
         return self._openclaw(
-            deadline_at, ("gateway", "call", "agents.list", "--params", "{}", "--json"), url
+            deadline_at,
+            ("gateway", "call", "agents.list", "--params", "{}", "--json"),
+            url,
         )
 
     def tasks_list(self, deadline_at: float, url: str | None) -> CommandResult:
         params = json.dumps({"limit": MAX_METADATA_ITEMS}, separators=(",", ":"))
         return self._openclaw(
-            deadline_at, ("gateway", "call", "tasks.list", "--params", params, "--json"), url
+            deadline_at,
+            ("gateway", "call", "tasks.list", "--params", params, "--json"),
+            url,
         )
 
-    def cron_list(self, deadline_at: float, url: str | None, params: dict[str, object]) -> CommandResult:
+    def cron_list(
+        self, deadline_at: float, url: str | None, params: dict[str, object]
+    ) -> CommandResult:
         encoded = json.dumps(params, separators=(",", ":"), sort_keys=True)
         return self._openclaw(
-            deadline_at, ("gateway", "call", "cron.list", "--params", encoded, "--json"), url
+            deadline_at,
+            ("gateway", "call", "cron.list", "--params", encoded, "--json"),
+            url,
         )
 
     def tailscale_status(self, deadline_at: float) -> CommandResult:
         return run_command([*self.tailscale, "status", "--json"], deadline_at)
 
-    def _openclaw(self, deadline_at: float, arguments: Sequence[str], url: str | None) -> CommandResult:
+    def _openclaw(
+        self, deadline_at: float, arguments: Sequence[str], url: str | None
+    ) -> CommandResult:
         timeout = max(
             1,
-            min(OPENCLAW_TIMEOUT_MILLISECONDS, int(seconds_until_deadline(deadline_at) * 1000)),
+            min(
+                OPENCLAW_TIMEOUT_MILLISECONDS,
+                int(seconds_until_deadline(deadline_at) * 1000),
+            ),
         )
         command = [*self.openclaw, *arguments, "--timeout", str(timeout)]
         if url is not None:
@@ -125,7 +147,7 @@ def run_command(command: Sequence[str], deadline_at: float) -> CommandResult:
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         start_new_session=True,
-        preexec_fn=terminate_with_parent,
+        preexec_fn=terminate_with_parent,  # noqa: PLW1509 -- PDEATHSIG 用。スレッドからは呼ばない
     )
     stdout = bytearray()
     stderr = bytearray()
@@ -141,7 +163,10 @@ def run_command(command: Sequence[str], deadline_at: float) -> CommandResult:
                 output = key.data
                 chunk = os.read(
                     key.fd,
-                    min(COMMAND_READ_CHUNK_BYTES, MAX_COMMAND_STREAM_BYTES + 1 - len(output)),
+                    min(
+                        COMMAND_READ_CHUNK_BYTES,
+                        MAX_COMMAND_STREAM_BYTES + 1 - len(output),
+                    ),
                 )
                 if not chunk:
                     selector.unregister(key.fileobj)

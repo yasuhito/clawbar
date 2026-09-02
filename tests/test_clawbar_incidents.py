@@ -6,11 +6,19 @@ from pathlib import Path
 
 from scripts import clawbar_collect, clawbar_incidents
 from tests.collector_fixture import CollectorFixture
-from tests.fake_commands import FakeCommandSurface, gateway_unresolved, node_not_hosting, ok, text
+from tests.fake_commands import (
+    FakeCommandSurface,
+    gateway_unresolved,
+    node_not_hosting,
+    ok,
+    text,
+)
 
 
 class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
-    assets_directory = Path(clawbar_incidents.__file__).resolve().parent.parent / "assets"
+    assets_directory = (
+        Path(clawbar_incidents.__file__).resolve().parent.parent / "assets"
+    )
     incident_icon = str(assets_directory / "clawbar-incident.svg")
     recovered_icon = str(assets_directory / "clawbar-recovered.svg")
 
@@ -50,7 +58,10 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
             "name": name,
             "enabled": enabled,
             "schedule": {"kind": "cron"},
-            "state": {"lastRunStatus": result, "consecutiveErrors": 1 if result == "error" else 0},
+            "state": {
+                "lastRunStatus": result,
+                "consecutiveErrors": 1 if result == "error" else 0,
+            },
         }
 
     def test_each_incident_kind_starts_an_individual_notification(self) -> None:
@@ -68,7 +79,9 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
                 "Morning review: Automation Failure",
             ),
         )
-        for index, (name, commands, expected_exit_code, expected_body) in enumerate(scenarios):
+        for index, (name, commands, expected_exit_code, expected_body) in enumerate(
+            scenarios
+        ):
             with self.subTest(name=name):
                 log_path = self.root / f"notifications-{index}.jsonl"
                 result = self.collect(
@@ -109,7 +122,17 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
         self.observe(
             commands=FakeCommandSurface.healthy(
                 agents_list=ok({"agents": [{"id": "planner"}]}),
-                tasks_list=ok({"tasks": [{"agentId": "planner", "status": "failed", "endedAt": 1_700_000_000_000}]}),
+                tasks_list=ok(
+                    {
+                        "tasks": [
+                            {
+                                "agentId": "planner",
+                                "status": "failed",
+                                "endedAt": 1_700_000_000_000,
+                            }
+                        ]
+                    }
+                ),
             )
         )
 
@@ -118,16 +141,28 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
     def test_gateway_setup_required_stays_quiet(self) -> None:
         setup_log = self.root / "setup-required-notifications.jsonl"
         result = self.collect(
-            FakeCommandSurface(gateway_status=gateway_unresolved(), node_status=node_not_hosting()),
+            FakeCommandSurface(
+                gateway_status=gateway_unresolved(), node_status=node_not_hosting()
+            ),
             XDG_RUNTIME_DIR=str(self.root / "setup-required-runtime"),
             FAKE_NOTIFICATION_LOG=str(setup_log),
         )
         self.assertEqual(result.snapshot["gateway"], {"state": "setup_required"})
         self.assertFalse(setup_log.exists())
 
-    def test_gateway_setup_required_silently_ends_a_previous_gateway_incident(self) -> None:
-        self.observe(commands=FakeCommandSurface.healthy(gateway_status=ok({"rpc": {"ok": False}})))
-        self.observe(commands=FakeCommandSurface(gateway_status=gateway_unresolved(), node_status=node_not_hosting()))
+    def test_gateway_setup_required_silently_ends_a_previous_gateway_incident(
+        self,
+    ) -> None:
+        self.observe(
+            commands=FakeCommandSurface.healthy(
+                gateway_status=ok({"rpc": {"ok": False}})
+            )
+        )
+        self.observe(
+            commands=FakeCommandSurface(
+                gateway_status=gateway_unresolved(), node_status=node_not_hosting()
+            )
+        )
         self.observe()
 
         notifications = self.read_notifications()
@@ -145,7 +180,10 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
 
     def test_simultaneous_starts_are_grouped_once(self) -> None:
         result = self.observe(
-            nodes=[self.offline_node("node-1", "studio-ops"), self.offline_node("node-2", "archive-box")],
+            nodes=[
+                self.offline_node("node-1", "studio-ops"),
+                self.offline_node("node-2", "archive-box"),
+            ],
             automations=[
                 self.automation(),
                 self.automation(automation_id="nightly-sync", name="Nightly sync"),
@@ -155,13 +193,15 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
         self.assertEqual(
             self.read_notifications(),
-            [[
-                "--app-name=Clawbar",
-                "--urgency=critical",
-                f"--app-icon={self.incident_icon}",
-                "2 incidents detected",
-                "Morning review: Automation Failure; Nightly sync: Automation Failure",
-            ]],
+            [
+                [
+                    "--app-name=Clawbar",
+                    "--urgency=critical",
+                    f"--app-icon={self.incident_icon}",
+                    "2 incidents detected",
+                    "Morning review: Automation Failure; Nightly sync: Automation Failure",
+                ]
+            ],
         )
 
     def test_offline_node_transitions_stay_quiet(self) -> None:
@@ -186,12 +226,16 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
             "gateway": {"state": "healthy"},
             "fleet": {
                 "available": True,
-                "nodes": [{"key": "node:legacy", "name": "studio-ops", "state": "offline"}],
+                "nodes": [
+                    {"key": "node:legacy", "name": "studio-ops", "state": "offline"}
+                ],
             },
             "automations": {"available": True, "items": []},
         }
 
-        state, starts, recoveries = clawbar_incidents.reconcile_incidents(snapshot, previous)
+        state, starts, recoveries = clawbar_incidents.reconcile_incidents(
+            snapshot, previous
+        )
 
         self.assertEqual(state["incidents"], {})
         self.assertEqual(starts, [])
@@ -204,14 +248,22 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
         ]
         recovered = [
             self.automation(result="ok"),
-            self.automation(automation_id="nightly-sync", name="Nightly sync", result="ok"),
+            self.automation(
+                automation_id="nightly-sync", name="Nightly sync", result="ok"
+            ),
         ]
         self.observe(
-            nodes=[self.offline_node("node-1", "studio-ops"), self.offline_node("node-2", "archive-box")],
+            nodes=[
+                self.offline_node("node-1", "studio-ops"),
+                self.offline_node("node-2", "archive-box"),
+            ],
             automations=failed,
         )
         self.observe(
-            nodes=[self.healthy_node("node-1", "studio-ops"), self.healthy_node("node-2", "archive-box")],
+            nodes=[
+                self.healthy_node("node-1", "studio-ops"),
+                self.healthy_node("node-2", "archive-box"),
+            ],
             automations=recovered,
         )
 
@@ -277,7 +329,9 @@ class IncidentNotificationTests(CollectorFixture, unittest.TestCase):
     def test_dispatch_failure_preserves_snapshot_and_transition_state(self) -> None:
         offline = [self.offline_node("node-1", "studio-ops")]
         failed = [self.automation()]
-        first = self.observe(nodes=offline, automations=failed, FAKE_NOTIFICATION_EXIT="7")
+        first = self.observe(
+            nodes=offline, automations=failed, FAKE_NOTIFICATION_EXIT="7"
+        )
         second = self.observe(nodes=offline, automations=failed)
 
         self.assertEqual(first.exit_code, clawbar_collect.ExitCode.OK)

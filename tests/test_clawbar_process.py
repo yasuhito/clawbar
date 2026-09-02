@@ -10,64 +10,18 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest import mock
-from datetime import datetime
 from pathlib import Path
+from unittest import mock
 
 from scripts import (
     clawbar_cli,
     clawbar_collect,
     clawbar_commands,
-    clawbar_gateway,
     clawbar_metadata,
     clawbar_snapshot,
-    clawbar_target_state,
 )
-from scripts.clawbar_commands import CollectionDeadlineExceeded, CommandOutputExceeded, SubprocessCommandSurface
+from scripts.clawbar_commands import SubprocessCommandSurface
 from tests.collector_fixture import CollectorFixture
-from tests.fake_commands import (
-    LOCAL_GATEWAY_URL,
-    FakeCommandSurface,
-    echo_dialed_url,
-    failed,
-    gateway_ok,
-    gateway_unresolved,
-    node_hosting,
-    node_not_hosting,
-    ok,
-    text,
-)
-
-NODE_HOST_URL = "wss://node-gateway.example.test:18789/openclaw-gw"
-CONFIGURED_REMOTE_URL = "wss://configured-gateway.example.test:18789"
-ALPHA_URL = "ws://gateway-alpha.example.ts.net:18789"
-TAILSCALE_ALPHA = {
-    "Peer": {
-        "nodekey:PRIVATE-A": {
-            "ID": "PRIVATE-A",
-            "HostName": "gateway-alpha",
-            "DNSName": "gateway-alpha.example.ts.net.",
-            "Online": True,
-        }
-    }
-}
-
-
-def setup_required(tailscale_status: dict[str, object] | None = None) -> FakeCommandSurface:
-    """No local Gateway, no node host; Tailscale answers ``tailscale_status`` when given."""
-    answers = {"gateway_status": gateway_unresolved(), "node_status": node_not_hosting()}
-    if tailscale_status is not None:
-        answers["tailscale_status"] = ok(tailscale_status)
-    return FakeCommandSurface(**answers)
-
-
-def node_host_gateway(**answers) -> FakeCommandSurface:
-    """The local ``gateway status`` fails, the device hosts a Gateway, and dialing it succeeds."""
-    return FakeCommandSurface.healthy(
-        gateway_status=[failed(9, "connection broken", "invalid token"), echo_dialed_url()],
-        node_status=node_hosting(),
-        **answers,
-    )
 
 
 class MetadataTests(unittest.TestCase):
@@ -79,9 +33,9 @@ class MetadataTests(unittest.TestCase):
                 side_effect=[FileNotFoundError, b""],
             ),
             mock.patch.object(os, "open", side_effect=FileExistsError),
+            self.assertRaisesRegex(OSError, "Invalid Clawbar local key secret"),
         ):
-            with self.assertRaisesRegex(OSError, "Invalid Clawbar local key secret"):
-                clawbar_metadata.load_local_key_secret()
+            clawbar_metadata.load_local_key_secret()
 
     def test_secret_reader_rejects_symbolic_links(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -92,9 +46,11 @@ class MetadataTests(unittest.TestCase):
             target.write_bytes(b"x" * 32)
             (secret_directory / "node-key-secret").symlink_to(target)
 
-            with mock.patch.dict(os.environ, {"XDG_RUNTIME_DIR": str(root)}):
-                with self.assertRaises(OSError):
-                    clawbar_metadata.load_local_key_secret()
+            with (
+                mock.patch.dict(os.environ, {"XDG_RUNTIME_DIR": str(root)}),
+                self.assertRaises(OSError),
+            ):
+                clawbar_metadata.load_local_key_secret()
 
 
 class BoundedInputTests(unittest.TestCase):
@@ -159,11 +115,15 @@ class SubprocessCommandSurfaceTests(unittest.TestCase):
 
     echo = (sys.executable, "-c", "import sys; print(' '.join(sys.argv[1:]))")
 
-    def test_openclaw_questions_carry_a_bounded_timeout_and_the_target_url(self) -> None:
+    def test_openclaw_questions_carry_a_bounded_timeout_and_the_target_url(
+        self,
+    ) -> None:
         surface = SubprocessCommandSurface(openclaw=self.echo)
         deadline_at = time.monotonic() + 2
 
-        status = surface.gateway_status(deadline_at, "wss://example.test").stdout.split()
+        status = surface.gateway_status(
+            deadline_at, "wss://example.test"
+        ).stdout.split()
         nodes = surface.nodes_status(deadline_at, None).stdout.split()
         node = surface.node_status(deadline_at).stdout.split()
 
@@ -180,11 +140,16 @@ class SubprocessCommandSurfaceTests(unittest.TestCase):
         deadline_at = time.monotonic() + 2
 
         tasks = surface.tasks_list(deadline_at, None).stdout
-        cron = surface.cron_list(deadline_at, None, {"offset": 0, "limit": 200, "includeDisabled": True}).stdout
+        cron = surface.cron_list(
+            deadline_at, None, {"offset": 0, "limit": 200, "includeDisabled": True}
+        ).stdout
         agents = surface.agents_list(deadline_at, None).stdout
 
         self.assertIn('gateway call tasks.list --params {"limit":500} --json', tasks)
-        self.assertIn('gateway call cron.list --params {"includeDisabled":true,"limit":200,"offset":0} --json', cron)
+        self.assertIn(
+            'gateway call cron.list --params {"includeDisabled":true,"limit":200,"offset":0} --json',
+            cron,
+        )
         self.assertIn("gateway call agents.list --params {} --json", agents)
 
     def test_tailscale_status_uses_its_own_executable(self) -> None:
@@ -204,7 +169,9 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
     def test_executable_forced_termination_stops_running_gateway_command(self) -> None:
         self._assert_executable_termination_stops_running_gateway_command("kill")
 
-    def _assert_executable_termination_stops_running_gateway_command(self, method: str) -> None:
+    def _assert_executable_termination_stops_running_gateway_command(
+        self, method: str
+    ) -> None:
         pid_path = self.root / "gateway-command.pid"
         child_pid: int | None = None
         collector: subprocess.Popen[str] | None = None
@@ -231,7 +198,10 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
                 collector.wait(timeout=2)
 
                 stopped_deadline = time.monotonic() + 1
-                while self._process_exists(child_pid) and time.monotonic() < stopped_deadline:
+                while (
+                    self._process_exists(child_pid)
+                    and time.monotonic() < stopped_deadline
+                ):
                     time.sleep(0.01)
                 self.assertFalse(
                     self._process_exists(child_pid),
@@ -259,7 +229,10 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
             status = Path(f"/proc/{pid}/status").read_text(encoding="utf-8")
         except FileNotFoundError:
             return "gone"
-        return next((line for line in status.splitlines() if line.startswith("State:")), "unknown")
+        return next(
+            (line for line in status.splitlines() if line.startswith("State:")),
+            "unknown",
+        )
 
     def test_executable_bounds_gateway_command_output(self) -> None:
         started_at = time.monotonic()
@@ -267,7 +240,9 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
             "local",
             timeout=2,
             environment_overrides={
-                "FAKE_GATEWAY_OUTPUT_BYTES": str(clawbar_commands.MAX_COMMAND_STREAM_BYTES + 1),
+                "FAKE_GATEWAY_OUTPUT_BYTES": str(
+                    clawbar_commands.MAX_COMMAND_STREAM_BYTES + 1
+                ),
             },
         )
 
@@ -275,7 +250,9 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(json.loads(result.stdout)["failureKind"], "command_failed")
         self.assertLess(time.monotonic() - started_at, 2)
 
-    def test_executable_enforces_default_twelve_second_whole_collection_deadline(self) -> None:
+    def test_executable_enforces_default_twelve_second_whole_collection_deadline(
+        self,
+    ) -> None:
         started_at = time.monotonic()
         with self.fake_environment(FAKE_SCENARIO="node_host", FAKE_NODE_DELAY="30"):
             environment = os.environ.copy()
@@ -296,7 +273,9 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
             )
         elapsed = time.monotonic() - started_at
 
-        self.assertEqual(result.returncode, clawbar_collect.ExitCode.COMMAND_TIMEOUT, result.stderr)
+        self.assertEqual(
+            result.returncode, clawbar_collect.ExitCode.COMMAND_TIMEOUT, result.stderr
+        )
         self.assertGreaterEqual(elapsed, 10.5)
         self.assertLess(elapsed, 12.25)
         self.assertEqual(json.loads(result.stdout)["failureKind"], "timeout")
@@ -327,7 +306,9 @@ class CollectorEntryPointTests(CollectorFixture, unittest.TestCase):
             collector_arguments=["--read-theme-colors", str(colors_path)],
         )
 
-        self.assertEqual(fifo_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(
+            fifo_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED
+        )
         self.assertEqual(fifo_result.stdout, "")
 
         colors_path.unlink()
@@ -341,7 +322,9 @@ class CollectorEntryPointTests(CollectorFixture, unittest.TestCase):
             collector_arguments=["--read-theme-colors", str(colors_path)],
         )
 
-        self.assertEqual(link_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(
+            link_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED
+        )
         self.assertEqual(link_result.stdout, "")
 
         colors_path.unlink()
@@ -354,7 +337,9 @@ class CollectorEntryPointTests(CollectorFixture, unittest.TestCase):
             collector_arguments=["--read-theme-colors", str(colors_path)],
         )
 
-        self.assertEqual(oversized_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(
+            oversized_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED
+        )
         self.assertEqual(oversized_result.stdout, "")
 
     def test_read_cache_prints_a_valid_regular_snapshot(self) -> None:
@@ -387,7 +372,9 @@ class CollectorEntryPointTests(CollectorFixture, unittest.TestCase):
             collector_arguments=["--read-cache"],
         )
 
-        self.assertEqual(fifo_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(
+            fifo_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED
+        )
         self.assertEqual(fifo_result.stdout, "")
 
         snapshot_path.unlink()
@@ -401,7 +388,9 @@ class CollectorEntryPointTests(CollectorFixture, unittest.TestCase):
             collector_arguments=["--read-cache"],
         )
 
-        self.assertEqual(link_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(
+            link_result.returncode, clawbar_collect.ExitCode.COMMAND_FAILED
+        )
         self.assertEqual(link_result.stdout, "")
         self.assertIn("sentinel", outside.read_text(encoding="utf-8"))
 
@@ -414,8 +403,12 @@ class RefreshIntervalTests(unittest.TestCase):
         parser = clawbar_cli.build_parser()
 
         self.assertEqual(parser.parse_args([]).refresh_interval, 30)
-        self.assertEqual(parser.parse_args(["--refresh-interval", "15"]).refresh_interval, 15)
-        self.assertEqual(parser.parse_args(["--refresh-interval", "300"]).refresh_interval, 300)
+        self.assertEqual(
+            parser.parse_args(["--refresh-interval", "15"]).refresh_interval, 15
+        )
+        self.assertEqual(
+            parser.parse_args(["--refresh-interval", "300"]).refresh_interval, 300
+        )
         self.assertIn("12 seconds", parser.format_help())
 
     def test_rejects_values_outside_bounds(self) -> None:
@@ -425,7 +418,3 @@ class RefreshIntervalTests(unittest.TestCase):
             parser.parse_args(["--refresh-interval", "14"])
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             parser.parse_args(["--refresh-interval", "301"])
-
-
-if __name__ == "__main__":
-    unittest.main()

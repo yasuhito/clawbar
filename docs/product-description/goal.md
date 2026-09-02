@@ -12,7 +12,7 @@ Read in this order before drafting:
 2. `Clawbar.qml`, `ClawbarPanel.qml`, and the relevant row or detail QML component for the visible action and state.
 3. `ClawbarSnapshot.js` and `ClawbarPresentation.js` for selection, visible state, labels, severity, counts, time display, and freshness.
 4. `ClawbarService.qml` and the relevant module under `scripts/` for scheduling, resolution, reduction, publication, or notification behavior.
-5. The matching tests. Start with `tests/test_clawbar_logic.cjs`, then use `tests/test_clawbar_collect.py`, `tests/test_clawbar_freshness.py`, `tests/test_clawbar_incidents.py`, or `tests/test_clawbar_automation.py` as the feature requires.
+5. The matching tests. Start with `tests/test_clawbar_logic.cjs`. For collection, use `tests/test_clawbar_collection.py` for Gateway responses and deadlines, `tests/test_clawbar_gateway_target.py` for Gateway Target resolution, `tests/test_clawbar_operational_metadata.py` for Fleet and Registered Agent reduction, or `tests/test_clawbar_process.py` for the process and CLI entry point. Use `tests/test_clawbar_freshness.py`, `tests/test_clawbar_incidents.py`, or `tests/test_clawbar_automation.py` for those features.
 6. `README.md`, `manifest.json`, and `scripts/clawbar_demo.py` for documented defaults and the running-product verification route.
 
 Do not describe code. Describe what the user sees and does. Technical detail goes only in `> Technical note:` block quotes and only when it changes what the user would expect.

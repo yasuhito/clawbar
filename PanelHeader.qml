@@ -78,8 +78,8 @@ Item {
   }
 
   Text {
-    textFormat: Text.PlainText
     id: observedTime
+    textFormat: Text.PlainText
     anchors.right: parent.right
     anchors.bottom: headerDivider.top
     anchors.bottomMargin: Style.space(4)

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Command-line entry point for the bounded Clawbar collector."""
 
 from __future__ import annotations
@@ -7,8 +6,8 @@ import argparse
 import json
 import os
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 if __package__:
     from .clawbar_snapshot import read_bounded_regular_file

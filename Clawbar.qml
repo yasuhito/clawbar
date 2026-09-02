@@ -27,145 +27,133 @@ BarWidget {
   property color warningColor: Color.accent
   readonly property var themeGeneration: Color.shellValues
   readonly property string themeColorsPath: Color.currentThemePath + "/colors.toml"
-  property string collectorPath: decodeURIComponent(
-    String(Qt.resolvedUrl("scripts/clawbar_collect.py")).replace(/^file:\/\//, "")
-  )
+  property string collectorPath: decodeURIComponent(String(Qt.resolvedUrl("scripts/clawbar_collect.py")).replace(/^file:\/\//, ""))
   readonly property var collectorService: {
-    if (!bar || !bar.shell || typeof bar.shell.serviceFor !== "function") return null
-    return bar.shell.serviceFor(root.moduleName)
+    if (!bar || !bar.shell || typeof bar.shell.serviceFor !== "function")
+      return null;
+    return bar.shell.serviceFor(root.moduleName);
   }
   readonly property string barSeverity: Snapshot.barSeverity(lastSnapshot, state)
   readonly property int barCount: Snapshot.barCount(lastSnapshot, state)
   readonly property bool developerDemo: !!lastSnapshot && typeof lastSnapshot.demoScenario === "string"
   readonly property string baseSummary: Presentation.summary(state, resolutionSource, barCount, barSeverity)
-  readonly property string refreshSummary: Presentation.refreshSummary(
-    baseSummary, refreshFeedback, lastSnapshot !== null
-  )
-  readonly property string summary: developerDemo
-    ? "Developer demo · " + refreshSummary : refreshSummary
-  readonly property string basePanelSummary: Presentation.panelSummary(
-    state, resolutionSource, barCount, barSeverity, Presentation.panelSignal(lastSnapshot, state).label
-  )
-  readonly property string refreshPanelSummary: Presentation.refreshSummary(
-    basePanelSummary, refreshFeedback, lastSnapshot !== null
-  )
-  readonly property string panelSummary: developerDemo
-    ? "Developer demo · " + refreshPanelSummary : refreshPanelSummary
+  readonly property string refreshSummary: Presentation.refreshSummary(baseSummary, refreshFeedback, lastSnapshot !== null)
+  readonly property string summary: developerDemo ? "Developer demo · " + refreshSummary : refreshSummary
+  readonly property string basePanelSummary: Presentation.panelSummary(state, resolutionSource, barCount, barSeverity, Presentation.panelSignal(lastSnapshot, state).label)
+  readonly property string refreshPanelSummary: Presentation.refreshSummary(basePanelSummary, refreshFeedback, lastSnapshot !== null)
+  readonly property string panelSummary: developerDemo ? "Developer demo · " + refreshPanelSummary : refreshPanelSummary
   readonly property var operationalSectionData: Snapshot.sectionData(lastSnapshot, state)
-  readonly property var operationalPanelModel: PanelModel.create(
-    operationalSectionData, Presentation.panelSections(operationalSectionData)
-  )
+  readonly property var operationalPanelModel: PanelModel.create(operationalSectionData, Presentation.panelSections(operationalSectionData))
   readonly property var gatewaySignal: Presentation.panelSignal(lastSnapshot, state)
-  readonly property var barSignal: Presentation.signalPresentation(
-    barSeverity === "critical" ? "failed" : barSeverity === "warning" ? "waiting" : "healthy"
-  )
-  readonly property color barSignalColor: ColorKit.signalColor(
-    barSignal.tone,
-    signalForeground,
-    Color.accent,
-    bar ? bar.urgent : Color.urgent,
-    Color.muted,
-    null,
-    warningColor
-  )
+  readonly property var barSignal: Presentation.signalPresentation(barSeverity === "critical" ? "failed" : barSeverity === "warning" ? "waiting" : "healthy")
+  readonly property color barSignalColor: ColorKit.signalColor(barSignal.tone, signalForeground, Color.accent, bar ? bar.urgent : Color.urgent, Color.muted, null, warningColor)
 
   function loadThemeColors(raw) {
-    healthyColor = ColorKit.themeColorFromTheme(raw, "green", signalForeground)
-    warningColor = ColorKit.themeColorFromTheme(raw, "yellow", Color.accent)
+    healthyColor = ColorKit.themeColorFromTheme(raw, "green", signalForeground);
+    warningColor = ColorKit.themeColorFromTheme(raw, "yellow", Color.accent);
   }
 
   function readThemeColors() {
     if (themeReader.running) {
-      themeReadPending = true
-      return
+      themeReadPending = true;
+      return;
     }
-    themeReadOutput = ""
-    themeReader.running = true
+    themeReadOutput = "";
+    themeReader.running = true;
   }
 
   function consumeThemeRead(exitCode) {
     if (themeReadPending) {
-      themeReadPending = false
-      themeReadOutput = ""
-      themeReader.running = true
-      return
+      themeReadPending = false;
+      themeReadOutput = "";
+      themeReader.running = true;
+      return;
     }
-    loadThemeColors(exitCode === 0 ? themeReadOutput : "")
+    loadThemeColors(exitCode === 0 ? themeReadOutput : "");
   }
 
   onThemeGenerationChanged: readThemeColors()
 
   function readSnapshot() {
-    var action = Snapshot.requestRefresh(cacheReader.running)
-    cacheReadPending = action.pending
-    if (action.start) cacheReader.running = true
+    var action = Snapshot.requestRefresh(cacheReader.running);
+    cacheReadPending = action.pending;
+    if (action.start)
+      cacheReader.running = true;
   }
 
   function consumeCacheRead(exitCode) {
-    var action = Snapshot.consumeRefresh(cacheReader.running, cacheReadPending)
-    cacheReadPending = action.pending
+    var action = Snapshot.consumeRefresh(cacheReader.running, cacheReadPending);
+    cacheReadPending = action.pending;
     if (action.wait) {
-      Qt.callLater(function() { root.consumeCacheRead(exitCode) })
-      return
+      Qt.callLater(function () {
+        root.consumeCacheRead(exitCode);
+      });
+      return;
     }
     if (exitCode !== 0 && lastSnapshot === null)
-      state = collectionAttempted ? "no_data" : "collecting"
-    if (action.start) cacheReader.running = true
+      state = collectionAttempted ? "no_data" : "collecting";
+    if (action.start)
+      cacheReader.running = true;
   }
 
   function requestCollection() {
-    refreshFeedbackTimer.stop()
+    refreshFeedbackTimer.stop();
     if (!collectorService) {
-      console.warn("Clawbar scheduler service unavailable")
+      console.warn("Clawbar scheduler service unavailable");
       if (lastSnapshot === null) {
-        state = "no_data"
+        state = "no_data";
       } else {
-        refreshFeedback = "failed"
-        refreshFeedbackTimer.restart()
+        refreshFeedback = "failed";
+        refreshFeedbackTimer.restart();
       }
-      return
+      return;
     }
-    refreshFeedback = "refreshing"
-    if (lastSnapshot === null) state = "collecting"
-    collectorService.requestCollection(true)
+    refreshFeedback = "refreshing";
+    if (lastSnapshot === null)
+      state = "collecting";
+    collectorService.requestCollection(true);
   }
 
   function consumeCollection() {
-    collectionAttempted = true
-    readSnapshot()
+    collectionAttempted = true;
+    readSnapshot();
   }
   function verifyCandidate(candidateKey) {
-    if (!collectorService || !candidateKey) return
-    collectorService.verifyCandidate(candidateKey)
+    if (!collectorService || !candidateKey)
+      return;
+    collectorService.verifyCandidate(candidateKey);
   }
 
   function applySnapshot(snapshot) {
-    state = Snapshot.snapshotState(snapshot, Date.now())
-    resolutionSource = String(snapshot.resolutionSource || "unresolved")
-    lastSnapshot = snapshot
+    state = Snapshot.snapshotState(snapshot, Date.now());
+    resolutionSource = String(snapshot.resolutionSource || "unresolved");
+    lastSnapshot = snapshot;
   }
 
   function refreshFreshness() {
-    nowMs = Date.now()
-    if (lastSnapshot) state = Snapshot.snapshotState(lastSnapshot, nowMs)
+    nowMs = Date.now();
+    if (lastSnapshot)
+      state = Snapshot.snapshotState(lastSnapshot, nowMs);
   }
 
   function open() {
-    opened = true
+    opened = true;
   }
 
   function toggle() {
-    if (opened) close()
-    else open()
+    if (opened)
+      close();
+    else
+      open();
   }
 
   function close() {
-    opened = false
+    opened = false;
   }
 
   Component.onCompleted: {
-    readSnapshot()
-    readThemeColors()
+    readSnapshot();
+    readThemeColors();
   }
 
   implicitWidth: button.implicitWidth
@@ -176,16 +164,27 @@ BarWidget {
     command: ["python3", root.collectorPath, "--read-cache"]
     stdout: StdioCollector {
       onStreamFinished: {
+        var snapshot;
         try {
-          root.applySnapshot(JSON.parse(text))
+          snapshot = JSON.parse(text);
         } catch (_) {
           if (root.lastSnapshot === null)
-            root.state = root.collectionAttempted ? "no_data" : "collecting"
+            root.state = root.collectionAttempted ? "no_data" : "collecting";
+          return;
+        }
+        try {
+          root.applySnapshot(snapshot);
+        } catch (error) {
+          console.warn("Clawbar rejected Snapshot: " + error.message);
+          if (root.lastSnapshot === null)
+            root.state = root.collectionAttempted ? "no_data" : "collecting";
         }
       }
     }
-    onExited: function(exitCode) {
-      Qt.callLater(function() { root.consumeCacheRead(exitCode) })
+    onExited: function (exitCode) {
+      Qt.callLater(function () {
+        root.consumeCacheRead(exitCode);
+      });
     }
   }
   Process {
@@ -194,8 +193,10 @@ BarWidget {
     stdout: StdioCollector {
       onStreamFinished: root.themeReadOutput = text
     }
-    onExited: function(exitCode) {
-      Qt.callLater(function() { root.consumeThemeRead(exitCode) })
+    onExited: function (exitCode) {
+      Qt.callLater(function () {
+        root.consumeThemeRead(exitCode);
+      });
     }
   }
   Timer {
@@ -227,14 +228,15 @@ BarWidget {
           width: Style.bar.iconCanvas
           height: width
           color: root.barSignalColor
-          animated: button.tooltipHovered
-            || (!!root.collectorService && root.collectorService.collecting)
+          animated: button.tooltipHovered || (!!root.collectorService && root.collectorService.collecting)
         }
       }
     }
-    onPressed: function(buttonCode) {
-      if (buttonCode === Qt.MiddleButton) root.requestCollection()
-      else root.toggle()
+    onPressed: function (buttonCode) {
+      if (buttonCode === Qt.MiddleButton)
+        root.requestCollection();
+      else
+        root.toggle();
     }
   }
 
@@ -242,10 +244,11 @@ BarWidget {
     target: root.collectorService
     function onCollectionFinished(interactive, succeeded) {
       if (interactive) {
-        root.refreshFeedback = succeeded ? "idle" : "failed"
-        if (!succeeded) root.refreshFeedbackTimer.restart()
+        root.refreshFeedback = succeeded ? "idle" : "failed";
+        if (!succeeded)
+          root.refreshFeedbackTimer.restart();
       }
-      root.consumeCollection()
+      root.consumeCollection();
     }
   }
 
@@ -263,8 +266,8 @@ BarWidget {
     healthy: root.healthyColor
     warning: root.warningColor
     onRefreshRequested: root.requestCollection()
-    onCandidateVerificationRequested: function(candidateKey) {
-      root.verifyCandidate(candidateKey)
+    onCandidateVerificationRequested: function (candidateKey) {
+      root.verifyCandidate(candidateKey);
     }
   }
 }

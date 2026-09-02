@@ -7,7 +7,12 @@ import unittest
 from scripts import clawbar_collect
 from scripts.clawbar_commands import CollectionDeadlineExceeded
 from tests.collector_fixture import CollectorFixture
-from tests.fake_commands import FakeCommandSurface, gateway_unresolved, node_not_hosting, ok
+from tests.fake_commands import (
+    FakeCommandSurface,
+    gateway_unresolved,
+    node_not_hosting,
+    ok,
+)
 
 
 class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
@@ -39,10 +44,14 @@ class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
             first_failure.snapshot["lastKnown"]["observedAt"],
             healthy.snapshot["generatedAt"],
         )
-        self.assertEqual(first_failure.snapshot["fleet"], {"available": False, "nodes": []})
+        self.assertEqual(
+            first_failure.snapshot["fleet"], {"available": False, "nodes": []}
+        )
         self.assertEqual(second_failure.snapshot["gateway"], {"state": "offline"})
         self.assertEqual(second_failure.snapshot["consecutiveFailures"], 2)
-        self.assertEqual(second_failure.snapshot["lastKnown"], first_failure.snapshot["lastKnown"])
+        self.assertEqual(
+            second_failure.snapshot["lastKnown"], first_failure.snapshot["lastKnown"]
+        )
 
         recovered = self.collect(FakeCommandSurface.healthy(nodes_status=ok(nodes)))
 
@@ -82,16 +91,22 @@ class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
         healthy = self.collect(FakeCommandSurface.healthy(nodes_status=ok(nodes)))
         self.assertEqual(len(healthy.snapshot["fleet"]["nodes"]), 1)
 
-        degraded = self.collect(FakeCommandSurface.healthy(nodes_status=CollectionDeadlineExceeded()))
+        degraded = self.collect(
+            FakeCommandSurface.healthy(nodes_status=CollectionDeadlineExceeded())
+        )
 
         self.assertEqual(degraded.snapshot["gateway"], {"state": "degraded"})
         self.assertEqual(degraded.snapshot["fleet"], {"available": False, "nodes": []})
-        self.assertEqual(degraded.snapshot["lastKnown"]["fleet"], healthy.snapshot["fleet"])
+        self.assertEqual(
+            degraded.snapshot["lastKnown"]["fleet"], healthy.snapshot["fleet"]
+        )
 
         failed = self.collect(FakeCommandSurface.lost())
 
         self.assertEqual(failed.snapshot["gateway"], {"state": "unstable"})
-        self.assertEqual(failed.snapshot["lastKnown"]["fleet"], healthy.snapshot["fleet"])
+        self.assertEqual(
+            failed.snapshot["lastKnown"]["fleet"], healthy.snapshot["fleet"]
+        )
 
     def test_degraded_agents_retain_complete_last_known_metadata(self) -> None:
         healthy = self.collect(FakeCommandSurface.healthy())
@@ -102,8 +117,12 @@ class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
 
         self.assertEqual(degraded.snapshot["gateway"], {"state": "degraded"})
         self.assertEqual(degraded.snapshot["agents"], {"available": False, "items": []})
-        self.assertEqual(degraded.snapshot["lastKnown"]["fleet"], healthy.snapshot["fleet"])
-        self.assertEqual(degraded.snapshot["lastKnown"]["agents"], healthy.snapshot["agents"])
+        self.assertEqual(
+            degraded.snapshot["lastKnown"]["fleet"], healthy.snapshot["fleet"]
+        )
+        self.assertEqual(
+            degraded.snapshot["lastKnown"]["agents"], healthy.snapshot["agents"]
+        )
         self.assertEqual(
             degraded.snapshot["lastKnown"]["automations"],
             healthy.snapshot["automations"],
@@ -137,13 +156,17 @@ class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
                 },
             }
 
-        clawbar_collect.atomic_write_snapshot(self.snapshot_path, snapshot("healthy", 0))
+        clawbar_collect.atomic_write_snapshot(
+            self.snapshot_path, snapshot("healthy", 0)
+        )
         reader = threading.Thread(target=read_repeatedly)
         reader.start()
         try:
             for generation in range(1, 40):
                 state = "healthy" if generation % 2 else "offline"
-                clawbar_collect.atomic_write_snapshot(self.snapshot_path, snapshot(state, generation))
+                clawbar_collect.atomic_write_snapshot(
+                    self.snapshot_path, snapshot(state, generation)
+                )
         finally:
             stop.set()
             reader.join()
@@ -155,14 +178,22 @@ class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
         healthy = self.run_external("local")
         first_failure = self.run_external(
             "local",
-            environment_overrides={"FAKE_EXIT": "9", "FAKE_STDOUT": "connection broken"},
+            environment_overrides={
+                "FAKE_EXIT": "9",
+                "FAKE_STDOUT": "connection broken",
+            },
         )
         second_failure = self.run_external(
             "local",
-            environment_overrides={"FAKE_EXIT": "9", "FAKE_STDOUT": "connection broken"},
+            environment_overrides={
+                "FAKE_EXIT": "9",
+                "FAKE_STDOUT": "connection broken",
+            },
         )
 
-        self.assertEqual(healthy.returncode, clawbar_collect.ExitCode.OK, healthy.stderr)
+        self.assertEqual(
+            healthy.returncode, clawbar_collect.ExitCode.OK, healthy.stderr
+        )
         first_snapshot = json.loads(first_failure.stdout)
         second_snapshot = json.loads(second_failure.stdout)
         self.assertEqual(first_snapshot["gateway"], {"state": "unstable"})
@@ -172,10 +203,13 @@ class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
             second_snapshot["lastKnown"]["observedAt"],
             json.loads(healthy.stdout)["generatedAt"],
         )
+
     def test_missing_resolution_after_success_is_gateway_loss_not_setup(self) -> None:
         healthy = self.collect(FakeCommandSurface.healthy())
         unresolved = [
-            FakeCommandSurface(gateway_status=gateway_unresolved(), node_status=node_not_hosting())
+            FakeCommandSurface(
+                gateway_status=gateway_unresolved(), node_status=node_not_hosting()
+            )
             for _ in range(2)
         ]
 
@@ -183,8 +217,12 @@ class FreshnessCollectorTests(CollectorFixture, unittest.TestCase):
         second_failure = self.collect(unresolved[1])
 
         self.assertEqual(healthy.exit_code, clawbar_collect.ExitCode.OK)
-        self.assertEqual(first_failure.exit_code, clawbar_collect.ExitCode.COMMAND_FAILED)
-        self.assertEqual(second_failure.exit_code, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(
+            first_failure.exit_code, clawbar_collect.ExitCode.COMMAND_FAILED
+        )
+        self.assertEqual(
+            second_failure.exit_code, clawbar_collect.ExitCode.COMMAND_FAILED
+        )
         self.assertEqual(first_failure.snapshot["gateway"], {"state": "unstable"})
         self.assertEqual(second_failure.snapshot["gateway"], {"state": "offline"})
         self.assertEqual(first_failure.snapshot["resolutionSource"], "local")

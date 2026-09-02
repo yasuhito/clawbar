@@ -6,10 +6,11 @@ from __future__ import annotations
 import json
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 if __package__:
     from . import clawbar_snapshot as snapshot_contract
@@ -31,7 +32,11 @@ if __package__:
         setup_retry_snapshot,
     )
     from .clawbar_incidents import process_incident_transitions
-    from .clawbar_metadata import OUTPUT_EXCEEDED_LIMIT, load_local_key_secret, sanitize_metadata
+    from .clawbar_metadata import (
+        OUTPUT_EXCEEDED_LIMIT,
+        load_local_key_secret,
+        sanitize_metadata,
+    )
     from .clawbar_snapshot import (
         SnapshotBuilder,
         atomic_write_snapshot,
@@ -58,7 +63,11 @@ else:
         setup_retry_snapshot,
     )
     from clawbar_incidents import process_incident_transitions
-    from clawbar_metadata import OUTPUT_EXCEEDED_LIMIT, load_local_key_secret, sanitize_metadata
+    from clawbar_metadata import (
+        OUTPUT_EXCEEDED_LIMIT,
+        load_local_key_secret,
+        sanitize_metadata,
+    )
     from clawbar_snapshot import (
         SnapshotBuilder,
         atomic_write_snapshot,
@@ -93,16 +102,15 @@ CANDIDATE_NOT_FOUND_GUIDANCE = (
 CANDIDATE_TIMEOUT_GUIDANCE = (
     "Gateway verification timed out. Check Tailscale and try again."
 )
-CANDIDATE_UNREACHABLE_GUIDANCE = (
-    "The selected device could not be verified. Check Tailscale or choose another device."
-)
+CANDIDATE_UNREACHABLE_GUIDANCE = "The selected device could not be verified. Check Tailscale or choose another device."
 CANDIDATE_UNSUPPORTED_GUIDANCE = (
     "The selected device does not provide a supported OpenClaw Gateway."
 )
 
+
 def validate_refresh_interval(value: object) -> int:
     if isinstance(value, bool):
-        raise ValueError
+        raise ValueError  # noqa: TRY004 -- 呼び出し側は不正値を一律 ValueError で受ける
     try:
         interval = int(value)
     except (TypeError, ValueError) as error:
@@ -118,7 +126,10 @@ def validate_refresh_interval(value: object) -> int:
 
 def load_previous_snapshot(path: Path) -> dict[str, Any] | None:
     snapshot = read_json_document(path)
-    if snapshot is None or snapshot.get("schemaVersion") != snapshot_contract.SCHEMA_VERSION:
+    if (
+        snapshot is None
+        or snapshot.get("schemaVersion") != snapshot_contract.SCHEMA_VERSION
+    ):
         return None
     return snapshot
 
@@ -132,11 +143,16 @@ def configuration_error_source(
     if source is not None:
         return source
     previous_source = previous.get("resolutionSource") if previous else None
-    return previous_source if previous_source in snapshot_contract.RESOLUTION_SOURCES else None
+    return (
+        previous_source
+        if previous_source in snapshot_contract.RESOLUTION_SOURCES
+        else None
+    )
 
 
-
-def publish(snapshot_path: Path, exit_code: ExitCode, snapshot: dict[str, Any]) -> CollectionResult:
+def publish(
+    snapshot_path: Path, exit_code: ExitCode, snapshot: dict[str, Any]
+) -> CollectionResult:
     atomic_write_snapshot(snapshot_path, snapshot)
     process_incident_transitions(snapshot)
     return CollectionResult(exit_code, snapshot)
@@ -156,9 +172,6 @@ def publish_failure(
     )
 
 
-
-
-
 def decode_json(completed: CommandResult) -> object | None:
     if completed.returncode != 0:
         return None
@@ -167,7 +180,10 @@ def decode_json(completed: CommandResult) -> object | None:
     except json.JSONDecodeError:
         return None
 
-def read_metadata_surface(ask: Callable[[], CommandResult]) -> tuple[object | None, str | None]:
+
+def read_metadata_surface(
+    ask: Callable[[], CommandResult],
+) -> tuple[object | None, str | None]:
     """1 つの metadata 質問を投げ、(payload, 失敗理由) を返す。失敗は Degraded Gateway に留める。"""
     try:
         return decode_json(ask()), None
@@ -181,7 +197,9 @@ def collect_metadata(
     commands: GatewayCommandSurface,
     deadline_at: float,
     target: GatewayTarget | None,
-) -> tuple[object | None, object | None, object | None, object | None, dict[str, str | None]]:
+) -> tuple[
+    object | None, object | None, object | None, object | None, dict[str, str | None]
+]:
     url = target.url if target is not None else None
     surfaces: tuple[tuple[str, Callable[[], CommandResult]], ...] = (
         ("fleet", lambda: commands.nodes_status(deadline_at, url)),
@@ -196,13 +214,13 @@ def collect_metadata(
         failures[name] = failure
 
     def read_automation_page(params: dict[str, object]) -> object | None:
-        payload, _ = read_metadata_surface(lambda: commands.cron_list(deadline_at, url, params))
+        payload, _ = read_metadata_surface(
+            lambda: commands.cron_list(deadline_at, url, params)
+        )
         return payload
 
     automation_payload = collect_automation_surface(read_automation_page)
     return (*payloads, automation_payload, failures)
-
-
 
 
 def publish_current(
@@ -301,9 +319,15 @@ def decode_status_or_fail(
         status = {}
     source = resolution_source(status, target.source if target else None)
     if source is None:
-        setup = (None, SETUP_GUIDANCE, CANDIDATE_UNSUPPORTED_GUIDANCE) if candidate_key else None
+        setup = (
+            (None, SETUP_GUIDANCE, CANDIDATE_UNSUPPORTED_GUIDANCE)
+            if candidate_key
+            else None
+        )
         snapshot = builder.configuration_error(
-            configuration_error_source(previous, status, target.source if target else None),
+            configuration_error_source(
+                previous, status, target.source if target else None
+            ),
             "unsupported_json",
             setup,
         )
@@ -323,7 +347,9 @@ def collect_gateway(
     """1 回の収集。外部 CLI へは commands（Gateway Command Surface）だけを通して話す。"""
     refresh_interval = validate_refresh_interval(refresh_interval)
     deadline_at = time.monotonic() + collection_deadline
-    command_deadline_at = deadline_at - min(SNAPSHOT_WRITE_RESERVE_SECONDS, collection_deadline / 10)
+    command_deadline_at = deadline_at - min(
+        SNAPSHOT_WRITE_RESERVE_SECONDS, collection_deadline / 10
+    )
     previous = load_previous_snapshot(snapshot_path)
     try:
         secret = local_key_secret or load_local_key_secret()
@@ -398,7 +424,9 @@ def collect_gateway(
                 "candidate_unreachable",
                 CANDIDATE_UNREACHABLE_GUIDANCE,
             )
-        if automatic_setup_required and not (previous and isinstance(previous.get("lastSuccessAt"), str)):
+        if automatic_setup_required and not (
+            previous and isinstance(previous.get("lastSuccessAt"), str)
+        ):
             return publish(
                 snapshot_path,
                 ExitCode.OK,
@@ -428,14 +456,18 @@ def collect_gateway(
     )
     if isinstance(decoded, CollectionResult):
         return decoded
-    status, source = decoded
+    _status, source = decoded
 
-    fleet_payload, agent_payload, task_payload, automation_payload, metadata_failures = (
-        collect_metadata(
-            commands,
-            command_deadline_at,
-            target,
-        )
+    (
+        fleet_payload,
+        agent_payload,
+        task_payload,
+        automation_payload,
+        metadata_failures,
+    ) = collect_metadata(
+        commands,
+        command_deadline_at,
+        target,
     )
     fleet, agents, automations, automation_failure = sanitize_metadata(
         fleet_payload,

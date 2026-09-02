@@ -1,81 +1,15 @@
 from __future__ import annotations
 
-import contextlib
-import io
 import json
-import os
-import signal
-import subprocess
-import sys
-import tempfile
-import time
 import unittest
-from unittest import mock
-from datetime import datetime
-from pathlib import Path
 
-from scripts import (
-    clawbar_collect,
-    clawbar_commands,
-    clawbar_gateway,
-    clawbar_metadata,
-    clawbar_snapshot,
-    clawbar_target_state,
-)
-from scripts.clawbar_commands import CollectionDeadlineExceeded, CommandOutputExceeded, SubprocessCommandSurface
+from scripts import clawbar_collect
 from tests.collector_fixture import CollectorFixture
-from tests.fake_commands import (
-    LOCAL_GATEWAY_URL,
-    FakeCommandSurface,
-    echo_dialed_url,
-    failed,
-    gateway_ok,
-    gateway_unresolved,
-    node_hosting,
-    node_not_hosting,
-    ok,
-    text,
-)
-
-NODE_HOST_URL = "wss://node-gateway.example.test:18789/openclaw-gw"
-CONFIGURED_REMOTE_URL = "wss://configured-gateway.example.test:18789"
-ALPHA_URL = "ws://gateway-alpha.example.ts.net:18789"
-TAILSCALE_ALPHA = {
-    "Peer": {
-        "nodekey:PRIVATE-A": {
-            "ID": "PRIVATE-A",
-            "HostName": "gateway-alpha",
-            "DNSName": "gateway-alpha.example.ts.net.",
-            "Online": True,
-        }
-    }
-}
-
-
-def setup_required(tailscale_status: dict[str, object] | None = None) -> FakeCommandSurface:
-    """No local Gateway, no node host; Tailscale answers ``tailscale_status`` when given."""
-    answers = {"gateway_status": gateway_unresolved(), "node_status": node_not_hosting()}
-    if tailscale_status is not None:
-        answers["tailscale_status"] = ok(tailscale_status)
-    return FakeCommandSurface(**answers)
-
-
-def node_host_gateway(**answers) -> FakeCommandSurface:
-    """The local ``gateway status`` fails, the device hosts a Gateway, and dialing it succeeds."""
-    return FakeCommandSurface.healthy(
-        gateway_status=[failed(9, "connection broken", "invalid token"), echo_dialed_url()],
-        node_status=node_hosting(),
-        **answers,
-    )
+from tests.fake_commands import FakeCommandSurface, ok
 
 
 class CollectionTests(CollectorFixture, unittest.TestCase):
-    """collect_gateway through its interface, with answers scripted on the Gateway Command Surface."""
-
-    @property
-    def state_directory(self) -> Path:
-        return self.snapshot_path.parent
-
+    """Reduce Fleet and Registered Agent responses to Operational Metadata."""
 
     def test_distinguishes_empty_fleet_from_missing_gateway(self) -> None:
         result = self.collect(FakeCommandSurface.healthy())
@@ -106,7 +40,11 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
                     "nodeId": "PRIVATE-HOST",
                     "ip": "PRIVATE-IP",
                 },
-                {"nodeId": "PRIVATE-HOST-2", "displayName": "studio-ops", "connected": True},
+                {
+                    "nodeId": "PRIVATE-HOST-2",
+                    "displayName": "studio-ops",
+                    "connected": True,
+                },
             ]
         }
         agents = {
@@ -146,12 +84,17 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         }
 
         result = self.collect(
-            FakeCommandSurface.healthy(nodes_status=ok(nodes), agents_list=ok(agents), tasks_list=ok(tasks))
+            FakeCommandSurface.healthy(
+                nodes_status=ok(nodes), agents_list=ok(agents), tasks_list=ok(tasks)
+            )
         )
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
         snapshot = result.snapshot
-        self.assertEqual([node["name"] for node in snapshot["fleet"]["nodes"]], ["Local", "studio-ops"])
+        self.assertEqual(
+            [node["name"] for node in snapshot["fleet"]["nodes"]],
+            ["Local", "studio-ops"],
+        )
         node_keys = [node["key"] for node in snapshot["fleet"]["nodes"]]
         self.assertEqual(len(set(node_keys)), 2)
         self.assertTrue(all(key.startswith("node:") for key in node_keys))
@@ -169,7 +112,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         for sentinel in private_sentinels:
             self.assertNotIn(sentinel, serialized)
 
-    def test_same_named_node_registrations_collapse_to_freshest_connected_node(self) -> None:
+    def test_same_named_node_registrations_collapse_to_freshest_connected_node(
+        self,
+    ) -> None:
         first_nodes = {
             "nodes": [
                 {
@@ -225,7 +170,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
 
         first = self.collect(FakeCommandSurface.healthy(nodes_status=ok(first_nodes)))
         second = self.collect(FakeCommandSurface.healthy(nodes_status=ok(second_nodes)))
-        replacement = self.collect(FakeCommandSurface.healthy(nodes_status=ok(replacement_nodes)))
+        replacement = self.collect(
+            FakeCommandSurface.healthy(nodes_status=ok(replacement_nodes))
+        )
         first_fleet = first.snapshot["fleet"]["nodes"]
         second_fleet = second.snapshot["fleet"]["nodes"]
         replacement_fleet = replacement.snapshot["fleet"]["nodes"]
@@ -248,7 +195,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         studio = next(node for node in first_fleet if node["name"] == "Studio")
         self.assertEqual(studio["platform"], "macOS 27.0")
 
-    def test_fresh_registration_after_first_hundred_duplicates_is_retained(self) -> None:
+    def test_fresh_registration_after_first_hundred_duplicates_is_retained(
+        self,
+    ) -> None:
         nodes = [
             {
                 "nodeId": f"PRIVATE-NODE-{index}",
@@ -267,7 +216,9 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
             }
         )
 
-        result = self.collect(FakeCommandSurface.healthy(nodes_status=ok({"nodes": nodes})))
+        result = self.collect(
+            FakeCommandSurface.healthy(nodes_status=ok({"nodes": nodes}))
+        )
         fleet = result.snapshot["fleet"]["nodes"]
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
@@ -276,11 +227,26 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(fleet[0]["version"], "current")
 
     def test_node_keys_stay_stable_without_runtime_directory(self) -> None:
-        nodes = {"nodes": [{"nodeId": "PRIVATE-NODE", "displayName": "Local", "connected": True}]}
-        environment = {"XDG_RUNTIME_DIR": "", "XDG_STATE_HOME": str(self.root / "state")}
+        nodes = {
+            "nodes": [
+                {"nodeId": "PRIVATE-NODE", "displayName": "Local", "connected": True}
+            ]
+        }
+        environment = {
+            "XDG_RUNTIME_DIR": "",
+            "XDG_STATE_HOME": str(self.root / "state"),
+        }
 
-        first = self.collect(FakeCommandSurface.healthy(nodes_status=ok(nodes)), secret=None, **environment)
-        second = self.collect(FakeCommandSurface.healthy(nodes_status=ok(nodes)), secret=None, **environment)
+        first = self.collect(
+            FakeCommandSurface.healthy(nodes_status=ok(nodes)),
+            secret=None,
+            **environment,
+        )
+        second = self.collect(
+            FakeCommandSurface.healthy(nodes_status=ok(nodes)),
+            secret=None,
+            **environment,
+        )
 
         first_node = first.snapshot["fleet"]["nodes"][0]
         second_node = second.snapshot["fleet"]["nodes"][0]
@@ -294,9 +260,15 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         secret_path = self.root / "runtime" / "clawbar" / "node-key-secret"
         secret_path.parent.mkdir(parents=True)
         secret_path.write_bytes(b"invalid")
-        nodes = {"nodes": [{"nodeId": "PRIVATE-NODE", "displayName": "Local", "connected": True}]}
+        nodes = {
+            "nodes": [
+                {"nodeId": "PRIVATE-NODE", "displayName": "Local", "connected": True}
+            ]
+        }
 
-        result = self.collect(FakeCommandSurface.healthy(nodes_status=ok(nodes)), secret=None)
+        result = self.collect(
+            FakeCommandSurface.healthy(nodes_status=ok(nodes)), secret=None
+        )
 
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
         self.assertEqual(result.snapshot["gateway"], {"state": "degraded"})
@@ -311,7 +283,3 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(result.exit_code, clawbar_collect.ExitCode.OK)
         self.assertEqual(result.snapshot["gateway"], {"state": "degraded"})
         self.assertEqual(result.snapshot["fleet"], {"available": False, "nodes": []})
-
-
-if __name__ == "__main__":
-    unittest.main()
