@@ -9,7 +9,7 @@ import os
 import subprocess
 import sys
 from collections.abc import Sequence
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -39,7 +39,7 @@ SCENARIOS = (
     "grouped-incidents",
     "recovery",
 )
-FIXTURE_NOW = datetime(2026, 8, 24, 17, 44, tzinfo=timezone.utc)
+FIXTURE_NOW = datetime(2026, 8, 24, 17, 44, tzinfo=UTC)
 
 
 def demo_marker_path() -> Path:
@@ -330,7 +330,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     set_demo_active(True)
     reload_shell()
-    snapshot = snapshot_for(arguments.scenario, datetime.now(timezone.utc))
+    snapshot = snapshot_for(arguments.scenario, datetime.now(UTC))
     snapshot_path = arguments.snapshot or default_snapshot_path()
     atomic_write_snapshot(snapshot_path, snapshot)
     process_demo_incidents(snapshot)

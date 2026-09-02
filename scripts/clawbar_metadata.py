@@ -6,7 +6,7 @@ import hashlib
 import hmac
 import os
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -79,7 +79,7 @@ def timestamp_from_milliseconds(value: object) -> str | None:
         return None
     try:
         return (
-            datetime.fromtimestamp(milliseconds / 1000, timezone.utc)
+            datetime.fromtimestamp(milliseconds / 1000, UTC)
             .isoformat(timespec="milliseconds")
             .replace("+00:00", "Z")
         )

@@ -542,7 +542,7 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         result = self.collect(FakeCommandSurface.healthy(gateway_status=slow_gateway))
 
         generated_at = datetime.fromisoformat(
-            result.snapshot["generatedAt"].replace("Z", "+00:00")
+            result.snapshot["generatedAt"]
         ).timestamp()
         self.assertGreaterEqual(generated_at, started_at + 0.15)
         self.assertEqual(

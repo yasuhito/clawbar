@@ -9,7 +9,7 @@ import stat
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -37,11 +37,7 @@ MAX_STATE_FILE_BYTES = MAX_COLLECTION_BYTES
 
 
 def utc_now() -> str:
-    return (
-        datetime.now(timezone.utc)
-        .isoformat(timespec="milliseconds")
-        .replace("+00:00", "Z")
-    )
+    return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def _unavailable_sections() -> dict[str, dict[str, Any]]:
