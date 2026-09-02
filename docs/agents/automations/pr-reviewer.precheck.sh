@@ -60,6 +60,9 @@ prs = gh_json(
 )
 
 blocked_labels = {"agent:reviewing", "ready-for-human", "agent:blocked"}
+# 同時実行は 1 件だけ。別の PR をレビュー中（agent:reviewing がある）なら新しい run を起こさない。
+if any("agent:reviewing" in {label["name"] for label in pr.get("labels", [])} for pr in prs):
+    sys.exit(1)
 for pr in prs:
     labels = {label["name"] for label in pr.get("labels", [])}
     if labels & blocked_labels:

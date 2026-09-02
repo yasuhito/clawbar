@@ -46,7 +46,7 @@ prs_json=$(gh pr list -R yasuhito/clawbar --state open --label agent:review --li
 - `agent:review` label がある
 - `agent:reviewing`、`ready-for-human`、`agent:blocked` がない
 
-候補が0件なら、GitHub へ書き込まず「対象 PR なし」と要約して終了する。複数ある場合は番号が最小の1件だけ扱う。
+`agent:reviewing` を持つ open PR が1件でもあれば、別の run がレビュー中なので候補を選ばず「レビュー中の PR あり」と要約して終了する（同時実行は1件だけ）。候補が0件なら、GitHub へ書き込まず「対象 PR なし」と要約して終了する。複数ある場合は番号が最小の1件だけ扱う。
 
 完了条件: 対象 PR 番号が1つ決まっている、または「対象 PR なし」で終了している。
 
@@ -350,7 +350,10 @@ PR #<PR> の独立レビュー指摘を修正してください。
 
 完了時は、修正、テスト、commit を要約し、最後に `<promise>COMPLETE</promise>` を出力する。
 判断不能なら `<promise>BLOCKED: 理由</promise>` を出力する。
+最終回答の前に、結果ファイル `/tmp/clawbar-fix-<PR>.md` を書く。1行目を `HEAD: <git rev-parse HEAD の値>`、2行目を `RESULT: COMPLETE` または `RESULT: BLOCKED: 理由`、最終行を同じ `<promise>` にする。
 ```
+
+送信前に `rm -f /tmp/clawbar-fix-<PR>.md` で消しておく。完了待ちは transcript の文字列検索ではなく、結果ファイルと worktree の git 状態（`review_base_head` から HEAD が進み、clean）で判定する。`terminal wait --for tui-idle` を繰り返し、結果ファイルが無くても「HEAD が進んだ・clean・idle」を 2 回連続で確認できたら完了とみなす。
 
 完了後、Coordinator が確認する。
 

@@ -83,9 +83,13 @@ def has_worker_worktree(branch):
 issues = gh_json("issue", "list", "-R", repo, "--state", "open", "--limit", "200", "--json", "number,title,body,labels,updatedAt")
 
 skip_labels = {"agent:in-progress", "agent:blocked", "agent:waiting-dependency", "needs-info", "ready-for-human", "wontfix"}
+# 同時実行は 1 件だけ。worker が動いている（agent:in-progress がある）間は新しい候補で run を起こさない。
+worker_running = any(
+    "agent:in-progress" in {label["name"] for label in issue.get("labels", [])} for issue in issues
+)
 for issue in issues:
     labels = {label["name"] for label in issue.get("labels", [])}
-    if {"ready-for-agent", "agent:implement"} <= labels and not (labels & skip_labels):
+    if {"ready-for-agent", "agent:implement"} <= labels and not (labels & skip_labels) and not worker_running:
         sys.exit(0)
 
 dependency_pattern = re.compile(r"(?:Depends on|Blocked by|依存:|ブロック:)\s*#(\d+)")

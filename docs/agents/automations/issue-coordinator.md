@@ -127,6 +127,7 @@ waiting_json=$(printf '%s' "$issues_json" | jq '[.[] | {number,title,url,labels:
 candidates_json=$(printf '%s' "$issues_json" | jq '[.[] | {number,title,url,labels:[.labels[].name]} | select((.labels | index("ready-for-agent")) and (.labels | index("agent:implement")) and ((.labels | index("agent:in-progress")) | not) and ((.labels | index("agent:blocked")) | not) and ((.labels | index("agent:waiting-dependency")) | not) and ((.labels | index("needs-info")) | not) and ((.labels | index("ready-for-human")) | not) and ((.labels | index("wontfix")) | not))] | sort_by(.number)')
 ```
 
+- `agent:in-progress` を持つ open issue が1件でもあれば、worker が動作中なので候補を選ばず終了する（同時実行は1件だけ）。
 - 候補が0件なら、GitHub へ書き込まず終了する。
 - 候補が複数あっても、番号が最小の1件だけ扱う。
 
@@ -253,20 +254,39 @@ Issue #<N> を実装してください。
 - unrelated な変更を戻さない。
 
 完了出力:
+- 最終回答を出す前に、結果ファイル `<resultPath>` を書いてください。1行目を `HEAD: <git rev-parse HEAD の値>`、2行目を `RESULT: COMPLETE` または `RESULT: BLOCKED: 理由`、続けて修正・テスト・commit の要約、最終行を `<promise>COMPLETE</promise>` または `<promise>BLOCKED: 理由</promise>` にしてください。
 - 完了したら最後に必ず `<promise>COMPLETE</promise>` を出力してください。
 - 失敗、仕様不足、危険変更、または判断不能なら、最後に必ず `<promise>BLOCKED: 理由</promise>` を日本語で出力してください。
 ```
 
+`<resultPath>` は `/tmp/clawbar-implement-<N>.md` とし、送信前に `rm -f` で消しておく。
+
 完了条件: worktree path と worker terminal handle を把握している。作成失敗なら Fail へ進む。
 
-### 6. Watch: worker の promise を待つ
+### 6. Watch: worker の結果ファイルを待つ
 
-`orca-ide terminal wait --for tui-idle --timeout-ms 300000 --json` と `orca-ide terminal read --json` を繰り返し、次のどちらかを待つ。
+pi の TUI に対する `orca-ide terminal read` は末尾の数行しか返さないため、transcript の文字列検索で `<promise>` を探してはいけない。判定の情報源は worker が書く結果ファイル `/tmp/clawbar-implement-<N>.md` と、worktree の git 状態だけにする。
 
-- `<promise>COMPLETE</promise>`
-- `<promise>BLOCKED: ...</promise>`
+```bash
+result_path=/tmp/clawbar-implement-<N>.md
+for attempt in $(seq 1 12); do
+  orca-ide terminal wait --terminal "$worker_terminal" --for tui-idle --timeout-ms 300000 --json || true
+  test -s "$result_path" && break
+  # 結果ファイルが無くても、worktree に新しい commit があり clean で、worker が idle なら完了とみなす
+  if [ -n "$(git -C "$worktree_path" log --oneline origin/main..HEAD)" ] && [ -z "$(git -C "$worktree_path" status --short)" ]; then
+    sleep 60
+    test -s "$result_path" && break
+    orca-ide terminal wait --terminal "$worker_terminal" --for tui-idle --timeout-ms 5000 --json >/dev/null 2>&1 && { echo "commit あり・clean・idle: 結果ファイル無しで完了扱い"; break; }
+  fi
+  sleep 30
+done
+cat "$result_path" 2>/dev/null || true
+```
 
-明確に止まった、失敗した、または BLOCKED を出した場合は Fail へ進む。
+- 結果ファイルに `RESULT: BLOCKED` があれば Fail へ進む。
+- 結果ファイルがあり `RESULT: COMPLETE` で、`HEAD:` が `git -C "$worktree_path" rev-parse HEAD` と一致すれば Verify へ進む。
+- 結果ファイルが無くても「commit あり・clean・idle」を 2 回連続で確認できたら Verify へ進む（Verify で改めて検証する）。
+- 12 回の待機後も commit が無い、または worker terminal が異常終了した場合は Fail へ進む。
 
 完了条件: COMPLETE / BLOCKED / 安全に続行できない状態のいずれかが判定できている。
 
