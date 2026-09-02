@@ -24,7 +24,7 @@ if [ -x "$QT6_BIN/qmllint" ]; then
     ln -s /usr/share/omarchy/shell "$qml_import_root/qs"
     import_flags=(-I "$qml_import_root")
   fi
-  # 既存コードで多発する 4 カテゴリは、解消するまで無効化する（issue 参照）
+  # 既存コードで多発する 4 カテゴリは、#22 で解消するまで無効化する
   "$QT6_BIN/qmllint" "${import_flags[@]+"${import_flags[@]}"}" \
     --unqualified disable \
     --missing-property disable \
