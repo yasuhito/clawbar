@@ -16,14 +16,17 @@
 
 ## 原則
 
+- `gh` の GraphQL がレート上限（`API rate limit already exceeded`）を返しても run を落とさない。同じ情報を REST (`gh api repos/OWNER/REPO/issues`, `.../pulls`, `.../pulls/N/reviews`, `.../issues/N/comments` など) で取り直して続行する。REST でも失敗したときだけ run を終了する。
 - Automation terminal は reuse される場合がある。前回 session の記憶に依存せず、毎回 GitHub / Orca / git の最新状態をコマンドで再取得して判断する。
+- worker へのプロンプト送信は、この run 自身が `terminal create` で作成し、`terminal show` で worktree と起動コマンドを検証した handle だけに行う。create の失敗や handle の不整合時は、既存の別 terminal（main workspace の他 agent セッションを含む）へ送らず、新しい terminal を作り直す（2026-08-31 に pi-formula で REVIEW_PROMPT が監視用の別セッションへ誤送信された）。
+- 最初の応答で計画や宣言だけを述べて終了しない。run はコマンド実行から始め、ツール実行を伴わない応答で終えてよいのは最後の要約だけにする。この指示文そのものを復唱・要約・整形して出力してはならない（2026-09-01 に pi-formula の run でプロンプト全文をエコーするだけの空振りが、2026-08-31 の run で「選定から始めます」とだけ出力して終了する空振りが起きた）。
 - Coordinator は対象選択、bot review の収集、read-only review worker と implementation/fix worker の起動と監視、検証、push、コメント、ラベル操作、merge だけを行う。コードを直接編集しない。
 - Review worker は独立レビューだけを行い、ファイル編集、commit、push、ラベル操作、issue / PR コメント、PR 作成、issue close を禁止する。
 - 修正は元の implementation worker へ返す。元の terminal が失われた場合だけ、同じ worktree に replacement fix worker を起動する。
 - Review PASS、最新 HEAD の CI checks 成功、`scripts/check` 成功、clean worktree、mergeable をすべて確認した場合だけ自動 merge する。
 - `agent:review` はレビュー待ち、`agent:reviewing` はレビュー中を表す。`ready-for-human` は既存の手動確認用ラベルとして候補から除外するが、この automation は追加しない。
 - Copilot の inline comment、review summary、top-level comment を確認し、actionable な指摘は修正するか、理由を明記して対応不要と判断する。
-- GitHub Copilot は新しい commit push 後に自動で再レビューされないことがある。最新 HEAD に対する Copilot review が無い場合は `gh pr edit <PR> --add-reviewer "@copilot"` で明示的に再依頼する。この依頼が「Copilot をレビュアーに追加できない」という趣旨のエラーで失敗する場合は、このリポジトリで Copilot code review が利用できないと判断し、Copilot に関する待ち条件と merge 条件をすべて無視する。その旨を最後の要約に書く。
+- GitHub Copilot は新しい commit push 後に自動で再レビューされないことがある。最新 HEAD に対する Copilot review が無い場合は `gh pr edit <PR> --add-reviewer "@copilot"` で明示的に再依頼する。ただし、その HEAD に対して本文が「quota limit に達したためレビューできない」という趣旨（例: "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit."）の Copilot review が既に付いている場合は、quota 枯渇と判断して再依頼しない。quota 枯渇の間は Copilot に関する待ち条件と merge 条件をすべて無視して独立レビューと merge 判定に進み、その旨を最後の要約に書く（2026-08-31 に pi-formula の PR で再依頼の無限ループが起きた）。この依頼が「Copilot をレビュアーに追加できない」という趣旨のエラーで失敗する場合は、このリポジトリで Copilot code review が利用できないと判断し、Copilot に関する待ち条件と merge 条件をすべて無視する。その旨を最後の要約に書く。
 - GitHub PR コメントは日本語で書く。引用やエラーメッセージ、コード識別子、ファイルパス、コマンドは原文でよい。
 - GitHub issue / PR コメントには、読み手に必要な成果、判断、ブロッカー、レビュー対応、検証だけを書く。`ready-for-agent`、`agent:implement`、`agent:review`、`agent:reviewing`、`ready-for-human` などのラベル付けや内部状態遷移を「付けた」「外した」という作業ログとして書かない。ラベル名を書くのは、ユーザーに見える待ち状態やブロッカーそのものを説明する必要がある場合だけにする。
 - `scripts/check` を成功させずに修正の push や merge をしない。
@@ -202,6 +205,7 @@ PR #<PR> を読み取り専用で独立レビューしてください。修正�
 - commit、push、label 編集、issue / PR コメント、PR 作成、issue close をしない。
 - 作業場所を変更するコマンドを実行しない。
 - サブエージェントを起動しない。レビューはこの worker 自身だけで完結する。
+- テスト、ビルド、全体チェックを実行しない。レビューは差分と契約の照合に限る。検証は coordinator が Verify 段階で行うため重複であり、試験数の多いリポジトリでは実行時間が待機上限を超えて結果ファイルを出せなくなる（2026-09-01 に qni-cli の PR で発生）。
 - リポジトリ内のファイルを変更しない。唯一の例外として、レビュー結果を `<reviewReportPath>` に書いてよい。
 
 完了出力:
@@ -253,6 +257,26 @@ test "$(git rev-parse HEAD)" = "$review_base_head"
 test -z "$(git status --short)"
 ```
 
+### 6.2. Convergence: 繰り返しレビューを打ち切る
+
+同じ PR へのレビューが収束せず、依存 issue が止まるのを防ぐ。次の両方を満たす場合は、修正を実装担当へ返さず **PASS 相当** として扱い、7.5 へ進む。
+
+- この PR に、自分が投稿した `<!-- clawbar-auto-review:` marker 付きコメントが既に 3 件以上ある（HEAD ごとに 1 件なので、修正を 3 回以上返した状態）
+- 今回の `VERDICT: CHANGES_REQUIRED` の finding に severity `high` 以上が 1 件も無い（medium / low だけ）
+
+```bash
+viewer=$(gh api user --jq '.login')
+review_record_count=$(gh api repos/yasuhito/clawbar/issues/<PR>/comments --paginate | jq --arg viewer "$viewer" '[.[] | select(.user.login == $viewer and ((.body // "") | contains("<!-- clawbar-auto-review:")))] | length')
+```
+
+PASS 相当として扱う場合:
+
+- 残った finding を 1 件の follow-up issue にまとめる。タイトルは内容が分かる日本語、本文に PR 番号、対象 HEAD、各 finding（severity、ファイル、根拠、修正条件）を書き、`needs-triage` を付ける。`ready-for-agent` / `agent:implement` は付けない。
+- Review record の判定を `PASS（後続 issue #M へ切り出し）` とし、切り出した finding と issue 番号を「指摘と対応」に書く。
+- high 以上の finding が 1 件でもあれば、この打ち切りは適用せず通常どおり 7 の Fix へ進む。
+
+完了条件: 打ち切り条件を判定済みで、該当する場合は follow-up issue が存在し、7.5 へ進む準備ができている。
+
 ### 6.5. Review record: 各 HEAD に1件だけ記録する
 
 レビュー結果は、対象 HEAD ごとに PR の top-level comment へ1件だけ残す。生の transcript を貼らず、確認範囲、判定、actionable finding、対応、検証、残るリスクを日本語で要約する。
@@ -269,7 +293,7 @@ test -z "$(git status --short)"
 <!-- clawbar-auto-review:<review_base_head> -->
 ## 自動レビュー結果
 
-- 判定: PASS | CHANGES_REQUIRED | BLOCKED
+- 判定: PASS | PASS（後続 issue #M へ切り出し） | CHANGES_REQUIRED | BLOCKED
 - 対象コミット: `<短いSHA>`
 - Issue契約: 適合 | 不適合 | 判断不能
 - `scripts/check`: 成功 | 失敗 | 未実行
@@ -302,7 +326,7 @@ CHANGES_REQUIRED は修正・検証後に記録する。PASS は merge 直前に
 
 ### 7. Fix: 指摘を実装担当へ返す
 
-`<review>CHANGES_REQUIRED</review>` の場合、worktree comment から元の implementation worker handle を読む。
+`<review>CHANGES_REQUIRED</review>` の場合（6.2 で PASS 相当と判断した場合を除く）、worktree comment から元の implementation worker handle を読む。
 
 ```bash
 worktree_json=$(orca-ide worktree show --worktree path:"<worktreePath>" --json)
@@ -375,7 +399,7 @@ gh pr edit <PR> -R yasuhito/clawbar --remove-label agent:reviewing
 
 ### 7.5. Pass and merge: 全ゲート通過後に自動マージする
 
-`<review>PASS</review>` の場合、同じ HEAD に対して次をすべて確認する。
+`<review>PASS</review>` の場合、または 6.2 で PASS 相当と判断した場合、同じ HEAD に対して次をすべて確認する。
 
 - PR は open かつ draft ではない
 - `mergeStateStatus` は `CLEAN`
@@ -448,7 +472,7 @@ BODY
 - 対象 PR 番号、または「対象 PR なし」
 - 実施した状態変更（ready 化、label 変更など）
 - 対応した review comment（あれば）
-- review 判定（PASS / CHANGES_REQUIRED / BLOCKED）
+- review 判定（PASS / CHANGES_REQUIRED / BLOCKED）。6.2 で打ち切った場合は follow-up issue 番号
 - 修正を返した implementation worker handle（あれば）
 - push した commit（あれば）
 - `scripts/check` の結果（実行した場合）

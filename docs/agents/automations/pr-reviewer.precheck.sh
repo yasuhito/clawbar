@@ -60,6 +60,37 @@ prs = gh_json(
     "--json", "number,isDraft,labels,statusCheckRollup,reviewRequests"
 )
 
+def clear_stale_reviewing(prs):
+    """run が異常終了して agent:reviewing が残ると全 run が skip されるため、
+    付与から 45 分以上経過した agent:reviewing を自己修復として外す
+    （2026-08-31 に pi-formula の PR #20 でデッドロックが起きた）。"""
+    import datetime
+    now = datetime.datetime.now(datetime.timezone.utc)
+    for pr in prs:
+        if "agent:reviewing" not in {label["name"] for label in pr.get("labels", [])}:
+            continue
+        try:
+            events = gh_json("api", f"repos/{repo}/issues/{pr['number']}/timeline", "--paginate")
+        except subprocess.CalledProcessError:
+            continue
+        applied = None
+        for event in events:
+            if event.get("event") == "labeled" and (event.get("label") or {}).get("name") == "agent:reviewing":
+                applied = event.get("created_at")
+        if not applied:
+            continue
+        applied_at = datetime.datetime.fromisoformat(applied.replace("Z", "+00:00"))
+        if (now - applied_at).total_seconds() < 45 * 60:
+            continue
+        subprocess.run(
+            ["gh", "pr", "edit", str(pr["number"]), "-R", repo, "--remove-label", "agent:reviewing"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+        )
+        pr["labels"] = [label for label in pr.get("labels", []) if label["name"] != "agent:reviewing"]
+
+
+clear_stale_reviewing(prs)
+
 blocked_labels = {"agent:reviewing", "ready-for-human", "agent:blocked"}
 # 同時実行は 1 件だけ。別の PR をレビュー中（agent:reviewing がある）なら新しい run を起こさない。
 if any("agent:reviewing" in {label["name"] for label in pr.get("labels", [])} for pr in prs):

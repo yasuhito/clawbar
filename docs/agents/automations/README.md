@@ -27,5 +27,5 @@ orca-ide automations runs --id <id> --json
 ## 動かすための前提
 
 - `main` に `scripts/check` と `.github/workflows/ci.yml` が入っていること。worker worktree は `origin/main` から作られ、PR reviewer は CI checks が 1 件以上成功していないとマージしない。
-- 自動実装に渡す issue には `ready-for-agent` と `agent:implement` の両方を付け、本文に `## 実装内容` / `## 受け入れ基準` / `## 対象外` を書く。
+- 自動実装に渡す issue には `ready-for-agent` と `agent:implement` の両方を付け、本文に `## 実装内容` / `## 受け入れ基準` / `## 対象外` を書く。依存関係は GitHub Relationships の `blockedBy` に入れる。
 - `.pi/extensions/clawbar-orca-role-name.ts` が pi の session 名を役割ごとに付ける。

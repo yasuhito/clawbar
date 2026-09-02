@@ -94,11 +94,19 @@ for issue in issues:
         sys.exit(0)
 
 dependency_pattern = re.compile(r"(?:Depends on|Blocked by|依存:|ブロック:)\s*#(\d+)")
+blocked_by_section_pattern = re.compile(r"^##\s*Blocked by\s*$\n((?:\s*-\s*#\d+\s*\n?)+)", re.MULTILINE)
+
+
+def body_dependencies(body):
+    dependencies = set(int(value) for value in dependency_pattern.findall(body))
+    for section in blocked_by_section_pattern.findall(body):
+        dependencies.update(int(value) for value in re.findall(r"#(\d+)", section))
+    return dependencies
 for issue in issues:
     labels = {label["name"] for label in issue.get("labels", [])}
     if "agent:waiting-dependency" not in labels:
         continue
-    dependencies = set(int(value) for value in dependency_pattern.findall(issue.get("body") or ""))
+    dependencies = body_dependencies(issue.get("body") or "")
     dependencies.update(issue_blocked_by_numbers(issue["number"]))
     if not dependencies:
         continue
