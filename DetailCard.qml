@@ -30,10 +30,7 @@ Item {
         text: Presentation.detailText(modelData, root.nowMs)
         Accessible.name: text
         Accessible.description: modelData.spoken
-        color: modelData.critical
-          ? root.palette.selectedSignalColor("critical")
-          : modelData.label === "" || modelData.label === "Task result"
-            ? root.palette.foreground : root.palette.selectedDim
+        color: modelData.critical ? root.palette.selectedSignalColor("critical") : modelData.label === "" || modelData.label === "Task result" ? root.palette.foreground : root.palette.selectedDim
         font.bold: modelData.critical
         font.family: root.palette.fontFamily
         font.pixelSize: Style.font.caption

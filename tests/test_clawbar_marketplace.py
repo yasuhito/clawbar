@@ -96,9 +96,9 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("origin.y: 11", mark)
         self.assertIn("property bool animated: false", mark)
         self.assertIn("loops: Animation.Infinite", mark)
-        self.assertIn('property: "jawAngle"; to: -26; duration: 96', mark)
-        self.assertIn('property: "jawAngle"; to: 4; duration: 144', mark)
-        self.assertIn("PauseAnimation { duration: 1392 }", mark)
+        self.assertIn('property: "jawAngle"\n      to: -26\n      duration: 96', mark)
+        self.assertIn('property: "jawAngle"\n      to: 4\n      duration: 144', mark)
+        self.assertIn("PauseAnimation {\n      duration: 1392\n    }", mark)
         self.assertIn("button.tooltipHovered", widget)
         self.assertIn("collectorService.collecting", widget)
         self.assertIn("readonly property bool collecting:", service)
@@ -176,7 +176,9 @@ class MarketplaceContractTest(unittest.TestCase):
             panel,
         )
         self.assertIn("id: scrollIndicatorActivity", panel)
-        self.assertIn("if (interactive) scrollIndicatorActivity.restart()", panel)
+        self.assertIn(
+            "if (interactive)\n          scrollIndicatorActivity.restart();", panel
+        )
         self.assertIn("Behavior on opacity", panel)
         self.assertIn("width: panelFlick.width - Style.space(8)", panel)
 
@@ -199,7 +201,7 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("Accessible.ignored: !expanded", reveal)
         self.assertEqual(section.count("DetailCard {"), 1)
         self.assertIn("sourceComponent: detailCardComponent", section)
-        self.assertIn("signal selectionGeometryChanged()", section)
+        self.assertIn("signal selectionGeometryChanged\n", section)
         self.assertIn("onSelectionGeometryChanged", panel)
 
     def test_operational_row_detail_uses_declarative_bindings(self) -> None:

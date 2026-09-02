@@ -80,14 +80,50 @@ Item {
     running: root.animated
     loops: Animation.Infinite
 
-    PauseAnimation { duration: 144 }
-    NumberAnimation { target: root; property: "flexAngle"; to: -4; duration: 96; easing.type: Easing.OutCubic }
-    NumberAnimation { target: root; property: "flexAngle"; to: 3; duration: 144; easing.type: Easing.OutCubic }
-    NumberAnimation { target: root; property: "flexAngle"; to: -4; duration: 144; easing.type: Easing.OutCubic }
-    PauseAnimation { duration: 96 }
-    NumberAnimation { target: root; property: "flexAngle"; to: 3; duration: 144; easing.type: Easing.OutCubic }
-    NumberAnimation { target: root; property: "flexAngle"; to: 0; duration: 240; easing.type: Easing.OutCubic }
-    PauseAnimation { duration: 1392 }
+    PauseAnimation {
+      duration: 144
+    }
+    NumberAnimation {
+      target: root
+      property: "flexAngle"
+      to: -4
+      duration: 96
+      easing.type: Easing.OutCubic
+    }
+    NumberAnimation {
+      target: root
+      property: "flexAngle"
+      to: 3
+      duration: 144
+      easing.type: Easing.OutCubic
+    }
+    NumberAnimation {
+      target: root
+      property: "flexAngle"
+      to: -4
+      duration: 144
+      easing.type: Easing.OutCubic
+    }
+    PauseAnimation {
+      duration: 96
+    }
+    NumberAnimation {
+      target: root
+      property: "flexAngle"
+      to: 3
+      duration: 144
+      easing.type: Easing.OutCubic
+    }
+    NumberAnimation {
+      target: root
+      property: "flexAngle"
+      to: 0
+      duration: 240
+      easing.type: Easing.OutCubic
+    }
+    PauseAnimation {
+      duration: 1392
+    }
 
     onStopped: root.flexAngle = 0
   }
@@ -96,14 +132,50 @@ Item {
     running: root.animated
     loops: Animation.Infinite
 
-    PauseAnimation { duration: 144 }
-    NumberAnimation { target: root; property: "jawAngle"; to: -26; duration: 96; easing.type: Easing.OutCubic }
-    NumberAnimation { target: root; property: "jawAngle"; to: 4; duration: 144; easing.type: Easing.OutCubic }
-    NumberAnimation { target: root; property: "jawAngle"; to: -24; duration: 144; easing.type: Easing.OutCubic }
-    PauseAnimation { duration: 96 }
-    NumberAnimation { target: root; property: "jawAngle"; to: 4; duration: 144; easing.type: Easing.OutCubic }
-    NumberAnimation { target: root; property: "jawAngle"; to: -10; duration: 240; easing.type: Easing.OutCubic }
-    PauseAnimation { duration: 1392 }
+    PauseAnimation {
+      duration: 144
+    }
+    NumberAnimation {
+      target: root
+      property: "jawAngle"
+      to: -26
+      duration: 96
+      easing.type: Easing.OutCubic
+    }
+    NumberAnimation {
+      target: root
+      property: "jawAngle"
+      to: 4
+      duration: 144
+      easing.type: Easing.OutCubic
+    }
+    NumberAnimation {
+      target: root
+      property: "jawAngle"
+      to: -24
+      duration: 144
+      easing.type: Easing.OutCubic
+    }
+    PauseAnimation {
+      duration: 96
+    }
+    NumberAnimation {
+      target: root
+      property: "jawAngle"
+      to: 4
+      duration: 144
+      easing.type: Easing.OutCubic
+    }
+    NumberAnimation {
+      target: root
+      property: "jawAngle"
+      to: -10
+      duration: 240
+      easing.type: Easing.OutCubic
+    }
+    PauseAnimation {
+      duration: 1392
+    }
 
     onStopped: root.jawAngle = -10
   }

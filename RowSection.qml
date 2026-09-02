@@ -25,17 +25,17 @@ Item {
   property int edgeInsetUnits: 8
 
   signal rowActivated(var vm)
-  signal selectionGeometryChanged()
+  signal selectionGeometryChanged
 
   height: rowsColumn.implicitHeight
 
   function itemForKey(key) {
     for (var i = 0; i < repeater.count; i++) {
-      var delegate = repeater.itemAt(i)
+      var delegate = repeater.itemAt(i);
       if (delegate && delegate.modelData.key === key)
-        return delegate
+        return delegate;
     }
-    return null
+    return null;
   }
 
   Column {
@@ -51,7 +51,10 @@ Item {
       delegate: Rectangle {
         id: rowRoot
         required property var modelData
-        readonly property var dot: modelData.dot ? modelData.dot : { shape: "circle", tone: "muted" }
+        readonly property var dot: modelData.dot ? modelData.dot : {
+          shape: "circle",
+          tone: "muted"
+        }
         readonly property bool selected: root.selectedKey !== "" && modelData.key === root.selectedKey
         width: parent.width
         height: summaryArea.height + detailReveal.height
@@ -64,7 +67,8 @@ Item {
         Accessible.name: modelData.name
         Accessible.description: modelData.accessibleDescription
         onHeightChanged: {
-          if (selected) root.selectionGeometryChanged()
+          if (selected)
+            root.selectionGeometryChanged();
         }
 
         Item {
@@ -84,9 +88,7 @@ Item {
             anchors.leftMargin: Style.space(root.dotInsetUnits)
             anchors.verticalCenter: titleText.verticalCenter
             kind: rowRoot.dot.shape
-            color: rowRoot.selected
-              ? root.palette.selectedSignalColor(rowRoot.dot.tone)
-              : root.palette.signalColor(rowRoot.dot.tone)
+            color: rowRoot.selected ? root.palette.selectedSignalColor(rowRoot.dot.tone) : root.palette.signalColor(rowRoot.dot.tone)
           }
 
           Text {
@@ -101,9 +103,7 @@ Item {
             anchors.verticalCenter: modelData.hasSub ? undefined : parent.verticalCenter
             text: modelData.name
             elide: Text.ElideRight
-            color: modelData.titleMuted
-              ? (rowRoot.selected ? root.palette.selectedDim : root.palette.dim)
-              : root.palette.foreground
+            color: modelData.titleMuted ? (rowRoot.selected ? root.palette.selectedDim : root.palette.dim) : root.palette.foreground
             font.family: root.palette.fontFamily
             font.pixelSize: Style.font.body
             font.bold: modelData.titleBold
@@ -120,11 +120,7 @@ Item {
             anchors.bottomMargin: Style.space(6)
             text: modelData.subText(root.nowMs)
             elide: Text.ElideRight
-            color: modelData.subCritical
-              ? (rowRoot.selected
-                  ? root.palette.selectedSignalColor("critical")
-                  : root.palette.signalColor("critical"))
-              : (rowRoot.selected ? root.palette.selectedDim : root.palette.dim)
+            color: modelData.subCritical ? (rowRoot.selected ? root.palette.selectedSignalColor("critical") : root.palette.signalColor("critical")) : (rowRoot.selected ? root.palette.selectedDim : root.palette.dim)
             font.bold: modelData.subCritical
             font.family: root.palette.fontFamily
             font.pixelSize: Style.font.caption
@@ -137,20 +133,11 @@ Item {
             anchors.right: parent.right
             anchors.rightMargin: Style.space(root.edgeInsetUnits)
             anchors.verticalCenter: titleText.verticalCenter
-            width: modelData.statusCapRatio !== null
-              ? Math.min(implicitWidth, parent.width * modelData.statusCapRatio)
-              : implicitWidth
+            width: modelData.statusCapRatio !== null ? Math.min(implicitWidth, parent.width * modelData.statusCapRatio) : implicitWidth
             horizontalAlignment: modelData.statusCapRatio !== null ? Text.AlignRight : Text.AlignLeft
-            text: modelData.statusStyle === "action" && rowRoot.selected && root.activeActionLabel !== ""
-              ? root.activeActionLabel
-              : modelData.statusLabel
+            text: modelData.statusStyle === "action" && rowRoot.selected && root.activeActionLabel !== "" ? root.activeActionLabel : modelData.statusLabel
             elide: Text.ElideRight
-            color: modelData.statusStyle === "action"
-              ? root.palette.accent
-              : rowRoot.selected
-                ? root.palette.selectedSignalColor(rowRoot.dot.tone)
-                : rowRoot.modelData.historical
-                  ? root.palette.dim : root.palette.signalColor(rowRoot.dot.tone)
+            color: modelData.statusStyle === "action" ? root.palette.accent : rowRoot.selected ? root.palette.selectedSignalColor(rowRoot.dot.tone) : rowRoot.modelData.historical ? root.palette.dim : root.palette.signalColor(rowRoot.dot.tone)
             font.family: root.palette.fontFamily
             font.pixelSize: Style.font.caption
             font.bold: modelData.statusStyle === "action"
@@ -161,8 +148,7 @@ Item {
           id: detailReveal
           width: parent.width
           expanded: rowRoot.selected && rowRoot.modelData.detail.length > 0
-          contentHeight: cardLoader.active && cardLoader.item
-            ? cardLoader.item.implicitHeight : 0
+          contentHeight: cardLoader.active && cardLoader.item ? cardLoader.item.implicitHeight : 0
           motionEnabled: root.motionEnabled
           fadeDuration: root.fadeDuration
           expandDuration: root.expandDuration
@@ -185,8 +171,7 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            active: rowRoot.modelData.detail.length > 0
-              && (rowRoot.selected || detailReveal.height > 0)
+            active: rowRoot.modelData.detail.length > 0 && (rowRoot.selected || detailReveal.height > 0)
             sourceComponent: detailCardComponent
           }
         }

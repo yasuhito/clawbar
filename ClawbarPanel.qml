@@ -16,7 +16,7 @@ KeyboardPanel {
   property int selectedIndexHint: 0
   property bool verifyingCandidate: false
 
-  signal refreshRequested()
+  signal refreshRequested
   signal candidateVerificationRequested(string candidateKey)
 
   readonly property var sections: panelModel.sections
@@ -30,9 +30,7 @@ KeyboardPanel {
   readonly property color panelSurface: Color.popups.background
   readonly property color rawDim: Color.muted
   readonly property color dim: ColorKit.readableColor(rawDim, foreground, panelSurface, 4.5)
-  readonly property color selectedSurface: ColorKit.blendColor(
-    Style.selectedStateColor(foreground, accent), panelSurface, Style.selectedFillAlpha
-  )
+  readonly property color selectedSurface: ColorKit.blendColor(Style.selectedStateColor(foreground, accent), panelSurface, Style.selectedFillAlpha)
   readonly property color selectedDim: ColorKit.readableColor(dim, foreground, selectedSurface, 4.5)
   readonly property color accent: Color.accent
   readonly property color urgent: bar ? bar.urgent : Color.urgent
@@ -80,62 +78,64 @@ KeyboardPanel {
   readonly property real scrollIndicatorIdleOpacity: 0.26
   readonly property int scrollIndicatorWidth: Style.space(2)
   readonly property int scrollIndicatorMinHeight: Style.space(28)
-  readonly property real scrollProgress: panelFlick.contentHeight > panelFlick.height
-    ? Math.max(0, Math.min(1,
-      panelFlick.contentY / (panelFlick.contentHeight - panelFlick.height)))
-    : 0
+  readonly property real scrollProgress: panelFlick.contentHeight > panelFlick.height ? Math.max(0, Math.min(1, panelFlick.contentY / (panelFlick.contentHeight - panelFlick.height))) : 0
 
   focusTarget: keyCatcher
   contentWidth: fittedContentWidth(Style.space(360))
-  contentHeight: fittedContentHeight(
-    panelHeader.height + Style.space(4) + contentColumn.implicitHeight,
-    Style.space(560)
-  )
+  contentHeight: fittedContentHeight(panelHeader.height + Style.space(4) + contentColumn.implicitHeight, Style.space(560))
 
   function reconcileRows() {
-    var selection = Presentation.reconcileSelection(selectionKeys, selectedKey, selectedIndexHint)
-    selectedKey = selection.key
-    selectedIndexHint = selection.index < 0 ? 0 : selection.index
+    var selection = Presentation.reconcileSelection(selectionKeys, selectedKey, selectedIndexHint);
+    selectedKey = selection.key;
+    selectedIndexHint = selection.index < 0 ? 0 : selection.index;
   }
 
   function selectRow(row) {
-    if (!row) return
-    selectedKey = row.key
-    selectedIndexHint = Presentation.indexForKey(selectionKeys, row.key)
-    Qt.callLater(root.ensureSelectionVisible)
+    if (!row)
+      return;
+    selectedKey = row.key;
+    selectedIndexHint = Presentation.indexForKey(selectionKeys, row.key);
+    Qt.callLater(root.ensureSelectionVisible);
   }
 
   function moveSelection(delta) {
-    var next = Presentation.moveFocus(selectedIndex, selectionKeys.length, delta)
-    if (next < 0) return
-    selectedKey = selectionKeys[next]
-    selectedIndexHint = next
-    Qt.callLater(root.ensureSelectionVisible)
+    var next = Presentation.moveFocus(selectedIndex, selectionKeys.length, delta);
+    if (next < 0)
+      return;
+    selectedKey = selectionKeys[next];
+    selectedIndexHint = next;
+    Qt.callLater(root.ensureSelectionVisible);
   }
 
   // Every kind lives in a key-addressable RowSection.
   function sectionForKind(kind) {
-    if (kind === "automation") return automationRows
-    if (kind === "node") return nodeRows
-    if (kind === "agent") return agentRows
-    if (kind === "candidate") return candidateRows
-    return null
+    if (kind === "automation")
+      return automationRows;
+    if (kind === "node")
+      return nodeRows;
+    if (kind === "agent")
+      return agentRows;
+    if (kind === "candidate")
+      return candidateRows;
+    return null;
   }
 
   function ensureSelectionVisible() {
-    var section = sectionForKind(selectedKind)
-    var delegate = section ? section.itemForKey(selectedKey) : null
-    if (!delegate) return
-    var top = delegate.mapToItem(contentColumn, 0, 0).y
-    var bottom = top + delegate.height
-    if (top < panelFlick.contentY) panelFlick.contentY = top
+    var section = sectionForKind(selectedKind);
+    var delegate = section ? section.itemForKey(selectedKey) : null;
+    if (!delegate)
+      return;
+    var top = delegate.mapToItem(contentColumn, 0, 0).y;
+    var bottom = top + delegate.height;
+    if (top < panelFlick.contentY)
+      panelFlick.contentY = top;
     else if (bottom > panelFlick.contentY + panelFlick.height)
-      panelFlick.contentY = Math.max(0, bottom - panelFlick.height)
+      panelFlick.contentY = Math.max(0, bottom - panelFlick.height);
   }
 
   function activateSelection() {
     if (selectedKind === "candidate" && !verifyingCandidate)
-      candidateVerificationRequested(selectedKey)
+      candidateVerificationRequested(selectedKey);
   }
 
   onSectionsChanged: reconcileRows()
@@ -151,16 +151,21 @@ KeyboardPanel {
       repeat: false
     }
 
-    onMoveRequested: function(dx, dy) {
-      if (dy !== 0) root.moveSelection(dy)
-      else if (dx !== 0) root.moveSelection(dx)
+    onMoveRequested: function (dx, dy) {
+      if (dy !== 0)
+        root.moveSelection(dy);
+      else if (dx !== 0)
+        root.moveSelection(dx);
     }
     onActivateRequested: root.activateSelection()
     onCloseRequested: root.close()
-    onTextKey: function(text) {
-      if (text === "j" || text === "J") root.moveSelection(1)
-      else if (text === "k" || text === "K") root.moveSelection(-1)
-      else if (text === "r" || text === "R") root.refreshRequested()
+    onTextKey: function (text) {
+      if (text === "j" || text === "J")
+        root.moveSelection(1);
+      else if (text === "k" || text === "K")
+        root.moveSelection(-1);
+      else if (text === "r" || text === "R")
+        root.refreshRequested();
     }
 
     PanelHeader {
@@ -185,7 +190,8 @@ KeyboardPanel {
       flickableDirection: Flickable.VerticalFlick
       interactive: contentHeight > height
       onContentYChanged: {
-        if (interactive) scrollIndicatorActivity.restart()
+        if (interactive)
+          scrollIndicatorActivity.restart();
       }
 
       Column {
@@ -252,10 +258,12 @@ KeyboardPanel {
           interactive: !root.verifyingCandidate
           activeActionLabel: root.verifyingCandidate ? "Verifying…" : ""
           edgeInsetUnits: 9
-          onRowActivated: function(vm) {
-            if (!vm.key) return
-            root.selectRow(vm)
-            if (!root.verifyingCandidate) root.candidateVerificationRequested(vm.key)
+          onRowActivated: function (vm) {
+            if (!vm.key)
+              return;
+            root.selectRow(vm);
+            if (!root.verifyingCandidate)
+              root.candidateVerificationRequested(vm.key);
           }
           onSelectionGeometryChanged: Qt.callLater(root.ensureSelectionVisible)
         }
@@ -302,8 +310,9 @@ KeyboardPanel {
           motionEnabled: root.detailMotionEnabled
           fadeDuration: root.detailFadeDuration
           expandDuration: root.detailExpandDuration
-          onRowActivated: function(vm) {
-            if (vm.key) root.selectRow(vm)
+          onRowActivated: function (vm) {
+            if (vm.key)
+              root.selectRow(vm);
           }
           onSelectionGeometryChanged: Qt.callLater(root.ensureSelectionVisible)
         }
@@ -341,8 +350,9 @@ KeyboardPanel {
           motionEnabled: root.detailMotionEnabled
           fadeDuration: root.detailFadeDuration
           expandDuration: root.detailExpandDuration
-          onRowActivated: function(vm) {
-            if (vm.key) root.selectRow(vm)
+          onRowActivated: function (vm) {
+            if (vm.key)
+              root.selectRow(vm);
           }
           onSelectionGeometryChanged: Qt.callLater(root.ensureSelectionVisible)
         }
@@ -391,32 +401,26 @@ KeyboardPanel {
           fadeDuration: root.detailFadeDuration
           expandDuration: root.detailExpandDuration
           dotInsetUnits: 8
-          onRowActivated: function(vm) {
-            if (vm.key) root.selectRow(vm)
+          onRowActivated: function (vm) {
+            if (vm.key)
+              root.selectRow(vm);
           }
           onSelectionGeometryChanged: Qt.callLater(root.ensureSelectionVisible)
         }
-
       }
     }
 
     Rectangle {
       id: scrollIndicator
-      readonly property bool active: panelFlick.moving || panelFlick.dragging
-        || scrollIndicatorActivity.running
+      readonly property bool active: panelFlick.moving || panelFlick.dragging || scrollIndicatorActivity.running
       visible: panelFlick.contentHeight > panelFlick.height + 1
       width: root.scrollIndicatorWidth
-      height: Math.max(
-        root.scrollIndicatorMinHeight,
-        panelFlick.height * Math.min(1, panelFlick.height / panelFlick.contentHeight)
-      )
+      height: Math.max(root.scrollIndicatorMinHeight, panelFlick.height * Math.min(1, panelFlick.height / panelFlick.contentHeight))
       x: panelFlick.x + panelFlick.width - width
       y: panelFlick.y + root.scrollProgress * Math.max(0, panelFlick.height - height)
       radius: width / 2
       color: root.foreground
-      opacity: active
-        ? root.scrollIndicatorActiveOpacity
-        : root.scrollIndicatorIdleOpacity
+      opacity: active ? root.scrollIndicatorActiveOpacity : root.scrollIndicatorIdleOpacity
       z: 2
       Accessible.ignored: true
 
