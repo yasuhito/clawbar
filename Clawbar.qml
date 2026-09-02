@@ -1,5 +1,6 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
-import Quickshell
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
@@ -12,7 +13,7 @@ BarWidget {
   id: root
   moduleName: "io.github.yasuhito.clawbar"
 
-  property string state: "starting"
+  property string gatewayState: "starting"
   property string resolutionSource: "unresolved"
   property var lastSnapshot: null
   property bool cacheReadPending: false
@@ -22,31 +23,38 @@ BarWidget {
   property bool opened: false
   property string refreshFeedback: "idle"
   property double nowMs: Date.now()
-  readonly property color signalForeground: bar ? bar.foreground : Color.foreground
+  readonly property color signalForeground: dynamicMember(bar, "foreground", Color.foreground)
   property color healthyColor: signalForeground
   property color warningColor: Color.accent
   readonly property var themeGeneration: Color.shellValues
   readonly property string themeColorsPath: Color.currentThemePath + "/colors.toml"
   property string collectorPath: decodeURIComponent(String(Qt.resolvedUrl("scripts/clawbar_collect.py")).replace(/^file:\/\//, ""))
   readonly property var collectorService: {
-    if (!bar || !bar.shell || typeof bar.shell.serviceFor !== "function")
+    var shell = dynamicMember(bar, "shell", null);
+    if (!shell || typeof shell.serviceFor !== "function")
       return null;
-    return bar.shell.serviceFor(root.moduleName);
+    return shell.serviceFor(root.moduleName);
   }
-  readonly property string barSeverity: Snapshot.barSeverity(lastSnapshot, state)
-  readonly property int barCount: Snapshot.barCount(lastSnapshot, state)
+  readonly property string barSeverity: Snapshot.barSeverity(lastSnapshot, gatewayState)
+  readonly property int barCount: Snapshot.barCount(lastSnapshot, gatewayState)
   readonly property bool developerDemo: !!lastSnapshot && typeof lastSnapshot.demoScenario === "string"
-  readonly property string baseSummary: Presentation.summary(state, resolutionSource, barCount, barSeverity)
+  readonly property string baseSummary: Presentation.summary(gatewayState, resolutionSource, barCount, barSeverity)
   readonly property string refreshSummary: Presentation.refreshSummary(baseSummary, refreshFeedback, lastSnapshot !== null)
   readonly property string summary: developerDemo ? "Developer demo · " + refreshSummary : refreshSummary
-  readonly property string basePanelSummary: Presentation.panelSummary(state, resolutionSource, barCount, barSeverity, Presentation.panelSignal(lastSnapshot, state).label)
+  readonly property string basePanelSummary: Presentation.panelSummary(gatewayState, resolutionSource, barCount, barSeverity, Presentation.panelSignal(lastSnapshot, gatewayState).label)
   readonly property string refreshPanelSummary: Presentation.refreshSummary(basePanelSummary, refreshFeedback, lastSnapshot !== null)
   readonly property string panelSummary: developerDemo ? "Developer demo · " + refreshPanelSummary : refreshPanelSummary
-  readonly property var operationalSectionData: Snapshot.sectionData(lastSnapshot, state)
+  readonly property var operationalSectionData: Snapshot.sectionData(lastSnapshot, gatewayState)
   readonly property var operationalPanelModel: PanelModel.create(operationalSectionData, Presentation.panelSections(operationalSectionData))
-  readonly property var gatewaySignal: Presentation.panelSignal(lastSnapshot, state)
+  readonly property var gatewaySignal: Presentation.panelSignal(lastSnapshot, gatewayState)
   readonly property var barSignal: Presentation.signalPresentation(barSeverity === "critical" ? "failed" : barSeverity === "warning" ? "waiting" : "healthy")
-  readonly property color barSignalColor: ColorKit.signalColor(barSignal.tone, signalForeground, Color.accent, bar ? bar.urgent : Color.urgent, Color.muted, null, warningColor)
+  readonly property color barSignalColor: ColorKit.signalColor(barSignal.tone, signalForeground, Color.accent, dynamicMember(bar, "urgent", Color.urgent), Color.muted, null, warningColor)
+  readonly property int barStatusSlot: Style.barToken("status-slot", 21)
+  readonly property int barIconCanvas: Style.barToken("icon-canvas", 16)
+
+  function dynamicMember(object, name, fallback) {
+    return object && name in object ? object[name] : fallback;
+  }
 
   function loadThemeColors(raw) {
     healthyColor = ColorKit.themeColorFromTheme(raw, "green", signalForeground);
@@ -62,14 +70,14 @@ BarWidget {
     themeReader.running = true;
   }
 
-  function consumeThemeRead(exitCode) {
+  function consumeThemeRead() {
     if (themeReadPending) {
       themeReadPending = false;
       themeReadOutput = "";
       themeReader.running = true;
       return;
     }
-    loadThemeColors(exitCode === 0 ? themeReadOutput : "");
+    loadThemeColors(themeReadOutput);
   }
 
   onThemeGenerationChanged: readThemeColors()
@@ -91,7 +99,7 @@ BarWidget {
       return;
     }
     if (exitCode !== 0 && lastSnapshot === null)
-      state = collectionAttempted ? "no_data" : "collecting";
+      gatewayState = collectionAttempted ? "no_data" : "collecting";
     if (action.start)
       cacheReader.running = true;
   }
@@ -101,7 +109,7 @@ BarWidget {
     if (!collectorService) {
       console.warn("Clawbar scheduler service unavailable");
       if (lastSnapshot === null) {
-        state = "no_data";
+        gatewayState = "no_data";
       } else {
         refreshFeedback = "failed";
         refreshFeedbackTimer.restart();
@@ -110,7 +118,7 @@ BarWidget {
     }
     refreshFeedback = "refreshing";
     if (lastSnapshot === null)
-      state = "collecting";
+      gatewayState = "collecting";
     collectorService.requestCollection(true);
   }
 
@@ -125,7 +133,7 @@ BarWidget {
   }
 
   function applySnapshot(snapshot) {
-    state = Snapshot.snapshotState(snapshot, Date.now());
+    gatewayState = Snapshot.snapshotState(snapshot, Date.now());
     resolutionSource = String(snapshot.resolutionSource || "unresolved");
     lastSnapshot = snapshot;
   }
@@ -133,7 +141,7 @@ BarWidget {
   function refreshFreshness() {
     nowMs = Date.now();
     if (lastSnapshot)
-      state = Snapshot.snapshotState(lastSnapshot, nowMs);
+      gatewayState = Snapshot.snapshotState(lastSnapshot, nowMs);
   }
 
   function open() {
@@ -169,7 +177,7 @@ BarWidget {
           snapshot = JSON.parse(text);
         } catch (_) {
           if (root.lastSnapshot === null)
-            root.state = root.collectionAttempted ? "no_data" : "collecting";
+            root.gatewayState = root.collectionAttempted ? "no_data" : "collecting";
           return;
         }
         try {
@@ -177,14 +185,13 @@ BarWidget {
         } catch (error) {
           console.warn("Clawbar rejected Snapshot: " + error.message);
           if (root.lastSnapshot === null)
-            root.state = root.collectionAttempted ? "no_data" : "collecting";
+            root.gatewayState = root.collectionAttempted ? "no_data" : "collecting";
         }
       }
     }
-    onExited: function (exitCode) {
-      Qt.callLater(function () {
-        root.consumeCacheRead(exitCode);
-      });
+    onRunningChanged: {
+      if (!running)
+        Qt.callLater(root.consumeCacheRead);
     }
   }
   Process {
@@ -193,10 +200,9 @@ BarWidget {
     stdout: StdioCollector {
       onStreamFinished: root.themeReadOutput = text
     }
-    onExited: function (exitCode) {
-      Qt.callLater(function () {
-        root.consumeThemeRead(exitCode);
-      });
+    onRunningChanged: {
+      if (!running)
+        Qt.callLater(root.consumeThemeRead);
     }
   }
   Timer {
@@ -218,14 +224,14 @@ BarWidget {
     bar: root.bar
     text: ""
     active: false
-    slotSize: Style.bar.statusSlot
-    opticalSize: Style.bar.iconCanvas
+    slotSize: root.barStatusSlot
+    opticalSize: root.barIconCanvas
     tooltipText: root.summary
     iconComponent: Component {
       Item {
         ClawMark {
           anchors.centerIn: parent
-          width: Style.bar.iconCanvas
+          width: root.barIconCanvas
           height: width
           color: root.barSignalColor
           animated: button.tooltipHovered || (!!root.collectorService && root.collectorService.collecting)
@@ -246,7 +252,7 @@ BarWidget {
       if (interactive) {
         root.refreshFeedback = succeeded ? "idle" : "failed";
         if (!succeeded)
-          root.refreshFeedbackTimer.restart();
+          refreshFeedbackTimer.restart();
       }
       root.consumeCollection();
     }

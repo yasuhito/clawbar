@@ -27,6 +27,7 @@ Item {
 
   function startCollection(interactive) {
     collectorInteractive = !!interactive;
+    collector.command = ["python3", root.collectorPath, "--refresh-interval", String(root.refreshIntervalSeconds), "--status-only"];
     collector.running = true;
   }
 
@@ -46,8 +47,24 @@ Item {
       candidatePending = candidateKey;
       return;
     }
-    candidateVerifier.command = ["python3", root.collectorPath, "--refresh-interval", String(root.refreshIntervalSeconds), "--verify-candidate", candidateKey];
+    candidateVerifier.command = ["python3", root.collectorPath, "--refresh-interval", String(root.refreshIntervalSeconds), "--verify-candidate", candidateKey, "--status-only"];
     candidateVerifier.running = true;
+  }
+
+  function processSucceeded(raw) {
+    try {
+      return JSON.parse(raw).succeeded === true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function finishProcess(raw, interactive) {
+    processSettling = true;
+    var succeeded = processSucceeded(raw);
+    Qt.callLater(function () {
+      root.consumeCollection(interactive, succeeded);
+    });
   }
 
   function consumeCollection(interactive, succeeded) {
@@ -73,24 +90,19 @@ Item {
 
   Process {
     id: collector
-    command: ["python3", root.collectorPath, "--refresh-interval", String(root.refreshIntervalSeconds)]
-    onExited: function (exitCode) {
-      var interactive = root.collectorInteractive;
-      root.collectorInteractive = false;
-      root.processSettling = true;
-      Qt.callLater(function () {
-        root.consumeCollection(interactive, exitCode === 0);
-      });
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var interactive = root.collectorInteractive;
+        root.collectorInteractive = false;
+        root.finishProcess(text, interactive);
+      }
     }
   }
 
   Process {
     id: candidateVerifier
-    onExited: function (exitCode) {
-      root.processSettling = true;
-      Qt.callLater(function () {
-        root.consumeCollection(false, exitCode === 0);
-      });
+    stdout: StdioCollector {
+      onStreamFinished: root.finishProcess(text, false)
     }
   }
 
