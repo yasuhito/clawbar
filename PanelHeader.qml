@@ -1,13 +1,12 @@
 import QtQuick
 import qs.Commons
-import qs.Ui
 
 // Fixed panel header: claw mark, product title, Gateway signal and the
 // summary / observation-time captions. Purely presentational.
 Item {
   id: root
 
-  required property var palette
+  required property var rowPalette
   required property var gatewaySignal
   required property string summary
   required property string timeCaption
@@ -23,7 +22,7 @@ Item {
     anchors.top: parent.top
     width: Style.space(20)
     height: width
-    color: root.palette.foreground
+    color: root.rowPalette.foreground
   }
 
   Text {
@@ -35,9 +34,9 @@ Item {
     anchors.rightMargin: Style.space(8)
     text: "OpenClaw"
     elide: Text.ElideRight
-    color: root.palette.foreground
-    font.family: root.palette.fontFamily
-    font.pixelSize: Style.font.title
+    color: root.rowPalette.foreground
+    font.family: root.rowPalette.fontFamily
+    font.pixelSize: Style.fontToken("title", Style.fontPx(1.167))
     font.bold: true
   }
 
@@ -50,15 +49,15 @@ Item {
     SignalPoint {
       anchors.verticalCenter: parent.verticalCenter
       kind: root.gatewaySignal.shape
-      color: root.palette.signalColor(root.gatewaySignal.tone)
+      color: root.rowPalette.signalColor(root.gatewaySignal.tone)
     }
 
     Text {
       textFormat: Text.PlainText
       text: root.gatewaySignal.label
-      color: root.palette.signalColor(root.gatewaySignal.tone)
-      font.family: root.palette.fontFamily
-      font.pixelSize: Style.font.caption
+      color: root.rowPalette.signalColor(root.gatewaySignal.tone)
+      font.family: root.rowPalette.fontFamily
+      font.pixelSize: Style.fontToken("caption", Style.fontPx(0.833))
       font.bold: true
     }
   }
@@ -72,9 +71,9 @@ Item {
     anchors.bottomMargin: Style.space(4)
     text: root.summary
     elide: Text.ElideRight
-    color: root.palette.dim
-    font.family: root.palette.fontFamily
-    font.pixelSize: Style.font.caption
+    color: root.rowPalette.dim
+    font.family: root.rowPalette.fontFamily
+    font.pixelSize: Style.fontToken("caption", Style.fontPx(0.833))
   }
 
   Text {
@@ -84,9 +83,9 @@ Item {
     anchors.bottom: headerDivider.top
     anchors.bottomMargin: Style.space(4)
     text: root.timeCaption
-    color: root.palette.dim
-    font.family: root.palette.fontFamily
-    font.pixelSize: Style.font.caption
+    color: root.rowPalette.dim
+    font.family: root.rowPalette.fontFamily
+    font.pixelSize: Style.fontToken("caption", Style.fontPx(0.833))
   }
 
   Rectangle {
@@ -95,7 +94,7 @@ Item {
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     height: 1
-    color: root.palette.dim
+    color: root.rowPalette.dim
     opacity: 0.28
   }
 }

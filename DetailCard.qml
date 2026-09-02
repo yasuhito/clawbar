@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import qs.Commons
 import "ClawbarPresentation.js" as Presentation
@@ -7,7 +9,7 @@ Item {
   id: root
 
   required property var vm
-  required property var palette
+  required property var rowPalette
   required property double nowMs
 
   implicitHeight: detailColumn.implicitHeight + Style.space(16)
@@ -30,10 +32,10 @@ Item {
         text: Presentation.detailText(modelData, root.nowMs)
         Accessible.name: text
         Accessible.description: modelData.spoken
-        color: modelData.critical ? root.palette.selectedSignalColor("critical") : modelData.label === "" || modelData.label === "Task result" ? root.palette.foreground : root.palette.selectedDim
+        color: modelData.critical ? root.rowPalette.selectedSignalColor("critical") : modelData.label === "" || modelData.label === "Task result" ? root.rowPalette.foreground : root.rowPalette.selectedDim
         font.bold: modelData.critical
-        font.family: root.palette.fontFamily
-        font.pixelSize: Style.font.caption
+        font.family: root.rowPalette.fontFamily
+        font.pixelSize: Style.fontToken("caption", Style.fontPx(0.833))
         wrapMode: Text.NoWrap
         elide: Text.ElideRight
       }

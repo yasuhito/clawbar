@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import qs.Commons
 import qs.Ui
@@ -26,17 +28,19 @@ KeyboardPanel {
   readonly property var automationsSection: PanelModel.sectionForKind(sections, "automation")
   readonly property int selectedIndex: Presentation.indexForKey(selectionKeys, selectedKey)
   readonly property string selectedKind: Presentation.keyKind(sections, selectedKey)
-  readonly property color foreground: bar ? bar.foreground : Color.foreground
-  readonly property color panelSurface: Color.popups.background
+  readonly property color foreground: dynamicMember(bar, "foreground", Color.foreground)
+  readonly property color panelSurface: Color.composed("popups.background", "popups.background-alpha", Color.background, 1.0)
   readonly property color rawDim: Color.muted
   readonly property color dim: ColorKit.readableColor(rawDim, foreground, panelSurface, 4.5)
   readonly property color selectedSurface: ColorKit.blendColor(Style.selectedStateColor(foreground, accent), panelSurface, Style.selectedFillAlpha)
   readonly property color selectedDim: ColorKit.readableColor(dim, foreground, selectedSurface, 4.5)
   readonly property color accent: Color.accent
-  readonly property color urgent: bar ? bar.urgent : Color.urgent
+  readonly property color urgent: dynamicMember(bar, "urgent", Color.urgent)
   required property color healthy
   required property color warning
-  readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
+  readonly property string fontFamily: dynamicMember(bar, "fontFamily", Style.fontFamily)
+  readonly property int captionFontSize: Style.fontToken("caption", Style.fontPx(0.833))
+  readonly property int bodyFontSize: Style.fontToken("body", Style.fontPx(1.0))
 
   // One palette object carries every color the Operational Rows need; the
   // panel derives it once so sections never re-thread theme colors.
@@ -83,6 +87,10 @@ KeyboardPanel {
   focusTarget: keyCatcher
   contentWidth: fittedContentWidth(Style.space(360))
   contentHeight: fittedContentHeight(panelHeader.height + Style.space(4) + contentColumn.implicitHeight, Style.space(560))
+
+  function dynamicMember(object, name, fallback) {
+    return object && name in object ? object[name] : fallback;
+  }
 
   function reconcileRows() {
     var selection = Presentation.reconcileSelection(selectionKeys, selectedKey, selectedIndexHint);
@@ -170,7 +178,7 @@ KeyboardPanel {
 
     PanelHeader {
       id: panelHeader
-      palette: root.palette
+      rowPalette: root.palette
       gatewaySignal: root.gatewaySignal
       summary: root.summary
       timeCaption: Presentation.panelTimeCaption(root.panelModel, root.nowMs)
@@ -206,7 +214,7 @@ KeyboardPanel {
           text: root.panelModel.setup.heading
           color: root.accent
           font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
+          font.pixelSize: root.captionFontSize
           font.bold: true
         }
 
@@ -217,7 +225,7 @@ KeyboardPanel {
           text: root.panelModel.setup.guidance
           color: root.foreground
           font.family: root.fontFamily
-          font.pixelSize: Style.font.body
+          font.pixelSize: root.bodyFontSize
           wrapMode: Text.Wrap
         }
 
@@ -228,7 +236,7 @@ KeyboardPanel {
           text: visible ? root.panelModel.setup.error : ""
           color: root.panelModel.setup.errorCritical ? root.urgent : root.accent
           font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
+          font.pixelSize: root.captionFontSize
           font.bold: true
           wrapMode: Text.Wrap
         }
@@ -240,7 +248,7 @@ KeyboardPanel {
           text: root.panelModel.setup.configurationGuidance
           color: root.foreground
           font.family: root.fontFamily
-          font.pixelSize: Style.font.body
+          font.pixelSize: root.bodyFontSize
           wrapMode: Text.Wrap
         }
 
@@ -249,7 +257,7 @@ KeyboardPanel {
           width: parent.width
           visible: root.candidateSection.visible
           rows: root.candidateSection.rows
-          palette: root.palette
+          rowPalette: root.palette
           selectedKey: root.selectedKey
           nowMs: root.nowMs
           motionEnabled: root.detailMotionEnabled
@@ -275,7 +283,7 @@ KeyboardPanel {
           text: root.fleetSection.heading
           color: root.dim
           font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
+          font.pixelSize: root.captionFontSize
           font.bold: true
         }
 
@@ -286,7 +294,7 @@ KeyboardPanel {
           text: root.fleetSection.unavailableText
           color: root.dim
           font.family: root.fontFamily
-          font.pixelSize: Style.font.body
+          font.pixelSize: root.bodyFontSize
         }
 
         Text {
@@ -296,7 +304,7 @@ KeyboardPanel {
           text: root.fleetSection.emptyText
           color: root.dim
           font.family: root.fontFamily
-          font.pixelSize: Style.font.body
+          font.pixelSize: root.bodyFontSize
         }
 
         RowSection {
@@ -304,7 +312,7 @@ KeyboardPanel {
           width: parent.width
           visible: root.fleetSection.visible
           rows: root.fleetSection.rows
-          palette: root.palette
+          rowPalette: root.palette
           selectedKey: root.selectedKey
           nowMs: root.nowMs
           motionEnabled: root.detailMotionEnabled
@@ -325,7 +333,7 @@ KeyboardPanel {
           text: root.agentsSection.heading
           color: root.dim
           font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
+          font.pixelSize: root.captionFontSize
           font.bold: true
         }
 
@@ -336,7 +344,7 @@ KeyboardPanel {
           text: root.agentsSection.unavailableText
           color: root.dim
           font.family: root.fontFamily
-          font.pixelSize: Style.font.body
+          font.pixelSize: root.bodyFontSize
         }
 
         RowSection {
@@ -344,7 +352,7 @@ KeyboardPanel {
           width: parent.width
           visible: root.agentsSection.visible
           rows: root.agentsSection.rows
-          palette: root.palette
+          rowPalette: root.palette
           selectedKey: root.selectedKey
           nowMs: root.nowMs
           motionEnabled: root.detailMotionEnabled
@@ -365,7 +373,7 @@ KeyboardPanel {
           text: root.automationsSection.heading
           color: root.dim
           font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
+          font.pixelSize: root.captionFontSize
           font.bold: true
         }
 
@@ -376,7 +384,7 @@ KeyboardPanel {
           text: root.automationsSection.unavailableText
           color: root.dim
           font.family: root.fontFamily
-          font.pixelSize: Style.font.body
+          font.pixelSize: root.bodyFontSize
         }
 
         Text {
@@ -386,7 +394,7 @@ KeyboardPanel {
           text: root.automationsSection.emptyText
           color: root.dim
           font.family: root.fontFamily
-          font.pixelSize: Style.font.body
+          font.pixelSize: root.bodyFontSize
         }
 
         RowSection {
@@ -394,7 +402,7 @@ KeyboardPanel {
           width: parent.width
           visible: root.automationsSection.visible
           rows: root.automationsSection.rows
-          palette: root.palette
+          rowPalette: root.palette
           selectedKey: root.selectedKey
           nowMs: root.nowMs
           motionEnabled: root.detailMotionEnabled

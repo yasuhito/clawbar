@@ -282,6 +282,26 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
 
 
 class CollectorEntryPointTests(CollectorFixture, unittest.TestCase):
+    def test_status_only_reports_collection_outcome_without_snapshot_fields(
+        self,
+    ) -> None:
+        succeeded = self.run_external(
+            "local",
+            timeout=1,
+            collector_arguments=["--status-only"],
+        )
+        failed = self.run_external(
+            "local",
+            timeout=1,
+            environment_overrides={"FAKE_EXIT": "9"},
+            collector_arguments=["--status-only"],
+        )
+
+        self.assertEqual(succeeded.returncode, clawbar_collect.ExitCode.OK)
+        self.assertEqual(json.loads(succeeded.stdout), {"succeeded": True})
+        self.assertEqual(failed.returncode, clawbar_collect.ExitCode.COMMAND_FAILED)
+        self.assertEqual(json.loads(failed.stdout), {"succeeded": False})
+
     def test_read_theme_colors_prints_a_valid_regular_file(self) -> None:
         colors_path = self.root / "colors.toml"
         colors = 'green = "#123456"\nyellow = "#abcdef"\n'

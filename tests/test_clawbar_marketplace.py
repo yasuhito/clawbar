@@ -210,7 +210,7 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertNotIn("onLoaded:", section)
         self.assertNotIn("item.vm =", section)
         self.assertIn("vm: rowRoot.modelData", section)
-        self.assertIn("palette: root.palette", section)
+        self.assertIn("rowPalette: root.rowPalette", section)
         self.assertIn("nowMs: root.nowMs", section)
 
     def test_operational_row_detail_loader_skips_collapsed_and_empty_rows(self) -> None:
@@ -276,9 +276,9 @@ class MarketplaceContractTest(unittest.TestCase):
         self.assertIn("readonly property color selectedDim", panel)
         # Selected-row secondaries resolve through the palette against each surface.
         self.assertIn("selectedSignalColor: function(tone)", color)
-        self.assertIn("root.palette.selectedSignalColor(rowRoot.dot.tone)", section)
-        self.assertIn("root.palette.selectedDim", section)
-        self.assertIn("root.palette.dim", section)
+        self.assertIn("root.rowPalette.selectedSignalColor(rowRoot.dot.tone)", section)
+        self.assertIn("root.rowPalette.selectedDim", section)
+        self.assertIn("root.rowPalette.dim", section)
 
     def test_healthy_row_labels_are_visually_quiet_but_accessible(self) -> None:
         presentation = (ROOT / "ClawbarPresentation.js").read_text(encoding="utf-8")

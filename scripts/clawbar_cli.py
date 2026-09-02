@@ -90,6 +90,11 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="CANDIDATE_KEY",
         help="verify one enumerated Tailscale candidate and collect from it",
     )
+    parser.add_argument(
+        "--status-only",
+        action="store_true",
+        help="print only whether collection succeeded for the QML service",
+    )
     return parser
 
 
@@ -113,7 +118,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return int(collector.ExitCode.OK)
     if developer_demo_active():
         snapshot = collector.load_previous_snapshot(snapshot_path)
-        if snapshot is not None:
+        if arguments.status_only:
+            json.dump({"succeeded": True}, sys.stdout, separators=(",", ":"))
+            sys.stdout.write("\n")
+        elif snapshot is not None:
             json.dump(snapshot, sys.stdout, separators=(",", ":"), sort_keys=True)
             sys.stdout.write("\n")
         return int(collector.ExitCode.OK)
@@ -123,7 +131,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         commands=SubprocessCommandSurface(),
         candidate_key=arguments.verify_candidate,
     )
-    json.dump(result.snapshot, sys.stdout, separators=(",", ":"), sort_keys=True)
+    output = (
+        {"succeeded": result.exit_code == collector.ExitCode.OK}
+        if arguments.status_only
+        else result.snapshot
+    )
+    json.dump(output, sys.stdout, separators=(",", ":"), sort_keys=True)
     sys.stdout.write("\n")
     return int(result.exit_code)
 
