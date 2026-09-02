@@ -176,9 +176,18 @@ BarWidget {
     command: ["python3", root.collectorPath, "--read-cache"]
     stdout: StdioCollector {
       onStreamFinished: {
+        var snapshot
         try {
-          root.applySnapshot(JSON.parse(text))
+          snapshot = JSON.parse(text)
         } catch (_) {
+          if (root.lastSnapshot === null)
+            root.state = root.collectionAttempted ? "no_data" : "collecting"
+          return
+        }
+        try {
+          root.applySnapshot(snapshot)
+        } catch (error) {
+          console.warn("Clawbar rejected Snapshot: " + error.message)
           if (root.lastSnapshot === null)
             root.state = root.collectionAttempted ? "no_data" : "collecting"
         }
