@@ -9,12 +9,42 @@ uvx ruff@0.16.5 check .
 echo "== Ruff format =="
 uvx ruff@0.16.5 format --check .
 
+# CI には Qt6 と Quickshell の QML モジュールが無いため、QML の検査は
+# ローカル実行時だけ行う。/usr/bin の qmllint / qmlformat は Qt5 の
+# 古いツールなので使わない。
+QT6_BIN=/usr/lib/qt6/bin
+
 echo "== QML lint =="
-if command -v qmllint > /dev/null; then
-  qmllint ./*.qml
+if [ -x "$QT6_BIN/qmllint" ]; then
+  import_flags=()
+  if [ -d /usr/share/omarchy/shell ]; then
+    # qs.* モジュールは Omarchy Shell のルートを qs という名前で参照する
+    qml_import_root=$(mktemp -d)
+    trap 'rm -rf "$qml_import_root"' EXIT
+    ln -s /usr/share/omarchy/shell "$qml_import_root/qs"
+    import_flags=(-I "$qml_import_root")
+  fi
+  # 既存コードで多発する 4 カテゴリは、解消するまで無効化する（issue 参照）
+  "$QT6_BIN/qmllint" "${import_flags[@]+"${import_flags[@]}"}" \
+    --unqualified disable \
+    --missing-property disable \
+    --signal-handler-parameters disable \
+    --property-override disable \
+    ./*.qml
 else
-  # CI には Quickshell の QML モジュールが無く import を解決できないため、ローカル実行時だけ確認する
   echo "qmllint が無いためスキップする"
+fi
+
+echo "== QML format =="
+if [ -x "$QT6_BIN/qmlformat" ]; then
+  for qml_file in ./*.qml; do
+    if ! "$QT6_BIN/qmlformat" "$qml_file" | diff -q "$qml_file" - > /dev/null; then
+      echo "qmlformat 未適用: $qml_file"
+      exit 1
+    fi
+  done
+else
+  echo "qmlformat が無いためスキップする"
 fi
 
 echo "== Python unit tests =="
