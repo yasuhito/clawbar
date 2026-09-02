@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 cd /home/yasuhito/Work/clawbar && python3 - <<'PY'
 import json
 import subprocess
