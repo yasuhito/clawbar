@@ -220,12 +220,16 @@ PR #<PR> を読み取り専用で独立レビューしてください。修正�
 
 `orca-ide terminal wait --for tui-idle --timeout-ms 300000 --json` を繰り返して完了を待つ。TUI 出力は有界で、プロンプト中のマーカーも含むため、terminal transcript の文字列検索を判定に使わない。判定の唯一の情報源は review worker が書いた `review_report_path` とする。
 
+`terminal wait --for tui-idle` は idle を取り逃がして即座に `null` を返すことがある。返り値を待ちの完了と見なすと、実際にはほとんど待たずにループを抜けてしまう。**結果ファイルの出現そのものを期限付きで待つ。**
+
 ```bash
-# 1回目の idle で結果ファイルが無ければ、terminal を閉じずに再度待つ。
-for attempt in 1 2 3; do
-  orca-ide terminal wait --terminal "$review_terminal" --for tui-idle --timeout-ms 300000 --json || true
+# terminal wait が null を返しても待ちが進んだことにしない。
+# 判定の情報源は結果ファイルなので、ファイルの出現を期限まで繰り返し確かめる。
+report_deadline=$(( $(date +%s) + 900 ))
+while [ "$(date +%s)" -lt "$report_deadline" ]; do
   test -s "$review_report_path" && break
-  sleep 2
+  orca-ide terminal wait --terminal "$review_terminal" --for tui-idle --timeout-ms 60000 --json >/dev/null 2>&1 || true
+  sleep 5
 done
 
 test -s "$review_report_path"
@@ -259,10 +263,19 @@ test -z "$(git status --short)"
 
 ### 6.2. Convergence: 繰り返しレビューを打ち切る
 
-同じ PR へのレビューが収束せず、依存 issue が止まるのを防ぐ。次の両方を満たす場合は、修正を実装担当へ返さず **PASS 相当** として扱い、7.5 へ進む。
+同じ PR へのレビューが収束せず、依存 issue が止まるのを防ぐ。次をすべて満たす場合は、修正を実装担当へ返さず **PASS 相当** として扱い、7.5 へ進む。
 
 - この PR に、自分が投稿した `<!-- clawbar-auto-review:` marker 付きコメントが既に 3 件以上ある（HEAD ごとに 1 件なので、修正を 3 回以上返した状態）
 - 今回の `VERDICT: CHANGES_REQUIRED` の finding に severity `high` 以上が 1 件も無い（medium / low だけ）
+- 今回の finding に**退行**が 1 件も無い
+
+**退行**とは、この PR の前は期待どおりだった入力が壊れることを指す。次のいずれかで保護されていた挙動が破れていれば退行である。
+
+- 既存のテストまたは既存のシナリオ
+- 対象 issue の受け入れ基準
+- 対象 issue の `対象外`（「この経路は変更しない」と書いたもの）
+
+退行は severity によらず打ち切りの対象外とし、7 の Fix へ返す。判定は「その入力は main で期待どおりに動くか」を実際に確かめて行う（2026-09-03 に pi-formula で medium の退行が 2 件そのまま main へ入り、利用者に見える表示バグになった）。
 
 ```bash
 viewer=$(gh api user --jq '.login')
