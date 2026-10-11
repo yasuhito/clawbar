@@ -152,6 +152,7 @@ Item {
 
         DetailReveal {
           id: detailReveal
+          anchors.top: summaryArea.bottom
           width: parent.width
           expanded: rowRoot.selected && rowRoot.modelData.detail.length > 0
           contentHeight: cardLoader.active && cardLoader.item ? root.dynamicMember(cardLoader.item, "implicitHeight", 0) : 0
