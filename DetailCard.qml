@@ -11,6 +11,7 @@ Item {
   required property var vm
   required property var rowPalette
   required property double nowMs
+  property real leftInset: Style.space(8)
 
   implicitHeight: detailColumn.implicitHeight + Style.space(16)
 
@@ -20,6 +21,7 @@ Item {
     anchors.right: parent.right
     anchors.top: parent.top
     anchors.margins: Style.space(8)
+    anchors.leftMargin: root.leftInset
     spacing: Style.space(4)
 
     Repeater {
