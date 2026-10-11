@@ -5,7 +5,7 @@ import unittest
 
 from scripts import clawbar_collect
 from tests.collector_fixture import CollectorFixture
-from tests.fake_commands import FakeCommandSurface, ok
+from tests.fake_commands import FakeCommandSurface, failed, ok
 
 
 class CollectionTests(CollectorFixture, unittest.TestCase):
@@ -18,6 +18,80 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(result.snapshot["gateway"], {"state": "healthy"})
         self.assertEqual(result.snapshot["fleet"], {"available": True, "nodes": []})
         self.assertEqual(result.snapshot["agents"], {"available": True, "items": []})
+
+    def test_removed_tasks_rpc_keeps_registered_agents_and_automations(self) -> None:
+        result = self.collect(
+            FakeCommandSurface.healthy(
+                agents_list=ok({"agents": [{"id": "planner"}]}),
+                cron_list=ok(
+                    {
+                        "jobs": [
+                            {
+                                "id": "daily",
+                                "name": "Daily check",
+                                "enabled": True,
+                                "schedule": {"kind": "cron"},
+                                "state": {},
+                            }
+                        ]
+                    }
+                ),
+                tasks_list=failed(
+                    1,
+                    json.dumps(
+                        {
+                            "ok": False,
+                            "error": {
+                                "type": "gateway_request_error",
+                                "code": "INVALID_REQUEST",
+                                "message": "unknown method: tasks.list",
+                                "retryable": False,
+                            },
+                        }
+                    ),
+                ),
+            )
+        )
+        self.assertEqual(result.snapshot["gateway"], {"state": "healthy"})
+        self.assertTrue(result.snapshot["agents"]["available"])
+        self.assertEqual(
+            result.snapshot["agents"]["items"],
+            [
+                {
+                    "key": "agent:planner",
+                    "name": "planner",
+                    "taskResult": {"state": "none"},
+                }
+            ],
+        )
+        self.assertTrue(result.snapshot["automations"]["available"])
+        self.assertEqual(
+            [item["id"] for item in result.snapshot["automations"]["items"]],
+            ["daily"],
+        )
+
+    def test_other_task_rpc_errors_remain_unavailable(self) -> None:
+        for code, message in (
+            ("INVALID_REQUEST", "invalid tasks.list params"),
+            ("FORBIDDEN", "unknown method: tasks.list"),
+            ("INVALID_REQUEST", "unknown method: agents.list"),
+        ):
+            with self.subTest(code=code, message=message):
+                result = self.collect(
+                    FakeCommandSurface.healthy(
+                        tasks_list=failed(
+                            1,
+                            json.dumps(
+                                {
+                                    "ok": False,
+                                    "error": {"code": code, "message": message},
+                                }
+                            ),
+                        )
+                    )
+                )
+                self.assertFalse(result.snapshot["agents"]["available"])
+                self.assertEqual(result.snapshot["gateway"], {"state": "degraded"})
 
     def test_sanitizes_registered_agents_and_task_results(self) -> None:
         private_sentinels = [

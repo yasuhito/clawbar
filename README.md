@@ -36,7 +36,7 @@ remote setup needs no second connection configuration.
 
 - Omarchy with the Quickshell plugin commands (`omarchy plugin ...`)
 - OpenClaw `2026.7.1-2` or a later stable release with the same supported JSON
-  command surfaces
+  command surfaces (also verified with `2026.9.9`)
 - Python 3; the collector uses only the standard library
 - Optional: Tailscale for the verified fallback setup when OpenClaw cannot
   resolve a local, configured remote, or Node-host Gateway
@@ -101,9 +101,11 @@ the repeated `Healthy` label while retaining it for accessibility; exceptional
 and historical states remain explicit. A green `Healthy` indicator remains
 visible in the panel header. Registered Agents use a static green presence dot
 without claiming health or current activity; previous Task Result remains
-separate. Offline Nodes appear as muted Operational Metadata and do not affect
-Attention counts, Incidents, or notifications. Automation Failures appear once
-in the Automations section.
+separate. On releases that have removed the Tasks ledger, registered Agents
+remain visible with Task Result `None`; Clawbar does not infer results from
+session content. Offline Nodes appear as muted Operational Metadata and do not
+affect Attention counts, Incidents, or notifications. Automation Failures appear
+once in the Automations section.
 
 ## Privacy boundary
 

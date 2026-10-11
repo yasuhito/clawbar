@@ -95,7 +95,12 @@ class SubprocessCommandSurface:
         return run_command([*self.openclaw, "node", "status", "--json"], deadline_at)
 
     def nodes_status(self, deadline_at: float, url: str | None) -> CommandResult:
-        return self._openclaw(deadline_at, ("nodes", "status", "--json"), url)
+        # Ask the same RPC directly, without the CLI's redundant status probe.
+        return self._openclaw(
+            deadline_at,
+            ("gateway", "call", "node.list", "--params", "{}", "--json"),
+            url,
+        )
 
     def agents_list(self, deadline_at: float, url: str | None) -> CommandResult:
         return self._openclaw(

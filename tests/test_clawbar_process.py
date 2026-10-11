@@ -131,7 +131,9 @@ class SubprocessCommandSurfaceTests(unittest.TestCase):
         self.assertEqual(status[-2:], ["--url", "wss://example.test"])
         self.assertEqual(status[4], "--timeout")
         self.assertTrue(1 <= int(status[5]) <= 2000)
-        self.assertEqual(nodes[:3], ["nodes", "status", "--json"])
+        self.assertEqual(
+            nodes[:6], ["gateway", "call", "node.list", "--params", "{}", "--json"]
+        )
         self.assertNotIn("--url", nodes)
         self.assertEqual(node, ["node", "status", "--json"])
 
