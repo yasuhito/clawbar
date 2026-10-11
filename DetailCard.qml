@@ -11,7 +11,8 @@ Item {
   required property var vm
   required property var rowPalette
   required property double nowMs
-  property real leftInset: Style.space(8)
+  // The owning row supplies its name position for every detail kind.
+  required property real leftInset
 
   implicitHeight: detailColumn.implicitHeight + Style.space(16)
 
