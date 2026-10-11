@@ -59,7 +59,7 @@ The selected row expands Node detail. Platform/model/version, last-seen time, an
 | A scheduled or manual refresh completing | Reconciles by Node UI Key. | Same; missing Node selects a nearby row. |
 | Omarchy Shell losing focus, restarting, or exiting | Stops panel input. | Node itself is unaffected. |
 | The snapshot changing, becoming stale, or becoming unreadable | Valid change rebuilds Fleet; unreadable input preserves current memory. | Can change the selected row to Last Known or unavailable. |
-| The plugin being disabled, updated, or removed | Removes observation only. | No Node command is issued. |
+| The plugin being disabled, updated, or removed | For disable/remove: Removes observation only. | No Node command is issued. Update only replaces files; loaded behavior may remain until shell reload. |
 | Switching between pointer and keyboard input | Both share Selection. | No effect on Node state. |
 | Gateway resolution or reachability changing | Not direct Node evidence. | Result comes from the Gateway Snapshot; no fallback direct probe occurs. |
 
@@ -67,7 +67,7 @@ The selected row expands Node detail. Platform/model/version, last-seen time, an
 
 **Privacy boundary.** Private Node IDs, IPs, hosts, and raw metadata are excluded. Safe Node UI Keys are not displayed.
 
-**Collection and freshness.** At most 5,000 raw Node registrations are considered. Unsafe identity makes Fleet unavailable rather than leaking or inventing identity.
+**Collection and freshness.** At most 5,000 raw Node registrations are considered, with at most 100 deduplicated Nodes displayed. Unsafe identity makes Fleet unavailable rather than leaking or inventing identity.
 
 **Selection and navigation.** The [Selection model](../foundations/selection-model.md) owns key retention and nearby fallback.
 

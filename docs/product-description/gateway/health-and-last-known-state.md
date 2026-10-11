@@ -80,7 +80,7 @@ A later success replaces historical rows with current metadata. The selection fo
 | A scheduled or manual refresh completing | Consumes the newest valid health result. | Settles Healthy, Degraded, failure progression, setup, or configuration state. |
 | Omarchy Shell losing focus, restarting, or exiting | Focus does not change health. | Restart recreates in-memory state from the persisted snapshot; exit stops visible freshness updates. |
 | The snapshot changing, becoming stale, or becoming unreadable | Valid replacement or age determines health. | Unreadable replacement preserves an existing in-memory snapshot; age may still turn it Stale. |
-| The plugin being disabled, updated, or removed | Removes the visible health surface. | Stops future observation; it does not change OpenClaw health. |
+| The plugin being disabled, updated, or removed | For disable/remove: Removes the visible health surface. | Stops future observation; it does not change OpenClaw health. Update only replaces files; loaded behavior may remain until shell reload. |
 | Switching between pointer and keyboard input | No effect on health. | No effect. |
 | Gateway resolution or reachability changing | Becomes visible only through a collector result. | The in-flight collector observes success, degraded metadata, unsupported surface, or failure within its deadline. |
 

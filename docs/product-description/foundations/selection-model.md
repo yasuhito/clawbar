@@ -84,7 +84,7 @@ Historical selections prefix detail with Last known and its observation age. Sta
 | A scheduled or manual refresh completing | A new row set may arrive before input and determines the starting index. | Reconciliation follows the stable key or chooses the nearby surviving row. |
 | Omarchy Shell losing focus, restarting, or exiting | Focus loss stops keyboard input. | Shell restart recreates UI state; persistence of selection across restart is not promised. |
 | The snapshot changing, becoming stale, or becoming unreadable | A valid change rebuilds rows; unreadable input preserves an existing in-memory row set. | Stable-key reconciliation applies. Historical transition changes labels and opacity. |
-| The plugin being disabled, updated, or removed | The panel becomes unavailable. | Selection is not OpenClaw state and has no promised persistence after reload. |
+| The plugin being disabled, updated, or removed | For disable/remove: The panel becomes unavailable. | Selection is not OpenClaw state and has no promised persistence after reload. Update only replaces files; loaded behavior may remain until shell reload. |
 | Switching between pointer and keyboard input | Either route acts on the one current selection. | No effect beyond the next exact or relative movement. |
 | Gateway resolution or reachability changing | The current row set stays until a snapshot reflects the change. | The resulting state may replace operational rows with candidates or historical rows, invoking reconciliation. |
 

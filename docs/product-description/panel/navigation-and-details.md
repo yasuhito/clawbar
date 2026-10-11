@@ -59,7 +59,7 @@ The selected row is made visible by scrolling within the list viewport below the
 | A scheduled or manual refresh completing | Rebuilds rows and reconciles Selection. | Same; the selected detail can move. |
 | Omarchy Shell losing focus, restarting, or exiting | Stops keyboard input. | Restart does not promise Selection persistence. |
 | The snapshot changing, becoming stale, or becoming unreadable | Valid changes rebuild rows; unreadable input preserves current rows when possible. | Historical labels and opacity can change around the same selected key. |
-| The plugin being disabled, updated, or removed | Removes navigation. | Session-local Selection is discarded on unload. |
+| The plugin being disabled, updated, or removed | For disable/remove: Removes navigation. | Session-local Selection is discarded on unload. Update only replaces files; loaded behavior may remain until shell reload. |
 | Switching between pointer and keyboard input | No separate focus model is created. | The next input acts on the shared Selection. |
 | Gateway resolution or reachability changing | Has no direct effect before collection. | Resulting row set is reconciled. |
 

@@ -60,7 +60,7 @@ No initial success settles as `No data yet`. Setup Required shows setup guidance
 | A scheduled or manual refresh completing | Can change empty, populated, or unavailable state. | Settles the new layout. |
 | Omarchy Shell losing focus, restarting, or exiting | Focus does not alter meaning. | Restart rereads persisted state. |
 | The snapshot changing, becoming stale, or becoming unreadable | Valid state selects presentation. | Unreadable replacement preserves an existing in-memory presentation. |
-| The plugin being disabled, updated, or removed | Removes the panel. | No state remains visible after unload. |
+| The plugin being disabled, updated, or removed | For disable/remove: Removes the panel. | No state remains visible after unload. Update only replaces files; loaded behavior may remain until shell reload. |
 | Switching between pointer and keyboard input | No effect on state. | No effect. |
 | Gateway resolution or reachability changing | Not shown until collected. | Result may replace operational sections with setup or historical rows. |
 

@@ -2,6 +2,22 @@
 
 A written description of the user experience of Clawbar: what the user sees, what they can do, and exactly what happens when they do it.
 
+## Version 0.1.1 refresh
+
+The current behavior corrections below were source-reviewed against 0.1.1 at
+`32476e1`. The live screenshots in the [root README](../../README.md) were taken
+with the installed 0.1.1 plugin at `30f0b6d`. They show Fleet devices, registered
+Agents with no Tasks ledger, Automation Failures, and aligned inline details.
+The coverage table remains `drafted`: screenshots do not verify every checklist.
+Older commit footers record earlier review baselines, not a claim of a new
+runtime verification pass.
+
+Updates replace files without restarting Omarchy Shell. In the interrupt tables,
+removing the surface or stopping scheduling applies to disable/remove or a shell
+reload, not to a file update alone. Use
+`omarchy plugin update io.github.yasuhito.clawbar --yes`; if the old version stays
+loaded, run `omarchy restart shell`. See [plugin lifecycle](cross-cutting/plugin-lifecycle.md).
+
 ## Purpose
 
 Clawbar is, from the user's point of view, a state chart attached to the Omarchy bar. The user moves through it by opening and closing the panel, moving the selection, requesting refreshes, and—when automatic Gateway discovery cannot finish setup—verifying a Tailscale device. Most behavior is defined implicitly across QML components, JavaScript presentation logic, the bounded Python collector, and their tests. There is no single place that says what the user sees after an action, what remains visible while collection is running, and what happens when the Gateway or shell changes state halfway through.
@@ -178,7 +194,7 @@ Status is one of `not started`, `drafted`, or `verified`.
 
 ## Reference
 
-The source of truth is the Clawbar implementation in this repository, outside `docs/product-description/`, at commit `f08496e`. Those implementation paths are read-only references while this description is written.
+The source of truth is the Clawbar implementation in this repository, outside `docs/product-description/`, at version 0.1.1, commit `32476e1`. Those implementation paths are read-only references while this description is written.
 
 - `README.md` and `manifest.json`: installation, requirements, defaults, entry points, and supported surface.
 - `CONTEXT.md`: canonical domain vocabulary and distinctions.

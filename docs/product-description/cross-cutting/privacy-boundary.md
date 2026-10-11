@@ -59,7 +59,7 @@ Only a reduced Snapshot reaches QML. Notifications use generalized labels and st
 | A scheduled or manual refresh completing | Publishes only reduced data. | Atomic replacement exposes no partial raw state. |
 | Omarchy Shell losing focus, restarting, or exiting | No effect on allowed fields. | Per-login secrets and Incident state follow runtime lifetime. |
 | The snapshot changing, becoming stale, or becoming unreadable | A valid Snapshot remains bounded. | Unreadable data is rejected rather than displayed. |
-| The plugin being disabled, updated, or removed | Stops future collection. | Does not send Private Content elsewhere. |
+| The plugin being disabled, updated, or removed | For disable/remove: Stops future collection. | Does not send Private Content elsewhere. Update only replaces files; loaded behavior may remain until shell reload. |
 | Switching between pointer and keyboard input | No effect. | No effect. |
 | Gateway resolution or reachability changing | Only generalized outcome is public. | Endpoint and raw errors remain private. |
 
