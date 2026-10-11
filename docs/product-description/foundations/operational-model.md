@@ -24,7 +24,7 @@ The arrows mean “reported by,” not visual containment or ownership that Claw
 
 Clawbar connects to exactly one Gateway Target per collection. The Gateway is the logical OpenClaw service; the Gateway Target is the resolved endpoint. A local Gateway, configured remote Gateway, Node-host record, or verified Tailscale fallback can supply the endpoint without changing the meaning of the Gateway shown in the panel.
 
-Clawbar does not present credentials, endpoint URLs, hostnames, or private network identifiers. The resolution source affects healthy summary wording, such as Local, Remote, Node-host, or Verified Tailscale Gateway.
+Clawbar does not present credentials, Gateway endpoint URLs, addresses, or private Node/Tailscale identifiers. Bounded device display names are visible, including Tailscale device names during fallback setup. The resolution source affects healthy summary wording, such as Local, Remote, Node-host, or Verified Tailscale Gateway.
 
 ## Fleet and Nodes
 
@@ -34,7 +34,7 @@ Each displayed Node represents the freshest connected registration for a display
 
 A Node UI Key preserves identity in the interface without revealing the private Node identifier. If Clawbar cannot derive safe keys for every Node, Fleet metadata becomes unavailable instead of falling back to positional or private identity.
 
-An Offline Node is routine muted metadata. It does not roll up to Gateway health, Attention count, Incident state, or desktop notification. A Degraded Node means its core state is current while related Task metadata is unavailable; that child unavailability can roll up as degraded rather than offline.
+An Offline Node is routine muted metadata. It does not roll up to Gateway health, Attention count, Incident state, or desktop notification. Unavailable Agent/Task metadata degrades the Gateway, not individual Nodes.
 
 ## Agents and Tasks
 
@@ -42,7 +42,7 @@ Registered Agents appear after the Fleet and are omitted as a section when the l
 
 Registration and previous Task Result remain independent. A Registered Agent may have a Failed result without becoming a failed Agent. Failed Task Result is visible metadata but is not an Attention Item or Incident.
 
-Clawbar does not display Task instructions, message content, destinations, accounts, raw failures, session events, current activity, or Node ownership. It uses Task records only to derive the bounded previous result.
+Clawbar does not display Task instructions, message content, destinations, accounts, raw failures, session events, current activity, or Node ownership. It uses Task records only to derive the bounded previous result. When the Gateway has removed `tasks.list`, Registered Agents remain visible with Task Result `None`; other Task collection failures make Agent/Task metadata unavailable.
 
 ## Automations
 
@@ -70,7 +70,7 @@ Automation Failures can make the bar and panel header critical while the Gateway
 
 Operational Metadata is intentionally smaller than the Gateway response. The collector discards Private Content during parsing. Snapshots and developer fixtures should therefore be safe to inspect without revealing task text, messages, destinations, accounts, credentials, raw errors, endpoint URLs, or private Node and Tailscale identifiers.
 
-Metadata collections are bounded. When a section exceeds its accepted limit or cannot be safely reduced in full, Clawbar marks that section unavailable instead of presenting a partial set as complete health. Automation collection, for example, accepts at most 500 reduced items even though collection requests pages from the Gateway.
+Metadata collections are bounded. Automation results above 500 make that section unavailable. Fleet reduction considers at most 5,000 registrations and displays at most 100 deduplicated Nodes. Agent reduction displays at most 100 registrations. Unsafe identity reduction makes the affected section unavailable.
 
 ## Interactions with other systems
 
@@ -88,8 +88,8 @@ Metadata collections are bounded. When a section exceeds its accepted limit or c
 
 ## Open questions and verification
 
-- Confirm how Degraded Node is represented in the current running panel; source vocabulary defines it, but fixture coverage should be observed.
+- Confirm that Agent/Task unavailability degrades the Gateway without inventing a Degraded Node state.
 - Confirm the shell exposes the explicit accessible name and description for healthy Node and Automation rows and for the Registered Agent dot.
 - Confirm the user-visible result when each metadata section hits its bound; automated tests establish availability state but not every layout consequence.
 
-Verified against Clawbar commit `e1af66c`.
+Source-reviewed for Clawbar 0.1.1 at commit `32476e1`; runtime checks remain recorded separately.

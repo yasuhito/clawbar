@@ -75,7 +75,7 @@ If the device responds but lacks the supported Gateway command surface, Clawbar 
 | A scheduled or manual refresh completing | Can update the candidate set and reconcile selection. | Current verification settles before queued ordinary refresh. |
 | Omarchy Shell losing focus, restarting, or exiting | Focus loss stops keyboard activation. | Shell exit unloads the service; the external verifier remains bounded. Persistence of its late result needs observation. |
 | The snapshot changing, becoming stale, or becoming unreadable | Candidate list can reorder while stable keys retain selection. | The verification result is consumed as a later snapshot; unreadable input does not itself verify a target. |
-| The plugin being disabled, updated, or removed | Setup becomes unavailable. | Future scheduling stops; no candidate is accepted without successful private-state publication. |
+| The plugin being disabled, updated, or removed | For disable/remove: Setup becomes unavailable. | Future scheduling stops; no candidate is accepted without successful private-state publication. Update only replaces files; loaded behavior may remain until shell reload. |
 | Switching between pointer and keyboard input | Both routes refer to the same selected key. | No effect on the in-flight target. |
 | Gateway resolution or reachability changing | A newly automatic Gateway can remove the need for fallback on a later collection. | The selected endpoint must answer during its own probe; Clawbar does not switch target mid-verification. |
 

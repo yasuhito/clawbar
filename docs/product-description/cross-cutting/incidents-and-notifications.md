@@ -61,7 +61,7 @@ Starts use critical urgency and the two-path claw shown beside elapsed time in O
 | A scheduled or manual refresh completing | Reconciles transitions. | Groups all changes in that Snapshot. |
 | Omarchy Shell losing focus, restarting, or exiting | Focus has no effect. | A new login can notify current Incidents again because state is per-login. |
 | The snapshot changing, becoming stale, or becoming unreadable | Only collector-processed valid state drives persisted transitions. | Unreadable UI input does not create a notification. |
-| The plugin being disabled, updated, or removed | Ends future monitoring. | Existing OpenClaw Incident conditions continue outside Clawbar. |
+| The plugin being disabled, updated, or removed | For disable/remove: Ends future monitoring. | Existing OpenClaw Incident conditions continue outside Clawbar. Update only replaces files; loaded behavior may remain until shell reload. |
 | Switching between pointer and keyboard input | No effect. | No effect. |
 | Gateway resolution or reachability changing | Collected Offline or Configuration Error can start an Incident. | Setup Required is non-Incident; successful current state can recover. |
 

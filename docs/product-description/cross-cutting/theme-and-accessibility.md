@@ -59,7 +59,7 @@ A theme generation change reloads green and yellow aliases; missing values use s
 | A scheduled or manual refresh completing | Updates accessible and visible state. | Dynamic announcement behavior requires verification. |
 | Omarchy Shell losing focus, restarting, or exiting | Focus behavior belongs partly to the shell. | Reload restores theme and current Snapshot. |
 | The snapshot changing, becoming stale, or becoming unreadable | Text and color update for valid state. | Existing presentation remains on unreadable input. |
-| The plugin being disabled, updated, or removed | Removes widget and panel from accessibility tree. | No Clawbar focus remains after unload. |
+| The plugin being disabled, updated, or removed | For disable/remove: Removes widget and panel from accessibility tree. | No Clawbar focus remains after unload. Update only replaces files; loaded behavior may remain until shell reload. |
 | Switching between pointer and keyboard input | Shared Selection prevents divergent state. | Focus indication may differ and needs observation. |
 | Gateway resolution or reachability changing | No direct visual change until Snapshot. | Result updates all state cues. |
 

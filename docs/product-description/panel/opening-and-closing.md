@@ -58,7 +58,7 @@ When open, keyboard actions route to the panel focus target. When closed, panel 
 | A scheduled or manual refresh completing | Closed state remains closed; open contents update. | Same. |
 | Omarchy Shell losing focus, restarting, or exiting | Focus-loss dismissal depends on inherited panel behavior. | Restart recreates the panel closed unless shell restoration says otherwise. |
 | The snapshot changing, becoming stale, or becoming unreadable | Does not force open or close. | Open content updates; closed panel remains hidden. |
-| The plugin being disabled, updated, or removed | Unloads the panel. | An open panel disappears with the plugin. |
+| The plugin being disabled, updated, or removed | For disable/remove: Unloads the panel. | An open panel disappears with the plugin. Update only replaces files; loaded behavior may remain until shell reload. |
 | Switching between pointer and keyboard input | Both share one panel. | No separate open state exists per input method. |
 | Gateway resolution or reachability changing | Does not force visibility. | The next Snapshot updates hidden or visible content. |
 

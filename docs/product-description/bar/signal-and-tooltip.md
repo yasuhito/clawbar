@@ -60,7 +60,7 @@ A consumed Snapshot recalculates severity, count, summary, and color. In Develop
 | A scheduled or manual refresh completing | Recomputes signal. | Replaces it with the new result. |
 | Omarchy Shell losing focus, restarting, or exiting | Focus does not change severity. | Exit removes the widget; restart rereads state and theme. |
 | The snapshot changing, becoming stale, or becoming unreadable | Valid state changes the signal. | Unreadable input preserves an existing signal; age can make it Stale. |
-| The plugin being disabled, updated, or removed | Removes the widget. | No signal exists after unload. |
+| The plugin being disabled, updated, or removed | For disable/remove: Removes the widget. | No signal exists after unload. Update only replaces files; loaded behavior may remain until shell reload. |
 | Switching between pointer and keyboard input | No effect on presentation. | No effect. |
 | Gateway resolution or reachability changing | Not visible until collected. | The resulting Snapshot changes the signal. |
 

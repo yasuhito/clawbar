@@ -7,7 +7,11 @@ Agents, and Automations. The bar shows whether anything needs attention; the
 keyboard-first panel explains what changed without exposing task content,
 messages, credentials, or raw errors.
 
-![Clawbar showing a fictional Fleet incident](preview.png)
+![Clawbar 0.1.1 showing the live Gateway, devices, and registered Agents](preview.png)
+
+The screenshots below show version 0.1.1 in the real Omarchy shell, using live
+OpenClaw metadata rather than developer demo data. Names, states, and times
+reflect that installation, not a bundled example.
 
 ## Install
 
@@ -22,7 +26,8 @@ remote setup needs no second connection configuration.
 ## What you get
 
 - **One-glance status.** The Claw changes color with current severity; open the
-  panel for Gateway, Node, Agent, Task Result, and Automation context.
+  panel for Gateway status, Fleet devices (Nodes), registered Agents, previous
+  Task Results, and Automations. The header shows the current Incident count.
 - **Quiet incident notifications.** Clawbar groups failures and recoveries and
   does not repeat the same notification on every refresh.
 - **A responsive shell.** Collection runs outside QML, has a 25-second deadline,
@@ -100,14 +105,33 @@ expanded detail with the selection. The panel keeps Agents and Automations in
 independent sections because Gateway metadata establishes no Node ownership; an
 empty Agents section is omitted. Routine healthy Node and Automation rows omit
 the repeated `Healthy` label while retaining it for accessibility; exceptional
-and historical states remain explicit. A green `Healthy` indicator remains
-visible in the panel header. Registered Agents use a static green presence dot
+and historical states remain explicit. The pinned header shows Gateway status or
+current Incident severity. Registered Agents use a static green presence dot
 without claiming health or current activity; previous Task Result remains
 separate. On releases that have removed the Tasks ledger, registered Agents
 remain visible with Task Result `None`; Clawbar does not infer results from
 session content. Offline Nodes appear as muted Operational Metadata and do not
 affect Attention counts, Incidents, or notifications. Automation Failures appear
-once in the Automations section.
+once in the Automations section. The header can show a healthy Gateway alongside
+Incidents from failed Automations; an Incident count is not a Gateway health
+label.
+
+### Row details in 0.1.1
+
+A selected device shows available platform, model, version, and last-seen
+metadata. Agent details show the previous Task Result and completion timestamp
+when available. Automation details show schedule kind, result, next run, and
+last run. Details expand below the selected row's summary without overlapping
+it, and keep the same text alignment as the row. Selecting a different row
+closes the previous detail.
+
+| Registered Agent | Failed Automation |
+| --- | --- |
+| ![Registered Agent with no previous Task Result](docs/images/agent-detail.png) | ![Failed Automation with inline schedule and run details](docs/images/automation-detail.png) |
+
+These live Agents report `Task: None` because this OpenClaw release has no Tasks
+ledger. Their green presence dots mean registered, not running or healthy. The
+failed Automation still contributes to Incidents while the Gateway is healthy.
 
 ## Privacy boundary
 
@@ -117,9 +141,11 @@ metadata, timestamps, and opaque local UI keys. It discards raw command output
 after parsing.
 
 Clawbar never persists or displays task instructions, message bodies,
-destinations, account identifiers, credentials, host/IP/private Node or
-Tailscale identifiers, or raw errors. Tailscale device identifiers are HMACed
-with Clawbar's local secret into stable candidate keys before entering a
+destinations, account identifiers, credentials, private Node or Tailscale
+identifiers, or raw errors in the public snapshot. Bounded device display names
+may be visible; Gateway endpoints and addresses are not shown in the panel.
+Tailscale device identifiers are HMACed with Clawbar's local secret into stable
+candidate keys before entering a
 snapshot. QML does not open user-controlled files directly. It obtains both the
 snapshot and current theme colors through collector commands that cap each read
 at 8 MiB, accept regular files only, and do not follow a final symbolic link.
@@ -127,7 +153,8 @@ The snapshot is `$XDG_STATE_HOME/clawbar/snapshot.json` (or
 `~/.local/state/clawbar/snapshot.json`). Private mode-`0600` state beside the
 snapshot maps opaque candidate keys to Tailscale targets and remembers a
 verified Tailscale fallback. Automatic resolution never replaces that fallback.
-None of these state files contains a token, password, or other credential.
+The private target-state files can contain endpoint URLs needed to reach the
+verified fallback, but none contains a token, password, or other credential.
 Incident deduplication state and the local key secret are per-login data under
 `XDG_RUNTIME_DIR`.
 
@@ -139,6 +166,18 @@ work.
 
 ```sh
 omarchy plugin update io.github.yasuhito.clawbar --yes
+```
+
+The update command does not restart Omarchy Shell. If the old version stays
+loaded after updating, reload it with:
+
+```sh
+omarchy restart shell
+```
+
+To stop collecting or uninstall:
+
+```sh
 omarchy plugin disable io.github.yasuhito.clawbar
 omarchy plugin remove io.github.yasuhito.clawbar --yes
 ```

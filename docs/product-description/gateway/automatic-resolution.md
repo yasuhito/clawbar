@@ -75,7 +75,7 @@ If no route identifies a target, the result is Gateway Setup Required. Tailscale
 | A scheduled or manual refresh completing | A prior result can change the current target state. | The current resolution settles; one pending refresh may run next. |
 | Omarchy Shell losing focus, restarting, or exiting | Focus does not define the target. | Restart or exit unloads scheduling; an external collector remains bounded. |
 | The snapshot changing, becoming stale, or becoming unreadable | Determines what remains visible while resolution starts. | Does not redirect the in-flight target; a valid result later replaces presentation. |
-| The plugin being disabled, updated, or removed | Prevents new resolution work. | Stops future scheduling; current collector can run to its deadline. |
+| The plugin being disabled, updated, or removed | For disable/remove: Prevents new resolution work. | Stops future scheduling; current collector can run to its deadline. Update only replaces files; loaded behavior may remain until shell reload. |
 | Switching between pointer and keyboard input | No effect on target precedence. | No effect. |
 | Gateway resolution or reachability changing | The new process observes current OpenClaw and private fallback state. | The selected route either responds or settles as a documented failure; Clawbar does not fan out. |
 

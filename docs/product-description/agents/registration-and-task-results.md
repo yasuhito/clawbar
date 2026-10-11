@@ -48,7 +48,7 @@ Detail states Task Result without claiming current activity. `None` means no pre
 | Input method | Pointer selects exactly; keyboard moves through shared order. | Both preserve one Selection. |
 | Panel visibility | Open panel is required for detail. | Closing does not affect Agent or Task work. |
 | Snapshot freshness | Current rows confirm a reported registration. | Historical rows use reduced emphasis and Last Known observation time. |
-| Gateway state | Current Agents require available Agent and Task metadata. | Degraded unavailability removes current Agent rows. |
+| Gateway state | Current Agents require available registration metadata. A retired Tasks ledger yields Task Result `None`. | Other Agent/Task collection failures remove current Agent rows and degrade the Gateway. |
 
 ## Cancel and interrupt
 
@@ -59,13 +59,13 @@ Detail states Task Result without claiming current activity. `None` means no pre
 | A scheduled or manual refresh completing | Updates registrations, results, times, order, and Selection. | Same. |
 | Omarchy Shell losing focus, restarting, or exiting | Stops panel input only. | Agent remains managed by OpenClaw. |
 | The snapshot changing, becoming stale, or becoming unreadable | Valid change rerenders; unreadable input preserves memory. | Can turn rows historical or unavailable. |
-| The plugin being disabled, updated, or removed | Removes observation. | Does not cancel Tasks. |
+| The plugin being disabled, updated, or removed | For disable/remove: Removes observation. | Does not cancel Tasks. Update only replaces files; loaded behavior may remain until shell reload. |
 
 ## Interactions with other systems
 
 **Privacy boundary.** Agent names, bounded model metadata, Task Result, and timestamps may be reduced; Task instructions, destinations, accounts, workspaces, raw errors, session events, and credentials are excluded.
 
-**Collection and freshness.** Agent and Task list surfaces are collected together for registration and previous-result reduction. Failure makes Agent metadata unavailable and degrades the Gateway.
+**Collection and freshness.** Agent and Task list surfaces are collected together for registration and previous-result reduction. When the Gateway reports that `tasks.list` has been removed, Registered Agents remain visible with Task Result `None`; Clawbar does not infer results from sessions. Other collection failures make Agent metadata unavailable and degrade the Gateway.
 
 **Selection and navigation.** Agent rows follow Nodes and precede Automations. Empty Agents add no heading or rows.
 
@@ -78,7 +78,7 @@ Detail states Task Result without claiming current activity. `None` means no pre
 ## Edge cases
 
 - A Registered Agent with a previous Failed result remains a registration plus a historical Task fact, not a failed Agent.
-- An Agent with no completed Task says `Task: None` and `No completion timestamp` in detail.
+- An Agent with no completed Task, including a Gateway with the retired Tasks ledger, says `Task: None` and `No completion timestamp` in detail.
 - Running and queued Task records do not create Working or Waiting Agent states.
 - Multiple Task records are reduced to the most relevant completed result without exposing content.
 - Historical rows confirm only the last reported registration and result, not current presence.
@@ -91,4 +91,4 @@ Detail states Task Result without claiming current activity. `None` means no pre
 - Confirm screen-reader descriptions for Registered Agent and failed Task Result.
 - Confirm whether omitting `No Agents` is consistent with user expectations beside explicit empty Fleet and Automations states.
 
-Verified against Clawbar commit `e1af66c`.
+Source-reviewed for Clawbar 0.1.1 at commit `32476e1`. The live 0.1.1 screenshot in the root README shows the retired-ledger `None` case; other runtime checks remain open.

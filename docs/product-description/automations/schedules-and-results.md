@@ -59,7 +59,7 @@ Detail names kind as Scheduled, Repeating, One-time, Event-driven, or Unknown an
 | A scheduled or manual refresh completing | Updates order, result, times, and Selection. | Same. |
 | Omarchy Shell losing focus, restarting, or exiting | Stops panel input. | Does not change Automation schedule. |
 | The snapshot changing, becoming stale, or becoming unreadable | Valid change rerenders; unreadable input preserves current memory. | Can turn current failure into historical context. |
-| The plugin being disabled, updated, or removed | Removes observation and notification scheduling. | Does not disable the Automation. |
+| The plugin being disabled, updated, or removed | For disable/remove: Removes observation and notification scheduling. | Does not disable the Automation. Update only replaces files; loaded behavior may remain until shell reload. |
 | Switching between pointer and keyboard input | No effect beyond Selection. | No effect. |
 | Gateway resolution or reachability changing | Not direct Automation state. | Later Snapshot determines current or historical presentation. |
 

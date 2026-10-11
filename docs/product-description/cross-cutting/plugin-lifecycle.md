@@ -2,7 +2,7 @@
 
 ## Summary
 
-Clawbar installs as one non-repeatable bar widget and one service. Enabling it places the widget in the right bar section by default and starts immediate bounded collection plus the repeating schedule. Updating reloads product files through Omarchy. Disabling or removing unloads scheduling without changing OpenClaw work or leaving a daemon or systemd unit.
+Clawbar installs as one non-repeatable bar widget and one service. Enabling it places the widget in the right bar section by default and starts immediate bounded collection plus the repeating schedule. Updating replaces the installed plugin files without restarting Omarchy Shell. Disabling or removing unloads scheduling without changing OpenClaw work or leaving a daemon or systemd unit.
 
 ## The simple case
 
@@ -16,7 +16,8 @@ The user disables or removes Clawbar. The widget, panel, service timer, and futu
 stateDiagram-v2
     [*] --> absent
     absent --> enabled : install and enable
-    enabled --> enabled : update or shell restart
+    enabled --> enabled : update files; loaded version may remain
+    enabled --> enabled : shell restart reloads plugin
     enabled --> disabled : disable
     disabled --> enabled : enable
     enabled --> absent : remove
@@ -28,11 +29,11 @@ Requirements are Omarchy with plugin commands, supported OpenClaw command surfac
 
 ### Invoked
 
-`omarchy plugin add … --enable` installs and enables. Update, disable, and remove use the plugin ID `io.github.yasuhito.clawbar`. Clawbar itself provides no in-panel lifecycle controls.
+`omarchy plugin add … --enable` installs and enables. Future updates use `omarchy plugin update io.github.yasuhito.clawbar --yes`. This command does not restart the shell. If the old version stays loaded, run `omarchy restart shell`. Disable and remove use the same plugin ID. Clawbar itself provides no in-panel lifecycle controls.
 
 ### Waiting begins
 
-Enable loads the service and triggers collection at once. Update or restart may briefly remove and recreate UI. Disable and remove unload future scheduling immediately.
+Enable loads the service and triggers collection at once. A shell restart recreates the UI. Updating files does not itself restart the shell. Disable and remove unload future scheduling immediately.
 
 ### While waiting
 
@@ -60,7 +61,7 @@ Enabled state has one widget because multiple instances are disallowed. Disabled
 | A scheduled or manual refresh completing | Can update state before lifecycle change. | A late collector may publish state after UI unload; later reload can read it. |
 | Omarchy Shell losing focus, restarting, or exiting | Focus has no lifecycle effect. | Restart unloads and recreates entries; exit stops service timer. |
 | The snapshot changing, becoming stale, or becoming unreadable | Does not enable or disable plugin. | Re-enabled UI applies normal read rules. |
-| The plugin being disabled, updated, or removed | This is the lifecycle Action itself. | Settles by unloading or replacing widget and service. |
+| The plugin being disabled, updated, or removed | This is the lifecycle Action itself. | Disable/remove unloads the widget and service. Update replaces files; loaded behavior may remain until reload. |
 | Switching between pointer and keyboard input | No effect on plugin commands. | No effect. |
 | Gateway resolution or reachability changing | Does not block installation. | Immediate collection after enable observes it. |
 
@@ -89,8 +90,8 @@ Enabled state has one widget because multiple instances are disallowed. Disabled
 
 ## Open questions and verification
 
-- Confirm update and shell-restart visual sequencing, late collector publication, and duplicate-process avoidance.
+- After an update, check whether the old version remains loaded before restarting the shell. Confirm late collector publication and duplicate-process avoidance during restart.
 - Confirm whether remove retains or deletes Snapshot, verified fallback, candidate mapping, and runtime secrets; user-facing cleanup expectations need a product decision.
 - Confirm re-enable notification behavior within the same desktop login.
 
-Verified against Clawbar commit `f08496e`.
+Source-reviewed for Clawbar 0.1.1 at commit `32476e1`. Runtime lifecycle checks remain open; no update or restart was performed for this documentation refresh.
