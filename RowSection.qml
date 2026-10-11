@@ -89,6 +89,7 @@ Item {
           }
 
           SignalPoint {
+            id: signalPoint
             visible: rowRoot.modelData.dot !== null
             anchors.left: parent.left
             anchors.leftMargin: Style.space(root.dotInsetUnits)
@@ -101,7 +102,7 @@ Item {
             id: titleText
             textFormat: Text.PlainText
             anchors.left: parent.left
-            anchors.leftMargin: Style.space(rowRoot.modelData.dot !== null ? 26 : 9)
+            anchors.leftMargin: rowRoot.modelData.dot !== null ? signalPoint.x + signalPoint.width + Style.space(8) : Style.space(9)
             anchors.right: statusText.visible ? statusText.left : parent.right
             anchors.rightMargin: Style.space(8)
             anchors.top: rowRoot.modelData.hasSub ? parent.top : undefined
@@ -168,6 +169,7 @@ Item {
               anchors.right: parent.right
               anchors.top: parent.top
               vm: rowRoot.modelData
+              leftInset: titleText.x
               rowPalette: root.rowPalette
               nowMs: root.nowMs
             }
