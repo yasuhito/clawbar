@@ -95,6 +95,13 @@ class CollectorFixture:
                     sys.stdout.write(output)
                     raise SystemExit(int(os.environ.get("FAKE_EXIT", "0")))
 
+                if arguments[:2] in (["nodes", "status"], ["gateway", "call"]):
+                    metadata_pids = os.environ.get("FAKE_METADATA_PID_DIRECTORY")
+                    if metadata_pids:
+                        with open(f"{metadata_pids}/{os.getpid()}", "w") as pid_file:
+                            pid_file.write(str(os.getpid()))
+                    time.sleep(float(os.environ.get("FAKE_METADATA_DELAY", "0")))
+
                 if arguments[:3] == ["nodes", "status", "--json"]:
                     sys.stdout.write(json.dumps({"nodes": []}))
                     raise SystemExit(0)

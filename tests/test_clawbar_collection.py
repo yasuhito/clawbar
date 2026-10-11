@@ -5,6 +5,7 @@ import subprocess
 import time
 import unittest
 from datetime import datetime
+from threading import Barrier
 from unittest.mock import patch
 
 from scripts import clawbar_collect
@@ -243,6 +244,27 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
                     self.assertTrue(result.snapshot[section]["available"])
                 self.assertEqual(len(set(commands.deadlines)), 1)
 
+    def test_independent_metadata_calls_do_not_wait_for_each_other(self) -> None:
+        barrier = Barrier(4, timeout=1)
+
+        def together(payload):
+            def answer(**_details):
+                barrier.wait()
+                return ok(payload)
+
+            return answer
+
+        commands = FakeCommandSurface.healthy(
+            nodes_status=together({"nodes": []}),
+            agents_list=together({"agents": []}),
+            tasks_list=together({"tasks": []}),
+            cron_list=together({"jobs": []}),
+        )
+        result = self.collect(commands, deadline=2)
+
+        self.assertEqual(result.snapshot["gateway"], {"state": "healthy"})
+        self.assertEqual(len(set(commands.deadlines)), 1)
+
     def test_metadata_timeout_degrades_without_gateway_loss(self) -> None:
         commands = FakeCommandSurface.healthy(
             nodes_status=CollectionDeadlineExceeded(),
@@ -334,7 +356,7 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
                     metadata = commands.questions()[3:]
                 else:
                     metadata = commands.questions()[1:]
-                self.assertEqual(
+                self.assertCountEqual(
                     metadata, ["nodes_status", "agents_list", "tasks_list", "cron_list"]
                 )
                 self.assertEqual(

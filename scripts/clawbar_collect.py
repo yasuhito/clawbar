@@ -7,6 +7,7 @@ import json
 import sys
 import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
@@ -78,8 +79,8 @@ else:
 DEFAULT_REFRESH_INTERVAL_SECONDS = 30
 MIN_REFRESH_INTERVAL_SECONDS = 15
 MAX_REFRESH_INTERVAL_SECONDS = 300
-# Resolution and each metadata RPC start a separate OpenClaw CLI. Allow for
-# their cumulative startup cost, with headroom below the default 30s interval.
+# Resolution and metadata start separate OpenClaw CLIs. Allow startup headroom
+# below the default 30s interval, even when target resolution needs extra probes.
 COLLECTION_DEADLINE_SECONDS = 25.0
 SNAPSHOT_WRITE_RESERVE_SECONDS = 0.5
 
@@ -230,12 +231,6 @@ def collect_metadata(
         ("agents", lambda: commands.agents_list(deadline_at, url), decode_json),
         ("tasks", lambda: commands.tasks_list(deadline_at, url), decode_tasks),
     )
-    payloads: list[object | None] = []
-    failures: dict[str, str | None] = {}
-    for name, ask, decode in surfaces:
-        payload, failure = read_metadata_surface(ask, decode)
-        payloads.append(payload)
-        failures[name] = failure
 
     def read_automation_page(params: dict[str, object]) -> object | None:
         payload, _ = read_metadata_surface(
@@ -243,7 +238,20 @@ def collect_metadata(
         )
         return payload
 
-    automation_payload = collect_automation_surface(read_automation_page)
+    # Independent surfaces share one deadline, not each other's CLI startup
+    # latency. Cron pagination stays sequential within its own worker.
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        metadata = [
+            executor.submit(read_metadata_surface, ask, decode)
+            for _name, ask, decode in surfaces
+        ]
+        automation = executor.submit(collect_automation_surface, read_automation_page)
+        results = [future.result() for future in metadata]
+        automation_payload = automation.result()
+    payloads = [payload for payload, _failure in results]
+    failures = {
+        name: result[1] for (name, _ask, _decode), result in zip(surfaces, results)
+    }
     return (*payloads, automation_payload, failures)
 
 

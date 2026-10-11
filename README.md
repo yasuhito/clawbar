@@ -70,8 +70,9 @@ export CLAWBAR_REFRESH_INTERVAL_SECONDS=60
 omarchy restart shell
 ```
 
-The whole collection has a 25-second deadline, allowing for the cumulative startup
-cost of sequential OpenClaw CLI calls. A slow or unavailable Gateway
+The whole collection has a 25-second deadline, allowing for OpenClaw CLI startup
+costs. Independent metadata calls run concurrently against the same Gateway,
+while target resolution and each Automation page sequence remain ordered. A slow or unavailable Gateway
 cannot accumulate overlapping collector processes or block the bar. A healthy
 snapshot becomes Stale after three configured refresh intervals.
 Each command output stream and local state file is limited to 8 MiB. Clawbar

@@ -40,7 +40,7 @@ The repeating timer triggers once at service start and then at each interval. Ma
 
 ### Whole-collection deadline
 
-One collector has a 25-second deadline shared by resolution, Gateway validation, and metadata work. This includes the cumulative startup cost of sequential OpenClaw CLI calls, not just RPC latency. It leaves headroom below the default 30-second refresh interval; at shorter intervals, refreshes still coalesce rather than overlap. Time spent resolving a Node-host Gateway leaves less time for the later Gateway probe and metadata calls.
+One collector has a 25-second deadline shared by resolution, Gateway validation, and metadata work. This includes OpenClaw CLI startup costs, not just RPC latency. After Gateway validation, Fleet, Agents, Tasks, and Automations are collected in at most four concurrent workers against that same Gateway. Automation pagination remains sequential. Whole collections still never overlap. It leaves headroom below the default 30-second refresh interval; at shorter intervals, refreshes still coalesce rather than overlap. Time spent resolving a Node-host Gateway leaves less time for the later Gateway probe and metadata calls.
 
 A slow Gateway cannot create overlapping collector processes. If another scheduled or manual request arrives while collection or verification is busy, Clawbar remembers at most one pending refresh.
 
