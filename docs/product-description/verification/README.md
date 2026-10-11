@@ -29,7 +29,7 @@ Each table row has a stable ID, priority, required device or condition, a linked
 - **Mouse:** a real pointer routed through Omarchy Shell. Middle-click must be a physical or compositor-generated middle button, not a normal click.
 - **Keyboard:** the panel's real focus target. Synthetic events do not prove shell shortcut or focus behavior.
 - **Demo:** a real panel reading a snapshot created by `scripts/clawbar_demo.py`; the script sets state but does not replace observing the UI.
-- **Delayed demo:** use the collector fixture or a controlled slow Gateway while keeping the request within 12 seconds. Do not infer responsiveness from a unit test.
+- **Delayed demo:** use the collector fixture or a controlled slow Gateway while keeping the request within 25 seconds. Do not infer responsiveness from a unit test.
 - **Tailscale:** at least two online test devices, one with a supported Gateway and one without it. Do not use production devices containing sensitive names.
 - **Gateway:** a disposable supported OpenClaw Gateway whose reachability and metadata responses can be controlled.
 - **Notification:** a desktop login with `notify-send` and a visible notification daemon; clear existing Clawbar notifications before each case.

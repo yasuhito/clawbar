@@ -37,7 +37,7 @@ This section starts with facts established during scope and grows as foundations
 
 - Clawbar is read-only. It observes one Gateway and cannot control Nodes, Agents, Tasks, or Automations.
 - The default refresh interval is 30 seconds. Accepted configured values are whole seconds from 15 through 300; invalid values use the 30-second default.
-- One whole collection has a 12-second deadline.
+- One whole collection has a 25-second deadline.
 - A snapshot becomes stale only after its age exceeds three accepted refresh intervals; at exactly three intervals it remains in its recorded state.
 - A scheduled collection starts immediately when the service loads and then repeats at the configured interval.
 - Manual refresh does not block the bar or panel. Repeated refresh requests while busy coalesce into one pending refresh.

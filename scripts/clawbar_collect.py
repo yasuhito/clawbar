@@ -78,7 +78,9 @@ else:
 DEFAULT_REFRESH_INTERVAL_SECONDS = 30
 MIN_REFRESH_INTERVAL_SECONDS = 15
 MAX_REFRESH_INTERVAL_SECONDS = 300
-COLLECTION_DEADLINE_SECONDS = 12.0
+# Resolution and each metadata RPC start a separate OpenClaw CLI. Allow for
+# their cumulative startup cost, with headroom below the default 30s interval.
+COLLECTION_DEADLINE_SECONDS = 25.0
 SNAPSHOT_WRITE_RESERVE_SECONDS = 0.5
 
 

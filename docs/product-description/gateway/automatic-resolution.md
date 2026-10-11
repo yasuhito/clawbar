@@ -41,7 +41,7 @@ If automatic resolution is absent, Clawbar may reuse a private state file contai
 
 ### Waiting begins
 
-The resolved target is validated through the supported read-only Gateway JSON surface within the shared 12-second whole-collection deadline. A reported URL is not persisted merely because the Gateway returns it, particularly when it could contain credentials.
+The resolved target is validated through the supported read-only Gateway JSON surface within the shared 25-second whole-collection deadline. A reported URL is not persisted merely because the Gateway returns it, particularly when it could contain credentials.
 
 ### While waiting
 

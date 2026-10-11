@@ -5,6 +5,7 @@ import subprocess
 import time
 import unittest
 from datetime import datetime
+from unittest.mock import patch
 
 from scripts import clawbar_collect
 from scripts.clawbar_commands import CollectionDeadlineExceeded, CommandOutputExceeded
@@ -199,6 +200,48 @@ class CollectionTests(CollectorFixture, unittest.TestCase):
             commands.questions(), ["gateway_status", "node_status", "gateway_status"]
         )
         self.assertEqual(len(set(commands.deadlines)), 1)
+
+    def test_default_budget_covers_sequential_cli_startup_costs(self) -> None:
+        # Replay the live failure: status ~4.6s and four CLI calls ~2s each.
+        # Include node-host resolution, which adds two more CLI startups.
+        for node_host in (False, True):
+            with self.subTest(node_host=node_host):
+
+                class TimedCommands(FakeCommandSurface):
+                    elapsed = 0.0
+
+                    def _answer(self, question, deadline_at, **details):
+                        self.elapsed += 4.6 if question == "gateway_status" else 2.0
+                        if self.elapsed >= deadline_at:
+                            self.elapsed = deadline_at
+                            raise CollectionDeadlineExceeded
+                        return super()._answer(question, deadline_at, **details)
+
+                commands = TimedCommands.healthy()
+                if node_host:
+                    commands.answers["gateway_status"] = [
+                        failed(9),
+                        echo_dialed_url(),
+                    ]
+                    commands.answers["node_status"] = [node_hosting()]
+                with (
+                    self.fake_environment(),
+                    patch(
+                        "scripts.clawbar_collect.time.monotonic",
+                        lambda commands=commands: commands.elapsed,
+                    ),
+                ):
+                    result = clawbar_collect.collect_gateway(
+                        self.snapshot_path,
+                        30,
+                        commands=commands,
+                        local_key_secret=b"clawbar-test-node-key-secret-32!",
+                    )
+
+                self.assertEqual(result.snapshot["gateway"], {"state": "healthy"})
+                for section in ("fleet", "agents", "automations"):
+                    self.assertTrue(result.snapshot[section]["available"])
+                self.assertEqual(len(set(commands.deadlines)), 1)
 
     def test_metadata_timeout_degrades_without_gateway_loss(self) -> None:
         commands = FakeCommandSurface.healthy(

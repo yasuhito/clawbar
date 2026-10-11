@@ -252,7 +252,7 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(json.loads(result.stdout)["failureKind"], "command_failed")
         self.assertLess(time.monotonic() - started_at, 2)
 
-    def test_executable_enforces_default_twelve_second_whole_collection_deadline(
+    def test_executable_enforces_default_twenty_five_second_whole_collection_deadline(
         self,
     ) -> None:
         started_at = time.monotonic()
@@ -270,7 +270,7 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
                 capture_output=True,
                 check=False,
                 text=True,
-                timeout=14,
+                timeout=27,
                 env=environment,
             )
         elapsed = time.monotonic() - started_at
@@ -278,8 +278,8 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(
             result.returncode, clawbar_collect.ExitCode.COMMAND_TIMEOUT, result.stderr
         )
-        self.assertGreaterEqual(elapsed, 10.5)
-        self.assertLess(elapsed, 12.25)
+        self.assertGreaterEqual(elapsed, 23.5)
+        self.assertLess(elapsed, 25.25)
         self.assertEqual(json.loads(result.stdout)["failureKind"], "timeout")
 
 
@@ -431,7 +431,7 @@ class RefreshIntervalTests(unittest.TestCase):
         self.assertEqual(
             parser.parse_args(["--refresh-interval", "300"]).refresh_interval, 300
         )
-        self.assertIn("12 seconds", parser.format_help())
+        self.assertIn("25 seconds", parser.format_help())
 
     def test_rejects_values_outside_bounds(self) -> None:
         parser = clawbar_cli.build_parser()
