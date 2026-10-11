@@ -105,7 +105,8 @@ expanded detail with the selection. The panel keeps Agents and Automations in
 independent sections because Gateway metadata establishes no Node ownership; an
 empty Agents section is omitted. Routine healthy Node and Automation rows omit
 the repeated `Healthy` label while retaining it for accessibility; exceptional
-and historical states remain explicit. The pinned header shows Gateway status or current Incident severity. Registered Agents use a static green presence dot
+and historical states remain explicit. The pinned header shows Gateway status or
+current Incident severity. Registered Agents use a static green presence dot
 without claiming health or current activity; previous Task Result remains
 separate. On releases that have removed the Tasks ledger, registered Agents
 remain visible with Task Result `None`; Clawbar does not infer results from
@@ -142,8 +143,9 @@ after parsing.
 Clawbar never persists or displays task instructions, message bodies,
 destinations, account identifiers, credentials, private Node or Tailscale
 identifiers, or raw errors in the public snapshot. Bounded device display names
-may be visible; Gateway endpoints and addresses are not shown in the panel. Tailscale device identifiers are HMACed
-with Clawbar's local secret into stable candidate keys before entering a
+may be visible; Gateway endpoints and addresses are not shown in the panel.
+Tailscale device identifiers are HMACed with Clawbar's local secret into stable
+candidate keys before entering a
 snapshot. QML does not open user-controlled files directly. It obtains both the
 snapshot and current theme colors through collector commands that cap each read
 at 8 MiB, accept regular files only, and do not follow a final symbolic link.
