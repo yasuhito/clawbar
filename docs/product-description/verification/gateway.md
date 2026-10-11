@@ -1,6 +1,6 @@
 # Verification: Gateway and collection
 
-Use a disposable Gateway and sanitized Tailscale devices. Preserve state files before setup tests and restore them afterward. Delays must stay within the 12-second whole-collection deadline unless the row explicitly checks timeout.
+Use a disposable Gateway and sanitized Tailscale devices. Preserve state files before setup tests and restore them afterward. Delays must stay within the 25-second whole-collection deadline unless the row explicitly checks timeout.
 
 ## foundations/collection-and-freshness.md
 
@@ -13,7 +13,7 @@ Use a disposable Gateway and sanitized Tailscale devices. Preserve state files b
 | COLL-05 | P1 | filesystem | Atomic publication never exposes a partial Snapshot ([Snapshot publication and reading](../foundations/collection-and-freshness.md#snapshot-publication-and-reading)). | Watch state directory during repeated large Snapshot writes. | 1. Continuously parse `snapshot.json` while collecting.<br>2. Record parse failures/partial shapes. | Every observed file is previous or new complete valid JSON. | — |
 | COLL-06 | P1 | demo | Last Known rows are historical and do not preserve old Incident count ([Last Known Metadata](../foundations/collection-and-freshness.md#last-known-metadata)). | Critical populated Snapshot then stale/failure transition. | 1. Open current state.<br>2. Make it Stale. | Rows say Last known with reduced emphasis; current count becomes one Stale item. | — |
 | COLL-07 | P3 | demo | Stale begins only after more than three accepted intervals, not exactly at the boundary ([Stale transition](../foundations/collection-and-freshness.md#stale-transition)). | Controlled generated time and 30-second interval. | 1. Observe at exactly 90 s.<br>2. Observe after next timer tick past 90 s. | Recorded state at exact boundary; Stale only afterward. | — |
-| COLL-08 | P3 | Gateway | Whole collection exits within the 12-second deadline ([Whole-collection deadline](../foundations/collection-and-freshness.md#whole-collection-deadline)). | Gateway command delayed 30 seconds. | 1. Request collection.<br>2. Time until collector exits. | Exits before 12.25 seconds and publishes bounded failure state. | — |
+| COLL-08 | P3 | Gateway | Whole collection exits within the 25-second deadline ([Whole-collection deadline](../foundations/collection-and-freshness.md#whole-collection-deadline)). | Gateway command delayed 30 seconds. | 1. Request collection.<br>2. Time until collector exits. | Exits before 25.25 seconds and publishes bounded failure state. | — |
 
 Not checkable by hand: internal inode replacement is aided by filesystem inspection and automated tests, not visual observation alone.
 

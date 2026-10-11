@@ -106,7 +106,7 @@ Manual refresh has no explicit cancel command. Closing the panel cancels only th
 
 **Privacy boundary.** Manual refresh uses the same reduction as scheduled collection. It does not make raw Gateway output, credentials, Private Content, host identifiers, or raw errors visible merely because the user requested it directly.
 
-**Collection and freshness.** The Action does not have a special deadline or stale policy. It uses the configured interval, the shared 12-second whole-collection deadline, atomic snapshot publication, and the three-interval stale boundary.
+**Collection and freshness.** The Action does not have a special deadline or stale policy. It uses the configured interval, the shared 25-second whole-collection deadline, atomic snapshot publication, and the three-interval stale boundary.
 
 **Selection and navigation.** Navigation remains responsive during collection. Snapshot replacement reconciles the one selection by stable key and nearby index; refresh itself does not reset selection.
 
@@ -114,7 +114,7 @@ Manual refresh has no explicit cancel command. Closing the panel cancels only th
 
 **Theme and accessibility.** The Action has a keyboard route (`r` or `R`) and a pointer route (middle-click). The visible Collecting, result, and severity presentations use theme colors and text labels rather than color alone in the panel and tooltip.
 
-**Plugin lifecycle.** Enabling the plugin already causes an immediate scheduled collection, so a manual refresh at startup may coalesce with it. Disabling or removing the plugin stops future work but does not promise to kill a collector already within its 12-second bound.
+**Plugin lifecycle.** Enabling the plugin already causes an immediate scheduled collection, so a manual refresh at startup may coalesce with it. Disabling or removing the plugin stops future work but does not promise to kill a collector already within its 25-second bound.
 
 ## Edge cases
 

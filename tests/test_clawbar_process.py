@@ -236,6 +236,59 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
             "unknown",
         )
 
+    def test_forced_termination_stops_all_concurrent_metadata_commands(self) -> None:
+        pid_directory = self.root / "metadata-pids"
+        pid_directory.mkdir()
+        with self.fake_environment(
+            FAKE_METADATA_DELAY="30",
+            FAKE_METADATA_PID_DIRECTORY=str(pid_directory),
+            XDG_STATE_HOME=str(self.root / "termination-state"),
+        ):
+            collector = subprocess.Popen(
+                [sys.executable, str(Path(clawbar_collect.__file__))],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            try:
+                started_deadline = time.monotonic() + 3
+                while len(list(pid_directory.iterdir())) < 4:
+                    self.assertIsNone(collector.poll())
+                    self.assertLess(time.monotonic(), started_deadline)
+                    time.sleep(0.01)
+                collector.kill()
+                collector.wait(timeout=2)
+                pids = [int(path.name) for path in pid_directory.iterdir()]
+                stopped_deadline = time.monotonic() + 1
+                while any(self._process_exists(pid) for pid in pids):
+                    self.assertLess(time.monotonic(), stopped_deadline)
+                    time.sleep(0.01)
+            finally:
+                if collector.poll() is None:
+                    collector.kill()
+                    collector.wait(timeout=2)
+                for path in pid_directory.iterdir():
+                    pid = int(path.name)
+                    if self._process_exists(pid):
+                        os.kill(pid, signal.SIGKILL)
+
+    def test_concurrent_metadata_commands_share_deadline_and_stop_on_timeout(
+        self,
+    ) -> None:
+        from tests.fake_commands import gateway_ok
+
+        class SlowMetadata(SubprocessCommandSurface):
+            def gateway_status(self, deadline_at, url=None):
+                return gateway_ok()
+
+        command = (sys.executable, "-c", "import time; time.sleep(30)")
+        started_at = time.monotonic()
+        result = self.collect(SlowMetadata(openclaw=command), deadline=0.3)
+
+        self.assertEqual(result.snapshot["gateway"], {"state": "degraded"})
+        for section in ("fleet", "agents", "automations"):
+            self.assertFalse(result.snapshot[section]["available"])
+        self.assertLess(time.monotonic() - started_at, 1)
+
     def test_executable_bounds_gateway_command_output(self) -> None:
         started_at = time.monotonic()
         result = self.run_external(
@@ -252,7 +305,7 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(json.loads(result.stdout)["failureKind"], "command_failed")
         self.assertLess(time.monotonic() - started_at, 2)
 
-    def test_executable_enforces_default_twelve_second_whole_collection_deadline(
+    def test_executable_enforces_default_twenty_five_second_whole_collection_deadline(
         self,
     ) -> None:
         started_at = time.monotonic()
@@ -270,7 +323,7 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
                 capture_output=True,
                 check=False,
                 text=True,
-                timeout=14,
+                timeout=27,
                 env=environment,
             )
         elapsed = time.monotonic() - started_at
@@ -278,8 +331,8 @@ class CollectorProcessTests(CollectorFixture, unittest.TestCase):
         self.assertEqual(
             result.returncode, clawbar_collect.ExitCode.COMMAND_TIMEOUT, result.stderr
         )
-        self.assertGreaterEqual(elapsed, 10.5)
-        self.assertLess(elapsed, 12.25)
+        self.assertGreaterEqual(elapsed, 23.5)
+        self.assertLess(elapsed, 25.25)
         self.assertEqual(json.loads(result.stdout)["failureKind"], "timeout")
 
 
@@ -431,7 +484,7 @@ class RefreshIntervalTests(unittest.TestCase):
         self.assertEqual(
             parser.parse_args(["--refresh-interval", "300"]).refresh_interval, 300
         )
-        self.assertIn("12 seconds", parser.format_help())
+        self.assertIn("25 seconds", parser.format_help())
 
     def test_rejects_values_outside_bounds(self) -> None:
         parser = clawbar_cli.build_parser()

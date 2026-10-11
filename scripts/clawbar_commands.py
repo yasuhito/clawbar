@@ -10,15 +10,16 @@ in-memory fake in ``tests/``.
 
 from __future__ import annotations
 
-import ctypes
 import json
 import os
 import selectors
 import signal
 import subprocess
+import sys
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 
 if __package__:
@@ -31,7 +32,7 @@ TAILSCALE_COMMAND = ("tailscale",)
 OPENCLAW_TIMEOUT_MILLISECONDS = 10_000
 MAX_COMMAND_STREAM_BYTES = MAX_COLLECTION_BYTES
 COMMAND_READ_CHUNK_BYTES = 64 * 1024
-PR_SET_PDEATHSIG = 1
+COMMAND_EXEC_PATH = Path(__file__).with_name("clawbar_exec.py")
 
 CommandResult = subprocess.CompletedProcess[str]
 
@@ -54,6 +55,7 @@ def seconds_until_deadline(deadline_at: float) -> float:
 class GatewayCommandSurface(Protocol):
     """The seven questions the collector may ask before ``deadline_at`` (monotonic seconds).
 
+    Metadata methods may run concurrently; adapters must support independent calls.
     Every method returns the raw answer. Adapters may raise CollectionDeadlineExceeded,
     CommandOutputExceeded, or OSError; the collector maps those to snapshot states.
     """
@@ -148,11 +150,10 @@ class SubprocessCommandSurface:
 
 def run_command(command: Sequence[str], deadline_at: float) -> CommandResult:
     process = subprocess.Popen(
-        command,
+        [sys.executable, str(COMMAND_EXEC_PATH), str(os.getpid()), *command],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         start_new_session=True,
-        preexec_fn=terminate_with_parent,  # noqa: PLW1509 -- PDEATHSIG 用。スレッドからは呼ばない
     )
     stdout = bytearray()
     stderr = bytearray()
@@ -198,15 +199,6 @@ def run_command(command: Sequence[str], deadline_at: float) -> CommandResult:
         stdout.decode("utf-8", errors="replace"),
         stderr.decode("utf-8", errors="replace"),
     )
-
-
-def terminate_with_parent() -> None:
-    libc = ctypes.CDLL(None, use_errno=True)
-    if libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM, 0, 0, 0) != 0:
-        error_number = ctypes.get_errno()
-        raise OSError(error_number, os.strerror(error_number))
-    if os.getppid() == 1:
-        os.kill(os.getpid(), signal.SIGTERM)
 
 
 def stop_process_group(process: subprocess.Popen[str]) -> None:

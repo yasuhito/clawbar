@@ -8,7 +8,7 @@ Clawbar installs as one non-repeatable bar widget and one service. Enabling it p
 
 The user installs and enables the plugin. The claw appears in the right bar section and collection starts immediately, then repeats every 30 seconds by default.
 
-The user disables or removes Clawbar. The widget, panel, service timer, and future notifications disappear. A collector already running exits within the shared 12-second deadline.
+The user disables or removes Clawbar. The widget, panel, service timer, and future notifications disappear. A collector already running exits within the shared 25-second deadline.
 
 ## The action, event by event
 

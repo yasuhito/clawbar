@@ -41,7 +41,7 @@ The public action supplies only the opaque candidate key. Private state maps tha
 
 The selected candidate row changes its action text from `Verify` to `Verifying…`. Candidate verification and ordinary collection are serialized; verification never overlaps the collector.
 
-The whole verification and collection path remains bounded by the 12-second deadline. Other candidate rows are also disabled while verification is active.
+The whole verification and collection path remains bounded by the 25-second deadline. Other candidate rows are also disabled while verification is active.
 
 ### While waiting
 

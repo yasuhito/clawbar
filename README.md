@@ -25,7 +25,7 @@ remote setup needs no second connection configuration.
   panel for Gateway, Node, Agent, Task Result, and Automation context.
 - **Quiet incident notifications.** Clawbar groups failures and recoveries and
   does not repeat the same notification on every refresh.
-- **A responsive shell.** Collection runs outside QML, has a 12-second deadline,
+- **A responsive shell.** Collection runs outside QML, has a 25-second deadline,
   and renders from an atomic cached snapshot without blocking Quickshell.
 - **A strict privacy boundary.** Only bounded Operational Metadata reaches the
   panel. Clawbar never stores a Gateway token or displays Private Content.
@@ -70,7 +70,9 @@ export CLAWBAR_REFRESH_INTERVAL_SECONDS=60
 omarchy restart shell
 ```
 
-The whole collection has a 12-second deadline. A slow or unavailable Gateway
+The whole collection has a 25-second deadline, allowing for OpenClaw CLI startup
+costs. Independent metadata calls run concurrently against the same Gateway,
+while target resolution and each Automation page sequence remain ordered. A slow or unavailable Gateway
 cannot accumulate overlapping collector processes or block the bar. A healthy
 snapshot becomes Stale after three configured refresh intervals.
 Each command output stream and local state file is limited to 8 MiB. Clawbar
@@ -143,7 +145,7 @@ omarchy plugin remove io.github.yasuhito.clawbar --yes
 
 Disable and remove unload the Quickshell service immediately, stopping future
 collection and notification scheduling. A collector already inside its bounded
-request exits within 12 seconds. No systemd unit, timer, or background daemon is
+request exits within 25 seconds. No systemd unit, timer, or background daemon is
 left behind.
 
 ## Developer demonstration

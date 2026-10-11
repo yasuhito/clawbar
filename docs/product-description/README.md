@@ -91,7 +91,7 @@ Progress is tracked in the [coverage table](#coverage).
 - **Developer demonstration is verification support.** It is not treated as a normal user-facing mode, but its visible `Developer demo` label is documented where relevant.
 - **OpenClaw and Tailscale interfaces are boundaries.** Their own setup and behavior are out of scope except for the status and guidance Clawbar exposes.
 - **Privacy is documented once and referenced.** Repeating the full allowlist and denial list in every feature would drift.
-- **Freshness is documented once and referenced.** The collection foundation owns the 30-second default, 15–300-second range, 12-second deadline, and three-interval stale boundary.
+- **Freshness is documented once and referenced.** The collection foundation owns the 30-second default, 15–300-second range, 25-second deadline, and three-interval stale boundary.
 - **Interaction shape.** The unit is an action with the phases ready, invoked, waiting begins, while waiting, and settled. Immediate actions skip the waiting phases. The interrupt list and cross-cutting order are fixed above.
 - **Numbered rules.** These are prose documents, not numbered specifications. Stable heading anchors are sufficient for cross-references.
 

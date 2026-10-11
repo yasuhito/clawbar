@@ -40,7 +40,7 @@ The repeating timer triggers once at service start and then at each interval. Ma
 
 ### Whole-collection deadline
 
-One collector has a 12-second deadline shared by resolution, Gateway validation, and metadata work. Time spent resolving a Node-host Gateway leaves less time for the later Gateway probe and metadata calls.
+One collector has a 25-second deadline shared by resolution, Gateway validation, and metadata work. This includes OpenClaw CLI startup costs, not just RPC latency. After Gateway validation, Fleet, Agents, Tasks, and Automations are collected in at most four concurrent workers against that same Gateway. Automation pagination remains sequential. Whole collections still never overlap. It leaves headroom below the default 30-second refresh interval; at shorter intervals, refreshes still coalesce rather than overlap. Time spent resolving a Node-host Gateway leaves less time for the later Gateway probe and metadata calls.
 
 A slow Gateway cannot create overlapping collector processes. If another scheduled or manual request arrives while collection or verification is busy, Clawbar remembers at most one pending refresh.
 
@@ -86,7 +86,7 @@ Historical rows show `Last known`, reduced opacity, and a relative observation t
 
 **Privacy boundary.** The snapshot contains only reduced Operational Metadata. Atomic publication does not make raw intermediate output a supported state file.
 
-**Collection and freshness.** This document is the owner. Other documents link here for the 15–300-second accepted range, 30-second default, 12-second deadline, scheduling, coalescing, and stale rule.
+**Collection and freshness.** This document is the owner. Other documents link here for the 15–300-second accepted range, 30-second default, 25-second deadline, scheduling, coalescing, and stale rule.
 
 **Selection and navigation.** Snapshot consumption can reorder, add, or remove rows. The selection foundation owns reconciliation after that replacement.
 
@@ -94,7 +94,7 @@ Historical rows show `Last known`, reduced opacity, and a relative observation t
 
 **Theme and accessibility.** Freshness is expressed by text (`Stale`, `Last known`), time, opacity, and severity color rather than by color alone.
 
-**Plugin lifecycle.** Disable or removal unloads scheduling immediately. A collector already running can remain until the 12-second deadline. No daemon or systemd timer remains.
+**Plugin lifecycle.** Disable or removal unloads scheduling immediately. A collector already running can remain until the 25-second deadline. No daemon or systemd timer remains.
 
 ## Edge cases
 
