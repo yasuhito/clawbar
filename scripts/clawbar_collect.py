@@ -181,12 +181,34 @@ def decode_json(completed: CommandResult) -> object | None:
         return None
 
 
+def decode_tasks(completed: CommandResult) -> object | None:
+    """The retired Tasks RPC has no historical result; other failures stay unavailable."""
+    payload = decode_json(completed)
+    if payload is not None or completed.returncode == 0:
+        return payload
+    try:
+        error_payload = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(error_payload, dict) or error_payload.get("ok") is not False:
+        return None
+    error = error_payload.get("error")
+    if (
+        isinstance(error, dict)
+        and error.get("code") == "INVALID_REQUEST"
+        and error.get("message") == "unknown method: tasks.list"
+    ):
+        return {"tasks": []}
+    return None
+
+
 def read_metadata_surface(
     ask: Callable[[], CommandResult],
+    decode: Callable[[CommandResult], object | None] = decode_json,
 ) -> tuple[object | None, str | None]:
     """1 つの metadata 質問を投げ、(payload, 失敗理由) を返す。失敗は Degraded Gateway に留める。"""
     try:
-        return decode_json(ask()), None
+        return decode(ask()), None
     except CommandOutputExceeded:
         return None, OUTPUT_EXCEEDED_LIMIT
     except (CollectionDeadlineExceeded, OSError):
@@ -201,15 +223,15 @@ def collect_metadata(
     object | None, object | None, object | None, object | None, dict[str, str | None]
 ]:
     url = target.url if target is not None else None
-    surfaces: tuple[tuple[str, Callable[[], CommandResult]], ...] = (
-        ("fleet", lambda: commands.nodes_status(deadline_at, url)),
-        ("agents", lambda: commands.agents_list(deadline_at, url)),
-        ("tasks", lambda: commands.tasks_list(deadline_at, url)),
+    surfaces = (
+        ("fleet", lambda: commands.nodes_status(deadline_at, url), decode_json),
+        ("agents", lambda: commands.agents_list(deadline_at, url), decode_json),
+        ("tasks", lambda: commands.tasks_list(deadline_at, url), decode_tasks),
     )
     payloads: list[object | None] = []
     failures: dict[str, str | None] = {}
-    for name, ask in surfaces:
-        payload, failure = read_metadata_surface(ask)
+    for name, ask, decode in surfaces:
+        payload, failure = read_metadata_surface(ask, decode)
         payloads.append(payload)
         failures[name] = failure
 
